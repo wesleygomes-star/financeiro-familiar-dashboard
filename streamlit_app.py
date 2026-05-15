@@ -21,6 +21,57 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ============== CSS RESPONSIVO (mobile-friendly) ==============
+st.markdown(
+    """
+    <style>
+    /* Em telas <= 768px (celular/tablet pequeno), colunas viram stack vertical */
+    @media (max-width: 768px) {
+        div[data-testid="column"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            min-width: 100% !important;
+            margin-bottom: 0.5rem;
+        }
+        /* KPI metric maior em mobile pra leitura rápida */
+        div[data-testid="stMetricValue"] {
+            font-size: 1.6rem !important;
+        }
+        /* Reduz padding do bloco principal pra ganhar área útil */
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        /* Título menor em mobile */
+        h1 {
+            font-size: 1.6rem !important;
+        }
+        h2 {
+            font-size: 1.3rem !important;
+        }
+        h3 {
+            font-size: 1.1rem !important;
+        }
+        /* Tabelas com scroll horizontal em mobile */
+        div[data-testid="stDataFrame"] {
+            overflow-x: auto;
+        }
+        /* Esconde colunas auxiliares em mobile (atualização, espaços vazios) */
+        .mobile-hide {
+            display: none !important;
+        }
+    }
+    /* Sempre — reduz padding excessivo do Streamlit */
+    .block-container {
+        max-width: 100% !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # Auth simples por senha (proteção mínima — só Wesley e Sabrina)
 def check_password():
     if st.session_state.get("auth_ok"):
