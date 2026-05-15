@@ -106,14 +106,18 @@ def detalhar_categoria(df_despesas: pd.DataFrame, categoria: str):
     st.dataframe(df_display, hide_index=True, use_container_width=True)
 
 
-def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame):
+def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame, modo: str = "Competência"):
     """Tabela + gráfico de barras agrupadas: Receita × Despesa por mês (6 meses).
+
+    modo='Competência': agrupa pelo mês que a despesa pertence.
+    modo='Caixa': agrupa pelo mês que o dinheiro efetivamente sai (Data Caixa).
 
     Para o mês atual: mostra o que JÁ foi lançado (parcial).
     Para meses futuros: mostra a projeção baseada nas recorrentes ativas.
     """
     from datetime import datetime
     hoje = datetime.now()
+    coluna_mes = "Mês Caixa" if modo == "Caixa" else "Competência"
 
     rec_despesa_mensal = df_recorrentes[
         (df_recorrentes["Ativo_bool"]) & (df_recorrentes["Forma Pgto"] != "Crédito em conta")
@@ -130,7 +134,7 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame)
             m -= 12; y += 1
         comp = f"{m:02d}/{y}"
         is_atual = (m == hoje.month and y == hoje.year)
-        lanc_mes = df_lancamentos[df_lancamentos["Competência"] == comp]
+        lanc_mes = df_lancamentos[df_lancamentos[coluna_mes] == comp]
         rec_lanc = lanc_mes[lanc_mes["Tipo"] == "Receita"]["Valor"].sum()
         desp_lanc = lanc_mes[lanc_mes["Tipo"] == "Despesa"]["Valor"].sum()
 
@@ -139,12 +143,10 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame)
             despesa = desp_lanc
             status = "🔄 Em andamento"
         elif i == 0 or comp < f"{hoje.month:02d}/{hoje.year}":
-            # mês passado, mostra o real
             receita = rec_lanc
             despesa = desp_lanc
             status = "✅ Fechado"
         else:
-            # mês futuro: projeção baseada em recorrentes
             receita = rec_receita_mensal
             despesa = rec_despesa_mensal
             status = "📊 Projetado"
@@ -171,8 +173,9 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame)
         marker_color="#EF4444",
         text=[fmt_brl(v) for v in df["Despesa"]], textposition="outside",
     ))
+    titulo_modo = "Caixa (quando entra/sai)" if modo == "Caixa" else "Competência (mês de pertencimento)"
     fig.update_layout(
-        title="📊 Receita × Despesa nos próximos 6 meses",
+        title=f"📊 Receita × Despesa nos próximos 6 meses — {titulo_modo}",
         barmode="group",
         height=420,
         margin=dict(l=10, r=10, t=50, b=10),

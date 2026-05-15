@@ -55,13 +55,35 @@ if df_lanc.empty:
 # ============== HEADER ==============
 st.title("💰 Financeiro Família Gomes")
 
+# Linha 1: Modo de visualização (Competência vs Caixa)
+col_modo, col_explicacao = st.columns([1, 3])
+with col_modo:
+    modo = st.radio(
+        "🎯 Modo de visão",
+        ["Competência", "Caixa"],
+        horizontal=True,
+        help="Competência = a qual mês a despesa pertence (ideal pra controle de teto). Caixa = quando o dinheiro efetivamente sai (ideal pra fluxo de caixa).",
+    )
+with col_explicacao:
+    st.write("")
+    if modo == "Competência":
+        st.caption("📅 **Competência:** mostra os gastos pelo mês a que pertencem. *Ex: compra de cartão em maio fica em maio, mesmo que o pagamento da fatura seja em junho.* Ideal pra **controle de tetos**.")
+    else:
+        st.caption("💵 **Caixa:** mostra quando o dinheiro efetivamente sai da conta. *Ex: compra de cartão em maio aparece em junho (quando paga a fatura).* Ideal pra **fluxo de caixa**.")
+
+# Linha 2: Filtros
 col_filtro, col_pessoa, col_refresh = st.columns([2, 2, 1])
 
 with col_filtro:
-    meses = meses_disponiveis(df_lanc)
+    meses = meses_disponiveis(df_lanc, modo=modo)
     mes_default = f"{datetime.now().month:02d}/{datetime.now().year}"
     idx_default = meses.index(mes_default) if mes_default in meses else 0
-    competencia = st.selectbox("📅 Competência", meses, index=idx_default)
+    competencia = st.selectbox(
+        f"📅 {modo} (mês)",
+        meses,
+        index=idx_default,
+        key=f"mes_{modo}",
+    )
 
 with col_pessoa:
     pessoa = st.selectbox("👥 Visão", ["Família (todos)", "Wesley", "Sabrina"])
@@ -76,7 +98,7 @@ with col_refresh:
 
 # Aplicar filtros
 pessoa_filter = None if pessoa == "Família (todos)" else pessoa
-df_filtrado = filtrar(df_lanc, competencia=competencia, pessoa=pessoa_filter)
+df_filtrado = filtrar(df_lanc, competencia=competencia, pessoa=pessoa_filter, modo=modo)
 
 df_receitas = df_filtrado[df_filtrado["Tipo"] == "Receita"]
 df_despesas = df_filtrado[df_filtrado["Tipo"] == "Despesa"]
@@ -94,7 +116,11 @@ pct_teto = total_despesa / total_tetos if total_tetos > 0 else 0
 hoje = datetime.now()
 mes_atual_str = f"{hoje.month:02d}/{hoje.year}"
 mes_em_andamento = (competencia == mes_atual_str)
-saldo_label = f"📊 Saldo parcial (até {hoje.strftime('%d/%m')})" if mes_em_andamento else "📊 Saldo do mês"
+
+if modo == "Caixa":
+    saldo_label = f"💵 Caixa parcial (até {hoje.strftime('%d/%m')})" if mes_em_andamento else "💵 Saldo de Caixa"
+else:
+    saldo_label = f"📊 Saldo parcial (até {hoje.strftime('%d/%m')})" if mes_em_andamento else "📊 Saldo do mês"
 
 c1, c2, c3, c4 = st.columns(4)
 with c1: kpi_card("Receitas", total_receita, emoji="💚")
@@ -104,24 +130,33 @@ with c4: kpi_card("Uso do teto", pct_teto, prefix="%", emoji="🎯")
 
 # Aviso pra mês em andamento (sem dar percepção falsa de sobra)
 if mes_em_andamento:
-    st.info(
-        f"🔄 **Mês em andamento.** Esse saldo é parcial até {hoje.strftime('%d/%m')}. "
-        f"Despesas ainda podem ser lançadas até fim do mês. "
-        f"O 'disponível pra investir' aparece só quando o mês fecha."
-    )
+    if modo == "Caixa":
+        st.info(
+            f"🔄 **Mês em andamento.** Esse caixa é parcial até {hoje.strftime('%d/%m')}. "
+            f"Pagamentos previstos (faturas de cartão, recorrentes) ainda podem entrar/sair."
+        )
+    else:
+        st.info(
+            f"🔄 **Mês em andamento.** Esse saldo é parcial até {hoje.strftime('%d/%m')}. "
+            f"Despesas ainda podem ser lançadas até fim do mês. "
+            f"O 'disponível pra investir' aparece só quando o mês fecha."
+        )
 elif saldo < 0:
     st.error(f"⚠️ Mês fechou com déficit de {fmt_brl(abs(saldo))} — revisar despesas.")
 else:
-    st.success(f"✅ **Mês fechado**: sobra final de {fmt_brl(saldo)} — disponível pra investir/poupar.")
+    if modo == "Caixa":
+        st.success(f"✅ **Caixa do mês**: sobrou {fmt_brl(saldo)} efetivamente em conta.")
+    else:
+        st.success(f"✅ **Mês fechado**: sobra final de {fmt_brl(saldo)} — disponível pra investir/poupar.")
 
 
 # ============== GASTOS POR CATEGORIA vs TETO ==============
 st.divider()
-st.subheader(f"📋 Gastos por Categoria — {competencia}")
+st.subheader(f"📋 Gastos por Categoria — {modo} {competencia}")
 st.caption("👆 **Clique numa barra** pra ver os lançamentos da categoria")
 col_a, col_b = st.columns([3, 2])
 with col_a:
-    cat_clicada = barras_categoria_vs_teto(df_despesas, df_tetos, titulo="", key=f"barras_{competencia}_{pessoa}")
+    cat_clicada = barras_categoria_vs_teto(df_despesas, df_tetos, titulo="", key=f"barras_{modo}_{competencia}_{pessoa}")
 with col_b:
     donut_categorias(df_despesas, titulo="Distribuição")
 
@@ -133,18 +168,19 @@ if cat_clicada:
 
 # ============== PROJEÇÃO 6 MESES ==============
 st.divider()
-projecao_6_meses(df_lanc if pessoa_filter is None else filtrar(df_lanc, pessoa=pessoa_filter), df_rec)
+df_proj_base = df_lanc if pessoa_filter is None else filtrar(df_lanc, pessoa=pessoa_filter, modo=modo)
+projecao_6_meses(df_proj_base, df_rec, modo=modo)
 
 
 # ============== TOP DESPESAS ==============
 st.divider()
-st.subheader(f"🔝 Top 10 maiores despesas — {competencia}")
+st.subheader(f"🔝 Top 10 maiores despesas — {modo} {competencia}")
 tabela_top_despesas(df_despesas, n=10)
 
 
 # ============== TODOS OS LANÇAMENTOS (drill-down) ==============
 st.divider()
-with st.expander(f"📜 Ver TODOS os lançamentos de {competencia} ({len(df_filtrado)} registros)"):
+with st.expander(f"📜 Ver TODOS os lançamentos ({modo} {competencia}) — {len(df_filtrado)} registros"):
     col_search, col_tipo, col_cat = st.columns([2, 1, 1])
     with col_search:
         busca = st.text_input("🔍 Buscar (descrição/categoria)", "")

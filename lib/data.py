@@ -76,6 +76,10 @@ def load_lancamentos() -> pd.DataFrame:
     df["Valor"] = df["Valor"].apply(_parse_valor)
     df["Data_dt"] = df["Data"].apply(_parse_data)
     df["Data Caixa_dt"] = df["Data Caixa"].apply(_parse_data)
+    # Coluna Mês Caixa (MM/YYYY) extraída de Data Caixa pra usar como pivot na visão Caixa
+    df["Mês Caixa"] = df["Data Caixa_dt"].apply(
+        lambda d: f"{d.month:02d}/{d.year}" if pd.notna(d) else ""
+    )
     return df
 
 
@@ -100,12 +104,16 @@ def load_tetos() -> pd.DataFrame:
     return df
 
 
-def meses_disponiveis(df: pd.DataFrame) -> list:
-    """Lista de competências únicas no formato MM/YYYY, ordenadas."""
-    if df.empty or "Competência" not in df.columns:
+def meses_disponiveis(df: pd.DataFrame, modo: str = "Competência") -> list:
+    """Lista de meses únicos no formato MM/YYYY.
+    modo: 'Competência' usa coluna Competência, 'Caixa' usa Mês Caixa.
+    """
+    coluna = "Mês Caixa" if modo == "Caixa" else "Competência"
+    if df.empty or coluna not in df.columns:
         return []
-    comps = df["Competência"].dropna().unique().tolist()
-    # ordena por ano+mês
+    valores = df[coluna].dropna()
+    valores = valores[valores != ""]
+    comps = valores.unique().tolist()
     def chave(c):
         try:
             m, y = c.split("/")
@@ -115,11 +123,12 @@ def meses_disponiveis(df: pd.DataFrame) -> list:
     return sorted(comps, key=chave, reverse=True)
 
 
-def filtrar(df: pd.DataFrame, competencia: str = None, pessoa: str = None, tipo: str = None) -> pd.DataFrame:
-    """Filtra dataframe por competência, pessoa e/ou tipo."""
+def filtrar(df: pd.DataFrame, competencia: str = None, pessoa: str = None, tipo: str = None, modo: str = "Competência") -> pd.DataFrame:
+    """Filtra dataframe por mês (Competência ou Caixa, conforme modo), pessoa e/ou tipo."""
     out = df.copy()
-    if competencia and "Competência" in out.columns:
-        out = out[out["Competência"] == competencia]
+    coluna_mes = "Mês Caixa" if modo == "Caixa" else "Competência"
+    if competencia and coluna_mes in out.columns:
+        out = out[out[coluna_mes] == competencia]
     if pessoa and "Pessoa" in out.columns:
         out = out[out["Pessoa"] == pessoa]
     if tipo and "Tipo" in out.columns:
