@@ -162,6 +162,71 @@ def meses_disponiveis(df: pd.DataFrame, modo: str = "Competência") -> list:
     return sorted(comps, key=chave, reverse=True)
 
 
+def classificar_fixa_variavel(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame) -> pd.DataFrame:
+    """Adiciona coluna 'Tipo Despesa' = 'Fixa' ou 'Variável'.
+
+    Heurística: um lançamento é considerado FIXO se a descrição bater
+    (substring case-insensitive) com a descrição de alguma recorrente ATIVA
+    e a categoria também coincidir. Caso contrário é VARIÁVEL.
+
+    Receitas mantêm 'Tipo Despesa' = '' (não se aplica).
+    """
+    out = df_lancamentos.copy()
+    out["Tipo Despesa"] = ""
+
+    if df_recorrentes.empty or "Ativo_bool" not in df_recorrentes.columns:
+        out.loc[out["Tipo"] == "Despesa", "Tipo Despesa"] = "Variável"
+        return out
+
+    rec_ativas = df_recorrentes[df_recorrentes["Ativo_bool"]].copy()
+    if rec_ativas.empty:
+        out.loc[out["Tipo"] == "Despesa", "Tipo Despesa"] = "Variável"
+        return out
+
+    # Coluna de descrição na planilha de recorrentes pode variar
+    col_desc_rec = None
+    for c in ("Descrição", "Descricao", "Item", "Nome"):
+        if c in rec_ativas.columns:
+            col_desc_rec = c
+            break
+
+    if col_desc_rec is None:
+        # Fallback: matching só por Categoria
+        cats_fixas = set(rec_ativas["Categoria"].dropna().astype(str).str.lower().str.strip())
+        def eh_fixa_por_cat(row):
+            if row.get("Tipo") != "Despesa":
+                return ""
+            cat = str(row.get("Categoria", "")).lower().strip()
+            return "Fixa" if cat in cats_fixas else "Variável"
+        out["Tipo Despesa"] = out.apply(eh_fixa_por_cat, axis=1)
+        return out
+
+    # Constrói lista de tuplas (categoria_lower, descricao_lower) das recorrentes ativas
+    pares_fixos = []
+    for _, r in rec_ativas.iterrows():
+        cat = str(r.get("Categoria", "")).lower().strip()
+        desc = str(r.get(col_desc_rec, "")).lower().strip()
+        if desc:
+            pares_fixos.append((cat, desc))
+
+    def classificar(row):
+        if row.get("Tipo") != "Despesa":
+            return ""
+        cat_l = str(row.get("Categoria", "")).lower().strip()
+        desc_l = str(row.get("Descrição", "")).lower().strip()
+        for cat_rec, desc_rec in pares_fixos:
+            # match se descrição da recorrente está contida na do lançamento (ou vice-versa)
+            # e a categoria coincide (se categoria da recorrente foi informada)
+            desc_match = (desc_rec in desc_l) or (desc_l and desc_l in desc_rec)
+            cat_match = (not cat_rec) or (cat_rec == cat_l)
+            if desc_match and cat_match:
+                return "Fixa"
+        return "Variável"
+
+    out["Tipo Despesa"] = out.apply(classificar, axis=1)
+    return out
+
+
 def filtrar(df: pd.DataFrame, competencia: str = None, pessoa: str = None, tipo: str = None, modo: str = "Competência") -> pd.DataFrame:
     """Filtra dataframe por mês (Competência ou Caixa, conforme modo), pessoa e/ou tipo."""
     out = df.copy()

@@ -10,8 +10,8 @@ Estrutura:
 """
 import streamlit as st
 from datetime import datetime
-from lib.data import load_lancamentos, load_recorrentes, load_tetos, meses_disponiveis, filtrar, mes_anterior, progresso_mes
-from lib.components import kpi_card, donut_categorias, barras_categoria_vs_teto, projecao_6_meses, tabela_top_despesas, detalhar_categoria, comparativo_mensal, fmt_brl
+from lib.data import load_lancamentos, load_recorrentes, load_tetos, meses_disponiveis, filtrar, mes_anterior, progresso_mes, classificar_fixa_variavel
+from lib.components import kpi_card, donut_categorias, barras_categoria_vs_teto, projecao_6_meses, tabela_top_despesas, detalhar_categoria, comparativo_mensal, fmt_brl, breakdown_fixa_variavel, detalhar_fixa_variavel
 
 
 st.set_page_config(
@@ -50,6 +50,9 @@ with st.spinner("Carregando dados..."):
 if df_lanc.empty:
     st.error("Sem dados na planilha. Verifique conexão.")
     st.stop()
+
+# Classifica todas as despesas como Fixa ou Variável (matching com recorrentes ativas)
+df_lanc = classificar_fixa_variavel(df_lanc, df_rec)
 
 
 # ============== HEADER ==============
@@ -214,6 +217,16 @@ else:
         st.success(f"✅ **Mês fechado**: sobra final de {fmt_brl(saldo)} — disponível pra investir/poupar.")
 
 
+# ============== FIXA vs VARIÁVEL ==============
+st.divider()
+st.subheader("💰 Composição da despesa — Fixa vs Variável")
+st.caption("👆 **Clique numa fatia da barra** pra ver os lançamentos do tipo")
+tipo_clicado = breakdown_fixa_variavel(df_despesas, key=f"fixavar_{modo}_{competencia}_{pessoa}")
+if tipo_clicado:
+    st.divider()
+    detalhar_fixa_variavel(df_despesas, tipo_clicado)
+
+
 # ============== GASTOS POR CATEGORIA vs TETO ==============
 st.divider()
 st.subheader(f"📋 Gastos por Categoria — {modo} {competencia}")
@@ -275,7 +288,7 @@ with st.expander(f"📜 Ver TODOS os lançamentos ({modo} {competencia}) — {le
     df_view = df_view.sort_values("Valor", ascending=False)
 
     # Formata pra exibição
-    cols_show = ["Data", "Tipo", "Categoria", "Subcategoria", "Descrição",
+    cols_show = ["Data", "Tipo", "Tipo Despesa", "Categoria", "Subcategoria", "Descrição",
                  "Pessoa", "Forma Pgto", "Cartão", "Parcela", "Valor", "Data Caixa", "Mensagem Original"]
     cols_show = [c for c in cols_show if c in df_view.columns]
     df_display = df_view[cols_show].copy()

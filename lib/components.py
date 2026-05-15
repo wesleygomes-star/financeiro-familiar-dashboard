@@ -227,6 +227,102 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame,
         )
 
 
+def breakdown_fixa_variavel(df_despesas: pd.DataFrame, key: str = "fixavar"):
+    """Renderiza breakdown Fixa vs Variável: 2 KPIs + barra horizontal proporcional.
+
+    Espera coluna 'Tipo Despesa' já preenchida ('Fixa' / 'Variável').
+    Retorna o tipo clicado ('Fixa', 'Variável') ou None.
+    """
+    if df_despesas.empty or "Tipo Despesa" not in df_despesas.columns:
+        return None
+
+    fixa = df_despesas[df_despesas["Tipo Despesa"] == "Fixa"]["Valor"].sum()
+    variavel = df_despesas[df_despesas["Tipo Despesa"] == "Variável"]["Valor"].sum()
+    total = fixa + variavel
+
+    if total <= 0:
+        return None
+
+    pct_fixa = fixa / total
+    pct_var = variavel / total
+
+    col1, col2, col3 = st.columns([1, 1, 3])
+    with col1:
+        st.metric("🔒 Despesa Fixa", fmt_brl(fixa), delta=f"{pct_fixa*100:.0f}% do total")
+        st.caption("Recorrentes: aluguel, escola, assinaturas...")
+    with col2:
+        st.metric("🎲 Despesa Variável", fmt_brl(variavel), delta=f"{pct_var*100:.0f}% do total")
+        st.caption("Discricionário: mercado, lazer, eventual...")
+    with col3:
+        # Barra empilhada horizontal
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            y=["Composição"], x=[fixa], name="🔒 Fixa",
+            orientation="h", marker_color="#6366F1",
+            text=f"{fmt_brl(fixa)} ({pct_fixa*100:.0f}%)",
+            textposition="inside", insidetextanchor="middle",
+            hovertemplate="<b>Fixa</b><br>%{x:,.2f}<extra></extra>",
+        ))
+        fig.add_trace(go.Bar(
+            y=["Composição"], x=[variavel], name="🎲 Variável",
+            orientation="h", marker_color="#F97316",
+            text=f"{fmt_brl(variavel)} ({pct_var*100:.0f}%)",
+            textposition="inside", insidetextanchor="middle",
+            hovertemplate="<b>Variável</b><br>%{x:,.2f}<extra></extra>",
+        ))
+        fig.update_layout(
+            barmode="stack",
+            height=120,
+            margin=dict(l=10, r=10, t=10, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
+            xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+            yaxis=dict(showgrid=False, showticklabels=False),
+        )
+        event = st.plotly_chart(fig, use_container_width=True, key=key, on_select="rerun")
+        if event and hasattr(event, "selection"):
+            pts = event.selection.get("points", [])
+            if pts:
+                nome = pts[0].get("legendgroup") or pts[0].get("curve_number")
+                # extrai pelo curveNumber (0 = Fixa, 1 = Variável)
+                idx = pts[0].get("curve_number", pts[0].get("curveNumber"))
+                if idx == 0:
+                    return "Fixa"
+                if idx == 1:
+                    return "Variável"
+    return None
+
+
+def detalhar_fixa_variavel(df_despesas: pd.DataFrame, tipo: str):
+    """Lista lançamentos de Fixa ou Variável, agrupados por categoria."""
+    df = df_despesas[df_despesas["Tipo Despesa"] == tipo].sort_values("Valor", ascending=False)
+    if df.empty:
+        st.info(f"Sem despesas {tipo.lower()}s nesse filtro.")
+        return
+    icone = "🔒" if tipo == "Fixa" else "🎲"
+    total = df["Valor"].sum()
+    st.markdown(f"### {icone} Despesas **{tipo}s** — {len(df)} lançamentos, total {fmt_brl(total)}")
+
+    # Resumo por categoria
+    resumo = df.groupby("Categoria", as_index=False).agg(
+        Valor=("Valor", "sum"),
+        Qtd=("Valor", "count"),
+    ).sort_values("Valor", ascending=False)
+    resumo["Valor"] = resumo["Valor"].apply(fmt_brl)
+    st.markdown("**Por categoria:**")
+    st.dataframe(resumo, hide_index=True, use_container_width=True)
+
+    # Lista detalhada
+    cols_show = ["Data", "Categoria", "Subcategoria", "Descrição", "Pessoa", "Forma Pgto", "Valor"]
+    cols_show = [c for c in cols_show if c in df.columns]
+    df_display = df[cols_show].copy()
+    df_display["Valor"] = df_display["Valor"].apply(fmt_brl)
+    with st.expander(f"Ver todos os {len(df)} lançamentos {tipo.lower()}s"):
+        st.dataframe(df_display, hide_index=True, use_container_width=True)
+
+
 def comparativo_mensal(df_lancamentos: pd.DataFrame, df_tetos: pd.DataFrame, modo: str = "Competência", n_meses: int = 6):
     """Evolução mensal: heatmap por categoria × mês + linha de total.
 
