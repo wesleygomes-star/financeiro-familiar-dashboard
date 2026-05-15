@@ -104,6 +104,45 @@ def load_tetos() -> pd.DataFrame:
     return df
 
 
+def mes_anterior(competencia: str) -> str:
+    """Recebe 'MM/YYYY' e retorna o mês anterior no mesmo formato.
+
+    Ex: '05/2026' -> '04/2026'; '01/2026' -> '12/2025'.
+    """
+    try:
+        m, y = competencia.split("/")
+        m, y = int(m), int(y)
+    except Exception:
+        return ""
+    m -= 1
+    if m < 1:
+        m = 12
+        y -= 1
+    return f"{m:02d}/{y}"
+
+
+def progresso_mes(competencia: str) -> float:
+    """Retorna a fração do mês já decorrida (0.0 a 1.0).
+
+    Se o mês ainda não começou -> 0.0
+    Se o mês já terminou -> 1.0
+    Se é o mês atual -> dia_hoje / dias_no_mes
+    """
+    from calendar import monthrange
+    try:
+        m, y = competencia.split("/")
+        m, y = int(m), int(y)
+    except Exception:
+        return 1.0
+    hoje = datetime.now()
+    if (y, m) < (hoje.year, hoje.month):
+        return 1.0
+    if (y, m) > (hoje.year, hoje.month):
+        return 0.0
+    dias_no_mes = monthrange(y, m)[1]
+    return hoje.day / dias_no_mes
+
+
 def meses_disponiveis(df: pd.DataFrame, modo: str = "Competência") -> list:
     """Lista de meses únicos no formato MM/YYYY.
     modo: 'Competência' usa coluna Competência, 'Caixa' usa Mês Caixa.

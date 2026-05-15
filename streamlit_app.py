@@ -10,7 +10,7 @@ Estrutura:
 """
 import streamlit as st
 from datetime import datetime
-from lib.data import load_lancamentos, load_recorrentes, load_tetos, meses_disponiveis, filtrar
+from lib.data import load_lancamentos, load_recorrentes, load_tetos, meses_disponiveis, filtrar, mes_anterior, progresso_mes
 from lib.components import kpi_card, donut_categorias, barras_categoria_vs_teto, projecao_6_meses, tabela_top_despesas, detalhar_categoria, comparativo_mensal, fmt_brl
 
 
@@ -137,16 +137,36 @@ hoje = datetime.now()
 mes_atual_str = f"{hoje.month:02d}/{hoje.year}"
 mes_em_andamento = (competencia == mes_atual_str)
 
+# Mês anterior — para deltas comparativos (aplica os mesmos filtros)
+comp_anterior = mes_anterior(competencia)
+df_anterior = filtrar(df_lanc, competencia=comp_anterior, pessoa=pessoa_filter, modo=modo)
+if cat_avancada != "Todas":
+    df_anterior = df_anterior[df_anterior["Categoria"] == cat_avancada]
+if forma_avancada != "Todas":
+    df_anterior = df_anterior[df_anterior["Forma Pgto"] == forma_avancada]
+if cartao_avancado != "Todos":
+    df_anterior = df_anterior[df_anterior["Cartão"] == cartao_avancado]
+
+receita_ant = df_anterior[df_anterior["Tipo"] == "Receita"]["Valor"].sum()
+despesa_ant = df_anterior[df_anterior["Tipo"] == "Despesa"]["Valor"].sum()
+saldo_ant = receita_ant - despesa_ant
+pct_teto_ant = despesa_ant / total_tetos if total_tetos > 0 else 0
+
 if modo == "Caixa":
     saldo_label = f"💵 Caixa parcial (até {hoje.strftime('%d/%m')})" if mes_em_andamento else "💵 Saldo de Caixa"
 else:
     saldo_label = f"📊 Saldo parcial (até {hoje.strftime('%d/%m')})" if mes_em_andamento else "📊 Saldo do mês"
 
 c1, c2, c3, c4 = st.columns(4)
-with c1: kpi_card("Receitas", total_receita, emoji="💚")
-with c2: kpi_card("Despesas", total_despesa, emoji="💸")
-with c3: kpi_card(saldo_label, saldo, emoji="")
-with c4: kpi_card("Uso do teto", pct_teto, prefix="%", emoji="🎯")
+with c1:
+    kpi_card("Receitas", total_receita, emoji="💚", valor_anterior=receita_ant)
+with c2:
+    # Despesa: subir é ruim → delta_inverso (vermelho quando sobe)
+    kpi_card("Despesas", total_despesa, emoji="💸", valor_anterior=despesa_ant, delta_inverso=True)
+with c3:
+    kpi_card(saldo_label, saldo, emoji="", valor_anterior=saldo_ant)
+with c4:
+    kpi_card("Uso do teto", pct_teto, prefix="%", emoji="🎯", valor_anterior=pct_teto_ant, delta_inverso=True)
 
 # Aviso pra mês em andamento (sem dar percepção falsa de sobra)
 if mes_em_andamento:
@@ -161,6 +181,30 @@ if mes_em_andamento:
             f"Despesas ainda podem ser lançadas até fim do mês. "
             f"O 'disponível pra investir' aparece só quando o mês fecha."
         )
+
+    # ---------- Indicador de ritmo (D) ----------
+    # Compara % do teto gasto vs % do mês decorrido. Se ratio > 1 -> tá à frente do ritmo esperado.
+    pct_mes = progresso_mes(competencia)
+    if pct_mes > 0 and total_tetos > 0:
+        ratio = pct_teto / pct_mes  # 1.0 = no ritmo; >1 = à frente; <1 = atrás
+        pct_mes_str = f"{pct_mes*100:.0f}% do mês"
+        pct_teto_str = f"{pct_teto*100:.0f}% do teto"
+        if ratio >= 1.3:
+            st.error(
+                f"🚨 **Ritmo acelerado:** já consumiu {pct_teto_str} com apenas {pct_mes_str} decorrido "
+                f"(gastando {(ratio-1)*100:.0f}% acima do esperado pro dia). "
+                f"Se continuar nesse ritmo, fecha o mês em {fmt_brl(total_despesa/pct_mes)}."
+            )
+        elif ratio >= 1.1:
+            st.warning(
+                f"⚠️ **Atenção ao ritmo:** {pct_teto_str} consumido com {pct_mes_str} decorrido "
+                f"({(ratio-1)*100:.0f}% acima do esperado). Projeção pro fim do mês: {fmt_brl(total_despesa/pct_mes)}."
+            )
+        else:
+            st.success(
+                f"✅ **No ritmo:** {pct_teto_str} consumido com {pct_mes_str} decorrido. "
+                f"Projeção pro fim do mês: {fmt_brl(total_despesa/pct_mes)}."
+            )
 elif saldo < 0:
     st.error(f"⚠️ Mês fechou com déficit de {fmt_brl(abs(saldo))} — revisar despesas.")
 else:

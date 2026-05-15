@@ -12,9 +12,36 @@ def fmt_brl(v) -> str:
         return "R$ 0,00"
 
 
-def kpi_card(label: str, value: float, prefix: str = "R$", delta: str = None, delta_color="normal", emoji: str = ""):
-    """Card grande com KPI. Use dentro de uma coluna st.columns."""
+def kpi_card(label: str, value: float, prefix: str = "R$", delta: str = None,
+             delta_color="normal", emoji: str = "",
+             valor_anterior: float = None, delta_inverso: bool = False):
+    """Card grande com KPI. Use dentro de uma coluna st.columns.
+
+    Args:
+        valor_anterior: se informado, calcula delta automaticamente como
+            (valor - valor_anterior). Exibe variação absoluta + percentual.
+        delta_inverso: True para métricas onde subir é ruim (ex: despesa).
+            Inverte a cor (vermelho quando sobe, verde quando cai).
+    """
     formatted = fmt_brl(value) if prefix == "R$" else f"{value:.1%}" if prefix == "%" else f"{prefix}{value}"
+
+    # Se valor_anterior foi passado, monta delta automaticamente
+    if valor_anterior is not None and delta is None:
+        diff = value - valor_anterior
+        if abs(valor_anterior) > 0.01:
+            pct = (diff / abs(valor_anterior)) * 100
+            pct_str = f" ({pct:+.0f}%)"
+        else:
+            pct_str = ""
+        if prefix == "R$":
+            delta = f"{fmt_brl(diff)}{pct_str} vs mês anterior"
+        elif prefix == "%":
+            delta = f"{diff*100:+.1f}pp vs mês anterior"
+        else:
+            delta = f"{diff:+.2f}{pct_str} vs mês anterior"
+        if delta_inverso:
+            delta_color = "inverse"
+
     st.metric(label=f"{emoji} {label}", value=formatted, delta=delta, delta_color=delta_color)
 
 
