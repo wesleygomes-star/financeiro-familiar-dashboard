@@ -252,12 +252,19 @@ def comparativo_mensal(df_lancamentos: pd.DataFrame, df_tetos: pd.DataFrame, mod
         z=pct.values,
         x=pivot.columns,
         y=pivot.index,
+        # Colorscale precisa estar normalizado em [0,1]. Como zmax=1.2,
+        # o valor 1.0 na escala = 120% do teto. Mapeamento:
+        #   0%   -> verde     (0/1.2 = 0.00)
+        #   60%  -> verde     (0.6/1.2 = 0.50)
+        #   80%  -> amarelo   (0.8/1.2 ≈ 0.67)
+        #   100% -> vermelho  (1.0/1.2 ≈ 0.83)
+        #   120% -> vinho     (1.2/1.2 = 1.00)
         colorscale=[
-            [0, "#10B981"],     # verde
-            [0.5, "#10B981"],   # verde
-            [0.8, "#F59E0B"],   # amarelo
-            [1.0, "#EF4444"],   # vermelho
-            [2.0, "#7F1D1D"],   # vinho (estouro forte)
+            [0.00, "#10B981"],   # verde
+            [0.50, "#10B981"],   # verde (até 60% do teto)
+            [0.67, "#F59E0B"],   # amarelo (~80%)
+            [0.83, "#EF4444"],   # vermelho (~100%)
+            [1.00, "#7F1D1D"],   # vinho (estouro forte, ≥120%)
         ],
         zmin=0, zmax=1.2,
         text=[[fmt_brl(v) for v in row] for row in pivot.values],
