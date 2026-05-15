@@ -11,7 +11,7 @@ Estrutura:
 import streamlit as st
 from datetime import datetime
 from lib.data import load_lancamentos, load_recorrentes, load_tetos, meses_disponiveis, filtrar
-from lib.components import kpi_card, donut_categorias, barras_categoria_vs_teto, projecao_6_meses, tabela_top_despesas, detalhar_categoria, fmt_brl
+from lib.components import kpi_card, donut_categorias, barras_categoria_vs_teto, projecao_6_meses, tabela_top_despesas, detalhar_categoria, comparativo_mensal, fmt_brl
 
 
 st.set_page_config(
@@ -96,9 +96,29 @@ with col_refresh:
         st.rerun()
 
 
+# Filtros avançados (collapsable)
+with st.expander("🔍 Filtros avançados", expanded=False):
+    fc1, fc2, fc3 = st.columns(3)
+    with fc1:
+        cats_disponiveis = ["Todas"] + sorted(df_lanc["Categoria"].dropna().unique().tolist())
+        cat_avancada = st.selectbox("Categoria", cats_disponiveis, key="filtro_cat")
+    with fc2:
+        formas = ["Todas"] + sorted(df_lanc["Forma Pgto"].dropna().unique().tolist())
+        forma_avancada = st.selectbox("Forma Pgto", formas, key="filtro_forma")
+    with fc3:
+        cartoes = ["Todos"] + sorted([c for c in df_lanc["Cartão"].dropna().unique().tolist() if c])
+        cartao_avancado = st.selectbox("Cartão", cartoes, key="filtro_cartao")
+
 # Aplicar filtros
 pessoa_filter = None if pessoa == "Família (todos)" else pessoa
 df_filtrado = filtrar(df_lanc, competencia=competencia, pessoa=pessoa_filter, modo=modo)
+# Aplica filtros avançados
+if cat_avancada != "Todas":
+    df_filtrado = df_filtrado[df_filtrado["Categoria"] == cat_avancada]
+if forma_avancada != "Todas":
+    df_filtrado = df_filtrado[df_filtrado["Forma Pgto"] == forma_avancada]
+if cartao_avancado != "Todos":
+    df_filtrado = df_filtrado[df_filtrado["Cartão"] == cartao_avancado]
 
 df_receitas = df_filtrado[df_filtrado["Tipo"] == "Receita"]
 df_despesas = df_filtrado[df_filtrado["Tipo"] == "Despesa"]
@@ -166,10 +186,17 @@ if cat_clicada:
     detalhar_categoria(df_despesas, cat_clicada)
 
 
+# ============== EVOLUÇÃO MENSAL (HEATMAP) ==============
+st.divider()
+st.subheader(f"🗓️ Evolução Mensal — últimos 6 meses ({modo})")
+df_evolucao_base = df_lanc if pessoa_filter is None else filtrar(df_lanc, pessoa=pessoa_filter, modo=modo)
+comparativo_mensal(df_evolucao_base, df_tetos, modo=modo, n_meses=6)
+
+
 # ============== PROJEÇÃO 6 MESES ==============
 st.divider()
-df_proj_base = df_lanc if pessoa_filter is None else filtrar(df_lanc, pessoa=pessoa_filter, modo=modo)
-projecao_6_meses(df_proj_base, df_rec, modo=modo)
+st.subheader(f"🔮 Projeção dos próximos 6 meses ({modo})")
+projecao_6_meses(df_evolucao_base, df_rec, modo=modo)
 
 
 # ============== TOP DESPESAS ==============

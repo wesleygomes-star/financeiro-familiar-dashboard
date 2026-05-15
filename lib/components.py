@@ -200,6 +200,114 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame,
         )
 
 
+def comparativo_mensal(df_lancamentos: pd.DataFrame, df_tetos: pd.DataFrame, modo: str = "Competência", n_meses: int = 6):
+    """Evolução mensal: heatmap por categoria × mês + linha de total.
+
+    Mostra últimos n_meses incluindo o atual.
+    Cores: verde (baixo % do teto), amarelo (médio), vermelho (alto/estouro).
+    """
+    from datetime import datetime
+    hoje = datetime.now()
+    coluna_mes = "Mês Caixa" if modo == "Caixa" else "Competência"
+
+    # Lista de meses (do mais antigo pro mais recente)
+    meses = []
+    for i in range(n_meses - 1, -1, -1):
+        m = hoje.month - i
+        y = hoje.year
+        while m < 1:
+            m += 12; y -= 1
+        meses.append(f"{m:02d}/{y}")
+
+    # Despesas por categoria × mês
+    despesas = df_lancamentos[df_lancamentos["Tipo"] == "Despesa"].copy()
+    if despesas.empty:
+        st.info("Sem despesas pra comparar.")
+        return
+
+    pivot = despesas.pivot_table(
+        index="Categoria",
+        columns=coluna_mes,
+        values="Valor",
+        aggfunc="sum",
+        fill_value=0,
+    )
+    # Mantém só meses do período + ordena
+    pivot = pivot.reindex(columns=meses, fill_value=0)
+
+    # Tetos
+    tetos_map = dict(zip(df_tetos["Categoria"], df_tetos["Teto Mensal"])) if not df_tetos.empty else {}
+
+    # Calcula % do teto pra colorir
+    pct = pivot.copy()
+    for cat in pct.index:
+        teto = tetos_map.get(cat, 0)
+        if teto > 0:
+            pct.loc[cat] = pivot.loc[cat] / teto
+        else:
+            pct.loc[cat] = 0
+
+    # Heatmap usando Plotly
+    fig = go.Figure(data=go.Heatmap(
+        z=pct.values,
+        x=pivot.columns,
+        y=pivot.index,
+        colorscale=[
+            [0, "#10B981"],     # verde
+            [0.5, "#10B981"],   # verde
+            [0.8, "#F59E0B"],   # amarelo
+            [1.0, "#EF4444"],   # vermelho
+            [2.0, "#7F1D1D"],   # vinho (estouro forte)
+        ],
+        zmin=0, zmax=1.2,
+        text=[[fmt_brl(v) for v in row] for row in pivot.values],
+        texttemplate="%{text}",
+        textfont={"size": 11, "color": "white"},
+        hovertemplate="<b>%{y}</b><br>%{x}<br>Gasto: %{text}<br>% teto: %{z:.0%}<extra></extra>",
+        showscale=True,
+        colorbar=dict(title="% teto", tickformat=".0%"),
+    ))
+    fig.update_layout(
+        title=f"🗓️ Evolução mensal por categoria — {modo}",
+        height=max(350, 35 * len(pivot.index) + 100),
+        margin=dict(l=10, r=10, t=50, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(side="top"),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Linha de total despesa × receita por mês (overview)
+    receitas = df_lancamentos[df_lancamentos["Tipo"] == "Receita"]
+    despesas_total = pivot.sum(axis=0)
+    receitas_total = receitas.groupby(coluna_mes)["Valor"].sum().reindex(meses, fill_value=0)
+    saldo_total = receitas_total - despesas_total
+
+    fig2 = go.Figure()
+    fig2.add_trace(go.Bar(x=meses, y=receitas_total, name="💚 Receita", marker_color="#10B981"))
+    fig2.add_trace(go.Bar(x=meses, y=despesas_total, name="💸 Despesa", marker_color="#EF4444"))
+    fig2.add_trace(go.Scatter(
+        x=meses, y=saldo_total,
+        name="📊 Saldo", mode="lines+markers+text",
+        line=dict(color="#FCD34D", width=3),
+        marker=dict(size=10),
+        text=[fmt_brl(v) for v in saldo_total],
+        textposition="top center",
+    ))
+    fig2.update_layout(
+        title=f"📊 Receita × Despesa × Saldo (últimos {n_meses} meses)",
+        barmode="group",
+        height=380,
+        margin=dict(l=10, r=10, t=50, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
+    )
+    st.plotly_chart(fig2, use_container_width=True)
+
+
 def tabela_top_despesas(df_despesas: pd.DataFrame, n: int = 10):
     """Top N maiores despesas do mês selecionado."""
     if df_despesas.empty:
