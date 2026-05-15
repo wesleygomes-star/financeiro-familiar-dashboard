@@ -59,3 +59,4 @@ Abre em http://localhost:8501.
 │   └── components.py      # Reusable charts
 └── .gitignore
 ```
+
