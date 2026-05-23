@@ -109,65 +109,79 @@ df_lanc = classificar_fixa_variavel(df_lanc, df_rec)
 # ============== HEADER ==============
 st.title("💰 Financeiro Família Gomes")
 
-# Linha 1: Modo de visualização (Competência vs Caixa)
-col_modo, col_explicacao = st.columns([1, 3])
-with col_modo:
-    modo = st.radio(
-        "🎯 Modo de visão",
-        ["Competência", "Caixa"],
-        horizontal=True,
-        help="Competência = a qual mês a despesa pertence (ideal pra controle de teto). Caixa = quando o dinheiro efetivamente sai (ideal pra fluxo de caixa).",
-    )
-with col_explicacao:
-    st.write("")
-    if modo == "Competência":
-        st.caption("📅 **Competência:** mostra os gastos pelo mês a que pertencem. *Ex: compra de cartão em maio fica em maio, mesmo que o pagamento da fatura seja em junho.* Ideal pra **controle de tetos**.")
-    else:
-        st.caption("💵 **Caixa:** mostra quando o dinheiro efetivamente sai da conta. *Ex: compra de cartão em maio aparece em junho (quando paga a fatura).* Ideal pra **fluxo de caixa**.")
+# ============== FILTROS (card único agrupado) ==============
+with st.container(border=True):
+    st.markdown("### 🔍 Filtros")
 
-# Linha 2: Filtros
-col_filtro, col_pessoa, col_refresh = st.columns([2, 2, 1])
+    # Linha 1: Modo (Competência/Caixa) + Atualizar
+    col_modo, col_refresh = st.columns([4, 1])
+    with col_modo:
+        modo = st.radio(
+            "🎯 Visão",
+            ["Competência", "Caixa"],
+            horizontal=True,
+            help="Competência = a qual mês a despesa pertence (ideal pra controle de teto). Caixa = quando o dinheiro efetivamente sai (ideal pra fluxo de caixa).",
+            label_visibility="collapsed",
+        )
+    with col_refresh:
+        if st.button("🔄 Atualizar", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
 
-with col_filtro:
+    # Linha 2: Mês + Pessoa + Categoria + Forma Pgto
     meses = meses_disponiveis(df_lanc, modo=modo)
     mes_default = f"{datetime.now().month:02d}/{datetime.now().year}"
     idx_default = meses.index(mes_default) if mes_default in meses else 0
-    competencia = st.selectbox(
-        f"📅 {modo} (mês)",
-        meses,
-        index=idx_default,
-        key=f"mes_{modo}",
-    )
 
-with col_pessoa:
-    pessoa = st.selectbox("👥 Visão", ["Família (todos)", "Wesley", "Sabrina"])
+    f1, f2, f3, f4 = st.columns(4)
+    with f1:
+        competencia = st.selectbox(
+            f"📅 Mês ({modo})",
+            meses,
+            index=idx_default,
+            key=f"mes_{modo}",
+        )
+    with f2:
+        pessoa = st.selectbox("👥 Pessoa", ["Família (todos)", "Wesley", "Sabrina"])
+    with f3:
+        cats_disponiveis = ["Todas"] + sorted(df_lanc["Categoria"].dropna().unique().tolist())
+        cat_avancada = st.selectbox("📂 Categoria", cats_disponiveis, key="filtro_cat")
+    with f4:
+        formas = ["Todas"] + sorted(df_lanc["Forma Pgto"].dropna().unique().tolist())
+        forma_avancada = st.selectbox("💳 Forma Pgto", formas, key="filtro_forma")
 
-with col_refresh:
-    st.write("")
-    st.write("")
-    if st.button("🔄 Atualizar"):
-        st.cache_data.clear()
-        st.rerun()
-
-
-# Filtros adicionais (visíveis por padrão — antes ficavam escondidos num expander)
-fc1, fc2, fc3 = st.columns(3)
-with fc1:
-    cats_disponiveis = ["Todas"] + sorted(df_lanc["Categoria"].dropna().unique().tolist())
-    cat_avancada = st.selectbox("📂 Categoria", cats_disponiveis, key="filtro_cat")
-with fc2:
-    formas = ["Todas"] + sorted(df_lanc["Forma Pgto"].dropna().unique().tolist())
-    forma_avancada = st.selectbox("💳 Forma Pgto", formas, key="filtro_forma")
-with fc3:
+    # Linha 3: Cartões (multiselect ocupa linha inteira pra acomodar várias chips)
     cartoes_disp = sorted([c for c in df_lanc["Cartão"].dropna().unique().tolist() if c])
     cartoes_selecionados = st.multiselect(
-        "💳 Cartão (vazio = todos)",
+        "💳 Cartões (vazio = todos)",
         cartoes_disp,
         default=[],
         key="filtro_cartao_multi",
-        placeholder="Todos os cartões",
-        help="Selecione um ou mais cartões. Vazio = mostra todos.",
+        placeholder="Selecione um ou mais cartões…",
+        help="Selecione um ou mais cartões pra ver fatura combinada. Vazio = mostra todos.",
     )
+
+# Linha-resumo do que tá filtrado (logo abaixo do card)
+_resumo_parts = [f"**{modo}** {competencia}"]
+if pessoa != "Família (todos)":
+    _resumo_parts.append(f"👥 {pessoa}")
+else:
+    _resumo_parts.append("👥 Família (todos)")
+if cat_avancada != "Todas":
+    _resumo_parts.append(f"📂 {cat_avancada}")
+if forma_avancada != "Todas":
+    _resumo_parts.append(f"💳 {forma_avancada}")
+if cartoes_selecionados:
+    _resumo_parts.append(f"💳 Cartões: {', '.join(cartoes_selecionados)}")
+_filtros_extras_ativos = (cat_avancada != "Todas") or (forma_avancada != "Todas") or bool(cartoes_selecionados)
+_emoji_resumo = "🔎" if _filtros_extras_ativos else "📊"
+st.caption(f"{_emoji_resumo} **Mostrando:** {' • '.join(_resumo_parts)}")
+
+# Caption explicativo do modo (mantido, mas em fonte menor)
+if modo == "Competência":
+    st.caption("ℹ️ **Competência:** gastos pelo mês a que pertencem (compra de cartão em maio fica em maio, mesmo que pague em junho). Ideal pra **controle de tetos**.")
+else:
+    st.caption("ℹ️ **Caixa:** quando o dinheiro efetivamente sai da conta (compra de cartão em maio aparece em junho). Ideal pra **fluxo de caixa**.")
 
 # Aplicar filtros
 pessoa_filter = None if pessoa == "Família (todos)" else pessoa
