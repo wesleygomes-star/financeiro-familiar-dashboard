@@ -140,7 +140,9 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame,
     modo='Caixa': agrupa pelo mês que o dinheiro efetivamente sai (Data Caixa).
 
     Para o mês atual: mostra o que JÁ foi lançado (parcial).
-    Para meses futuros: mostra a projeção baseada nas recorrentes ativas.
+    Para meses futuros:
+      - Caixa: parcelas de cartão já compradas (Data Caixa futura) + recorrentes ativas.
+      - Competência: só recorrentes ativas (compras futuras ainda não existem).
     """
     from datetime import datetime
     hoje = datetime.now()
@@ -165,18 +167,35 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame,
         rec_lanc = lanc_mes[lanc_mes["Tipo"] == "Receita"]["Valor"].sum()
         desp_lanc = lanc_mes[lanc_mes["Tipo"] == "Despesa"]["Valor"].sum()
 
+        # Stack pra mostrar composição: Já lançado vs Recorrentes projetadas
+        desp_lancada = 0.0
+        desp_recorrente = 0.0
+        rec_lancada = 0.0
+        rec_recorrente = 0.0
+
         if is_atual:
-            receita = rec_lanc
-            despesa = desp_lanc
+            desp_lancada = desp_lanc
+            rec_lancada = rec_lanc
             status = "🔄 Em andamento"
-        elif i == 0 or comp < f"{hoje.month:02d}/{hoje.year}":
-            receita = rec_lanc
-            despesa = desp_lanc
+        elif comp < f"{hoje.month:02d}/{hoje.year}":  # mês passado
+            desp_lancada = desp_lanc
+            rec_lancada = rec_lanc
             status = "✅ Fechado"
-        else:
-            receita = rec_receita_mensal
-            despesa = rec_despesa_mensal
-            status = "📊 Projetado"
+        else:  # mês futuro
+            # No modo Caixa: parcelas de cartão de compras passadas têm Data Caixa futura
+            # e aparecem em lanc_mes. Somar com recorrentes projetadas.
+            # No modo Competência: lanc_mes futuro normalmente = 0 (compras futuras não existem).
+            desp_lancada = desp_lanc  # parcelas futuras (Caixa) ou lançamentos futuros manuais
+            desp_recorrente = rec_despesa_mensal
+            rec_lancada = rec_lanc
+            rec_recorrente = rec_receita_mensal
+            if modo == "Caixa" and desp_lanc > 0:
+                status = f"📊 Projetado (parcelas {fmt_brl(desp_lanc)} + recorrentes)"
+            else:
+                status = "📊 Projetado"
+
+        receita = rec_lancada + rec_recorrente
+        despesa = desp_lancada + desp_recorrente
 
         pontos.append({
             "Mês": comp,
@@ -184,28 +203,45 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame,
             "Despesa": despesa,
             "Saldo": receita - despesa,
             "Status": status,
+            "Desp_Lancada": desp_lancada,
+            "Desp_Recorrente": desp_recorrente,
         })
 
     df = pd.DataFrame(pontos)
 
-    # Gráfico: barras agrupadas
+    # Gráfico: barras agrupadas — Receita única + Despesa STACKED (parcelas/lançado + recorrente)
     fig = go.Figure()
+
+    # Receita: 1 barra única
     fig.add_trace(go.Bar(
         x=df["Mês"], y=df["Receita"], name="💚 Receita",
         marker_color="#10B981",
         text=[fmt_brl(v) for v in df["Receita"]], textposition="outside",
+        offsetgroup="rec",
+    ))
+    # Despesa: stacked dentro do mesmo offsetgroup
+    label_lancada = "💸 Já lançado (parcelas + variáveis)" if modo == "Caixa" else "💸 Já lançado"
+    fig.add_trace(go.Bar(
+        x=df["Mês"], y=df["Desp_Lancada"], name=label_lancada,
+        marker_color="#EF4444",
+        text=[fmt_brl(v) if v > 0 else "" for v in df["Desp_Lancada"]],
+        textposition="inside",
+        offsetgroup="desp",
     ))
     fig.add_trace(go.Bar(
-        x=df["Mês"], y=df["Despesa"], name="💸 Despesa",
-        marker_color="#EF4444",
-        text=[fmt_brl(v) for v in df["Despesa"]], textposition="outside",
+        x=df["Mês"], y=df["Desp_Recorrente"], name="🔁 Recorrentes projetadas",
+        marker_color="#B91C1C",
+        text=[fmt_brl(v) if v > 0 else "" for v in df["Desp_Recorrente"]],
+        textposition="inside",
+        offsetgroup="desp",
     ))
+
     titulo_modo = "Caixa (quando entra/sai)" if modo == "Caixa" else "Competência (mês de pertencimento)"
     fig.update_layout(
         title=f"📊 Receita × Despesa nos próximos 6 meses — {titulo_modo}",
-        barmode="group",
-        height=420,
-        margin=dict(l=10, r=10, t=50, b=10),
+        barmode="relative",  # stacked dentro do mesmo offsetgroup, agrupado por offsetgroup
+        height=460,
+        margin=dict(l=10, r=10, t=60, b=10),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -215,16 +251,27 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame,
     st.plotly_chart(fig, use_container_width=True)
 
     # Tabela detalhada
-    df_display = df.copy()
-    df_display["Receita"] = df_display["Receita"].apply(fmt_brl)
-    df_display["Despesa"] = df_display["Despesa"].apply(fmt_brl)
-    df_display["Saldo"] = df_display["Saldo"].apply(fmt_brl)
+    df_display = df[["Mês", "Receita", "Despesa", "Desp_Lancada", "Desp_Recorrente", "Saldo", "Status"]].copy()
+    df_display = df_display.rename(columns={
+        "Desp_Lancada": "Já lançado",
+        "Desp_Recorrente": "Recorrentes proj.",
+    })
+    for col in ["Receita", "Despesa", "Já lançado", "Recorrentes proj.", "Saldo"]:
+        df_display[col] = df_display[col].apply(fmt_brl)
     with st.expander("📋 Ver detalhamento dos próximos 6 meses"):
         st.dataframe(df_display, hide_index=True, use_container_width=True)
-        st.caption(
-            "**Em andamento**: só inclui o que já foi lançado este mês. "
-            "**Projetado**: receitas e despesas recorrentes ativas (sem variáveis futuras)."
-        )
+        if modo == "Caixa":
+            st.caption(
+                "**Em andamento**: o que já foi lançado este mês (parcial). "
+                "**Projetado (Caixa)**: parcelas de cartão de compras passadas que vencem no mês futuro + recorrentes ativas. "
+                "Compras futuras com cartão ainda não feitas NÃO aparecem (pois não existem na planilha)."
+            )
+        else:
+            st.caption(
+                "**Em andamento**: só inclui o que já foi lançado este mês. "
+                "**Projetado (Competência)**: receitas e despesas recorrentes ativas. "
+                "Compras avulsas futuras não aparecem."
+            )
 
 
 def breakdown_fixa_variavel(df_despesas: pd.DataFrame, key: str = "fixavar"):

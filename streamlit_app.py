@@ -150,29 +150,35 @@ with col_refresh:
         st.rerun()
 
 
-# Filtros avançados (collapsable)
-with st.expander("🔍 Filtros avançados", expanded=False):
-    fc1, fc2, fc3 = st.columns(3)
-    with fc1:
-        cats_disponiveis = ["Todas"] + sorted(df_lanc["Categoria"].dropna().unique().tolist())
-        cat_avancada = st.selectbox("Categoria", cats_disponiveis, key="filtro_cat")
-    with fc2:
-        formas = ["Todas"] + sorted(df_lanc["Forma Pgto"].dropna().unique().tolist())
-        forma_avancada = st.selectbox("Forma Pgto", formas, key="filtro_forma")
-    with fc3:
-        cartoes = ["Todos"] + sorted([c for c in df_lanc["Cartão"].dropna().unique().tolist() if c])
-        cartao_avancado = st.selectbox("Cartão", cartoes, key="filtro_cartao")
+# Filtros adicionais (visíveis por padrão — antes ficavam escondidos num expander)
+fc1, fc2, fc3 = st.columns(3)
+with fc1:
+    cats_disponiveis = ["Todas"] + sorted(df_lanc["Categoria"].dropna().unique().tolist())
+    cat_avancada = st.selectbox("📂 Categoria", cats_disponiveis, key="filtro_cat")
+with fc2:
+    formas = ["Todas"] + sorted(df_lanc["Forma Pgto"].dropna().unique().tolist())
+    forma_avancada = st.selectbox("💳 Forma Pgto", formas, key="filtro_forma")
+with fc3:
+    cartoes_disp = sorted([c for c in df_lanc["Cartão"].dropna().unique().tolist() if c])
+    cartoes_selecionados = st.multiselect(
+        "💳 Cartão (vazio = todos)",
+        cartoes_disp,
+        default=[],
+        key="filtro_cartao_multi",
+        placeholder="Todos os cartões",
+        help="Selecione um ou mais cartões. Vazio = mostra todos.",
+    )
 
 # Aplicar filtros
 pessoa_filter = None if pessoa == "Família (todos)" else pessoa
 df_filtrado = filtrar(df_lanc, competencia=competencia, pessoa=pessoa_filter, modo=modo)
-# Aplica filtros avançados
+# Aplica filtros adicionais
 if cat_avancada != "Todas":
     df_filtrado = df_filtrado[df_filtrado["Categoria"] == cat_avancada]
 if forma_avancada != "Todas":
     df_filtrado = df_filtrado[df_filtrado["Forma Pgto"] == forma_avancada]
-if cartao_avancado != "Todos":
-    df_filtrado = df_filtrado[df_filtrado["Cartão"] == cartao_avancado]
+if cartoes_selecionados:
+    df_filtrado = df_filtrado[df_filtrado["Cartão"].isin(cartoes_selecionados)]
 
 df_receitas = df_filtrado[df_filtrado["Tipo"] == "Receita"]
 df_despesas = df_filtrado[df_filtrado["Tipo"] == "Despesa"]
@@ -198,8 +204,8 @@ if cat_avancada != "Todas":
     df_anterior = df_anterior[df_anterior["Categoria"] == cat_avancada]
 if forma_avancada != "Todas":
     df_anterior = df_anterior[df_anterior["Forma Pgto"] == forma_avancada]
-if cartao_avancado != "Todos":
-    df_anterior = df_anterior[df_anterior["Cartão"] == cartao_avancado]
+if cartoes_selecionados:
+    df_anterior = df_anterior[df_anterior["Cartão"].isin(cartoes_selecionados)]
 
 receita_ant = df_anterior[df_anterior["Tipo"] == "Receita"]["Valor"].sum()
 despesa_ant = df_anterior[df_anterior["Tipo"] == "Despesa"]["Valor"].sum()
