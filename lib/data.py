@@ -68,7 +68,7 @@ def _records_formatted(name: str):
 
 
 @st.cache_data(ttl=60)
-def load_lancamentos() -> pd.DataFrame:
+def load_lancamentos(incluir_cancelados: bool = False) -> pd.DataFrame:
     rows = _records_formatted("Lançamentos")
     df = pd.DataFrame(rows)
     if df.empty:
@@ -80,6 +80,15 @@ def load_lancamentos() -> pd.DataFrame:
     df["Mês Caixa"] = df["Data Caixa_dt"].apply(
         lambda d: f"{d.month:02d}/{d.year}" if pd.notna(d) else ""
     )
+    # Coluna Status (default Ativo se ausente ou vazio) — pra preservar histórico mas excluir
+    # lançamentos cancelados dos totais. Toggle UI pode incluir cancelados na visão "TODOS".
+    if "Status" not in df.columns:
+        df["Status"] = "Ativo"
+    else:
+        # Case-insensitive: aceita "Ativo", "ativo", "ATIVO" etc; normaliza vazio → Ativo
+        df["Status"] = df["Status"].astype(str).str.strip().replace("", "Ativo")
+    if not incluir_cancelados:
+        df = df[df["Status"].str.lower() != "cancelado"].copy()
     return df
 
 
