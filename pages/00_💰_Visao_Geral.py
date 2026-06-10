@@ -23,6 +23,133 @@ from lib.data import (
 
 st.set_page_config(page_title="Visão Geral", page_icon="💰", layout="wide")
 
+# ============== CSS responsivo (mobile-first) ==============
+st.markdown(
+    """
+    <style>
+    /* Reduz padding excessivo do Streamlit em qualquer tela */
+    .block-container { max-width: 100% !important; padding-top: 1rem !important; }
+
+    /* === MOBILE (≤ 768px) === */
+    @media (max-width: 768px) {
+        .block-container {
+            padding-top: 0.5rem !important;
+            padding-bottom: 1rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        /* Default: colunas viram stack vertical */
+        div[data-testid="stColumn"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            min-width: 100% !important;
+            margin-bottom: 0.4rem !important;
+        }
+        /* KPI metric maior pra leitura no celular */
+        div[data-testid="stMetricValue"] { font-size: 1.5rem !important; }
+        div[data-testid="stMetricLabel"] { font-size: 0.85rem !important; }
+        div[data-testid="stMetricDelta"] { font-size: 0.8rem !important; }
+        /* Headings menores */
+        h1 { font-size: 1.5rem !important; }
+        h2 { font-size: 1.2rem !important; }
+        h3 { font-size: 1.05rem !important; }
+        .stSubheader { font-size: 1.1rem !important; }
+        /* Containers com borda ganham padding interno menor */
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            padding: 0.6rem 0.7rem !important;
+        }
+        /* Dataframes scroll horizontal sem quebrar layout */
+        div[data-testid="stDataFrame"] { overflow-x: auto; }
+        /* Captions mais legíveis */
+        div[data-testid="stCaptionContainer"] p { font-size: 0.78rem !important; }
+        /* Botões com tap-target generoso */
+        button { min-height: 36px !important; }
+        /* Selects/radios em row ficam responsivos */
+        div[data-baseweb="select"] { min-width: 100% !important; }
+        /* Plotly charts com altura mínima legível */
+        .stPlotlyChart { min-height: 280px !important; }
+        /* Reduzir gap entre divider e conteúdo */
+        hr { margin: 0.6rem 0 !important; }
+    }
+
+    /* === TABLET (≤ 1024px) === */
+    @media (max-width: 1024px) and (min-width: 769px) {
+        div[data-testid="stMetricValue"] { font-size: 1.6rem !important; }
+    }
+
+    /* === KPI / Card grids custom (HTML inline) === */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .kpi-card {
+        background: rgba(128, 128, 128, 0.08);
+        border-radius: 8px;
+        padding: 14px 16px;
+    }
+    .kpi-label {
+        font-size: 11px;
+        color: var(--text-color-muted, #888);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .kpi-value {
+        font-size: 22px;
+        font-weight: 500;
+        line-height: 1.2;
+    }
+    .kpi-mini {
+        border-top: 0.5px solid rgba(128, 128, 128, 0.2);
+        margin-top: 8px;
+        padding-top: 8px;
+        font-size: 11px;
+        line-height: 1.7;
+    }
+    .kpi-mini-row {
+        display: flex;
+        justify-content: space-between;
+    }
+    .kpi-mini-row span:first-child { opacity: 0.7; }
+    .kpi-mini-row strong { font-weight: 500; }
+    .kpi-card.green .kpi-value { color: #1D9E75; }
+    .kpi-card.info { background: rgba(55, 138, 221, 0.10); border: 2px solid rgba(55, 138, 221, 0.35); }
+    .kpi-card.info .kpi-label, .kpi-card.info .kpi-value { color: #185FA5; }
+    .kpi-card.warning { background: rgba(239, 159, 39, 0.13); }
+    .kpi-card.warning .kpi-label, .kpi-card.warning .kpi-value, .kpi-card.warning .kpi-mini { color: #854F0B; }
+    .estimado-tag { font-size: 10px; font-style: italic; opacity: 0.85; }
+
+    /* 3-col grid responsivo (Caixa × Competência) */
+    .grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+    .grid-3 > div {
+        border: 0.5px solid rgba(128, 128, 128, 0.25);
+        border-radius: 8px;
+        padding: 14px 16px;
+    }
+    .grid-3 > div.warning {
+        background: rgba(239, 159, 39, 0.13);
+        border-color: rgba(239, 159, 39, 0.4);
+        color: #854F0B;
+    }
+
+    /* Responsivo: 4-col → 2x2 em mobile, 3-col → stack */
+    @media (max-width: 768px) {
+        .kpi-grid { grid-template-columns: 1fr 1fr !important; gap: 8px; }
+        .kpi-value { font-size: 18px !important; }
+        .grid-3 { grid-template-columns: 1fr !important; }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # Auth
 if "auth_ok" not in st.session_state:
     senha = st.text_input("🔐 Senha", type="password")
@@ -69,61 +196,108 @@ with c_refresh:
 
 st.divider()
 
-# ============== KPIs (4 cards) ==============
+# ============== KPIs (4 cards via HTML grid responsivo) ==============
 kpis = kpis_familia(df_lanc, df_saldo, competencia, modo=modo)
 
 st.subheader("Indicadores do mês")
 
-k1, k2, k3, k4 = st.columns(4)
+def _mini_rows(d: dict) -> str:
+    if not d:
+        return '<div class="kpi-mini-row"><span>sem lançamentos</span><strong>—</strong></div>'
+    return "".join(f'<div class="kpi-mini-row"><span>{p}</span><strong>{fmt(v)}</strong></div>' for p, v in d.items())
 
-with k1:
-    st.metric("Receita família", fmt(kpis["receita_total"]))
-    for p, v in kpis["receita_por_pessoa"].items():
-        st.caption(f"{p}: {fmt(v)}")
+# KPI 1: Receita
+kpi_receita = f"""
+<div class="kpi-card green">
+  <div class="kpi-label">💵 Receita família</div>
+  <div class="kpi-value">{fmt(kpis['receita_total'])}</div>
+  <div class="kpi-mini">{_mini_rows(kpis['receita_por_pessoa'])}</div>
+</div>
+"""
 
-with k2:
-    st.metric("Gastos família", fmt(kpis["despesa_total"]))
-    for p, v in kpis["despesa_por_pessoa"].items():
-        st.caption(f"{p}: {fmt(v)}")
+# KPI 2: Gastos
+kpi_gastos = f"""
+<div class="kpi-card">
+  <div class="kpi-label">💳 Gastos família</div>
+  <div class="kpi-value">{fmt(kpis['despesa_total'])}</div>
+  <div class="kpi-mini">{_mini_rows(kpis['despesa_por_pessoa'])}</div>
+</div>
+"""
 
-with k3:
-    aporte = kpis["aporte_total"]
-    estocado = kpis["saldo_estocado_total"]
-    if aporte == 0 and estocado == 0:
-        st.markdown("**📈 Investido**")
-        st.info("Categoria Investimentos ainda não rastreada", icon="💡")
-        st.caption("➕ Lançar 1º aporte · 👁 Ver histórico ↓")
-    else:
-        st.metric("Investido", fmt(aporte) if aporte > 0 else "—", help="Aporte do mês")
-        if aporte > 0:
-            for p, v in kpis["aporte_por_pessoa"].items():
-                st.caption(f"{p}: {fmt(v)}")
-        if estocado > 0:
-            st.caption(f"📦 Saldo estocado: **{fmt(estocado)}**")
-        else:
-            st.caption("📦 Saldo estocado: preencher aba `Saldo Investido`")
+# KPI 3: Investido (condicional — sem falso positivo)
+aporte = kpis["aporte_total"]
+estocado = kpis["saldo_estocado_total"]
+if aporte == 0 and estocado == 0:
+    kpi_invest = """
+    <div class="kpi-card info">
+      <div class="kpi-label">📈 Investido</div>
+      <div class="kpi-value" style="font-size: 14px; line-height: 1.4;">Categoria Investimentos ainda não rastreada</div>
+      <div class="kpi-mini">
+        <div>➕ Lançar 1º aporte</div>
+        <div>👁 Ver histórico ↓</div>
+      </div>
+    </div>
+    """
+else:
+    aporte_mini = _mini_rows(kpis["aporte_por_pessoa"])
+    estocado_html = f'<div class="kpi-mini-row" style="border-top: 0.5px solid rgba(128,128,128,0.2); margin-top: 4px; padding-top: 4px;"><span>📦 estocado</span><strong>{fmt(estocado)}</strong></div>' if estocado > 0 else ''
+    kpi_invest = f"""
+    <div class="kpi-card info">
+      <div class="kpi-label">📈 Investido</div>
+      <div class="kpi-value">{fmt(aporte) if aporte > 0 else '—'}</div>
+      <div class="kpi-mini">{aporte_mini}{estocado_html}</div>
+    </div>
+    """
 
-with k4:
-    # Faturas pendentes
-    if not df_faturas.empty and "Status" in df_faturas.columns:
-        pend = df_faturas[df_faturas["Status"].astype(str).str.lower() == "pendente"]
-        if not pend.empty and "Vencimento_dt" in pend.columns:
-            hoje = pd.Timestamp(datetime.now().date())
-            pend = pend.assign(_dias=(pend["Vencimento_dt"] - hoje).dt.days)
-            pend = pend[(pend["_dias"] >= -30) & (pend["_dias"] <= 30)].sort_values("_dias")
-            total_pend = float(pend["Total_num"].fillna(0).sum()) if "Total_num" in pend.columns else 0
-            st.metric("Faturas a debitar", fmt(total_pend) if total_pend > 0 else "—")
-            for _, r in pend.head(5).iterrows():
-                d = int(r["_dias"])
-                txt = f"venceu há {abs(d)}d" if d < 0 else (f"em {d}d" if d > 0 else "HOJE")
-                emoji = "🔴" if d < 0 else ("🟠" if d <= 5 else "🟡")
-                cartao = str(r.get("Cartão", "?"))[:24]
-                st.caption(f"{emoji} {cartao} — {txt}")
-        else:
-            st.metric("Faturas a debitar", "—")
-            st.caption("Nenhuma janela 30d")
-    else:
-        st.metric("Faturas", "—")
+# KPI 4: Faturas
+faturas_html_rows = ""
+total_pend = 0
+qtd_pend = 0
+is_estimado = False
+if not df_faturas.empty and "Status" in df_faturas.columns and "Vencimento_dt" in df_faturas.columns:
+    pend = df_faturas[df_faturas["Status"].astype(str).str.lower() == "pendente"].copy()
+    hoje = pd.Timestamp(datetime.now().date())
+    pend["_dias"] = (pend["Vencimento_dt"] - hoje).dt.days
+    pend = pend[(pend["_dias"] >= -30) & (pend["_dias"] <= 30)].sort_values("_dias")
+    qtd_pend = len(pend)
+    # buckets
+    em_5 = pend[(pend["_dias"] >= 0) & (pend["_dias"] <= 5)]
+    em_7 = pend[(pend["_dias"] > 5) & (pend["_dias"] <= 7)]
+    em_30 = pend[(pend["_dias"] > 7) & (pend["_dias"] <= 30)]
+    _flag = [False]
+    def soma_bucket(df_):
+        s = 0.0
+        for _, r in df_.iterrows():
+            v = float(r.get("Total_num", 0) or 0)
+            if v <= 0:
+                v_est, _ = fatura_estimada(str(r.get("Cartão", "")), str(r.get("Mês Referência", "")), df_lanc)
+                v = v_est
+                if v > 0:
+                    _flag[0] = True
+            s += v
+        return s
+    t5, t7, t30 = soma_bucket(em_5), soma_bucket(em_7), soma_bucket(em_30)
+    total_pend = t5 + t7 + t30
+    is_estimado = _flag[0]
+    if len(em_5):
+        faturas_html_rows += f'<div class="kpi-mini-row"><span>{len(em_5)} em até 5d</span><strong>{fmt(t5)}</strong></div>'
+    if len(em_7):
+        faturas_html_rows += f'<div class="kpi-mini-row"><span>{len(em_7)} em 7d</span><strong>{fmt(t7)}</strong></div>'
+    if len(em_30):
+        faturas_html_rows += f'<div class="kpi-mini-row"><span>{len(em_30)} em 30d</span><strong>{fmt(t30)}</strong></div>'
+
+valor_label = (f'~ {fmt(total_pend)}' if is_estimado else fmt(total_pend)) if total_pend > 0 else '—'
+estimado_label = '<div class="estimado-tag">estimado de lançamentos individuais</div>' if is_estimado else ''
+kpi_faturas = f"""
+<div class="kpi-card warning">
+  <div class="kpi-label">⚠️ Faturas a debitar</div>
+  <div class="kpi-value">{valor_label}</div>
+  {estimado_label}
+  <div class="kpi-mini">{faturas_html_rows or '<div class="kpi-mini-row"><span>Nenhuma na janela 30d</span></div>'}</div>
+</div>
+"""
+
+st.markdown(f'<div class="kpi-grid">{kpi_receita}{kpi_gastos}{kpi_invest}{kpi_faturas}</div>', unsafe_allow_html=True)
 
 st.divider()
 
@@ -137,20 +311,29 @@ caixa_total = float(splits_caixa["despesas"]["Valor"].sum()) if not splits_caixa
 comp_total = float(splits_comp["despesas"]["Valor"].sum()) if not splits_comp["despesas"].empty else 0.0
 empurrado = comp_total - caixa_total
 
-cc1, cc2, cc3 = st.columns(3)
-with cc1.container(border=True):
-    st.caption("🪙 **Caixa do mês**")
-    st.subheader(fmt(caixa_total))
-    st.caption("o que saiu em $ esse mês (vencimentos+débitos)")
-with cc2.container(border=True):
-    st.caption("📅 **Competência do mês**")
-    st.subheader(fmt(comp_total))
-    st.caption("o que foi decidido (data da compra)")
-with cc3.container(border=True):
-    cor = "🟠" if empurrado > 0 else "🟢"
-    st.caption(f"{cor} **Empurrado pro futuro**")
-    st.subheader(fmt(empurrado))
-    st.caption("parcelas que vão pesar próximos meses" if empurrado > 0 else "tudo decidido foi pago")
+empurrado_class = "warning" if empurrado > 0 else ""
+empurrado_sub = "parcelas que vão pesar próximos meses" if empurrado > 0 else "tudo decidido foi pago"
+
+cx_html = f"""
+<div class="grid-3">
+  <div>
+    <div class="kpi-label">🪙 Caixa do mês</div>
+    <div style="font-size: 20px; font-weight: 500;">{fmt(caixa_total)}</div>
+    <div style="font-size: 11px; opacity: 0.7; margin-top: 4px;">o que saiu em $ esse mês (vencimentos + débitos)</div>
+  </div>
+  <div>
+    <div class="kpi-label">📅 Competência do mês</div>
+    <div style="font-size: 20px; font-weight: 500;">{fmt(comp_total)}</div>
+    <div style="font-size: 11px; opacity: 0.7; margin-top: 4px;">o que foi decidido (data da compra)</div>
+  </div>
+  <div class="{empurrado_class}">
+    <div class="kpi-label">{'🟠' if empurrado > 0 else '🟢'} Empurrado pro futuro</div>
+    <div style="font-size: 20px; font-weight: 500;">{fmt(empurrado)}</div>
+    <div style="font-size: 11px; opacity: 0.75; margin-top: 4px;">{empurrado_sub}</div>
+  </div>
+</div>
+"""
+st.markdown(cx_html, unsafe_allow_html=True)
 
 st.divider()
 
