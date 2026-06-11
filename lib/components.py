@@ -63,8 +63,10 @@ def donut_categorias(df_despesas: pd.DataFrame, titulo: str = "Despesas por Cate
         showlegend=False,
         height=380,
         margin=dict(l=10, r=10, t=40, b=10),
+        template="plotly_white",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#2C2C2A", size=12),
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -104,9 +106,11 @@ def barras_categoria_vs_teto(df_despesas: pd.DataFrame, df_tetos: pd.DataFrame, 
         title=titulo,
         height=max(300, 30 * len(agg) + 100),
         margin=dict(l=10, r=80, t=40, b=10),
+        template="plotly_white",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(title="R$", showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
+        font=dict(color="#2C2C2A", size=12),
+        xaxis=dict(title="R$", showgrid=True, gridcolor="rgba(128,128,128,0.18)"),
         yaxis=dict(title=""),
     )
     event = st.plotly_chart(fig, use_container_width=True, key=key, on_select="rerun")
@@ -242,11 +246,13 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame,
         barmode="relative",  # stacked dentro do mesmo offsetgroup, agrupado por offsetgroup
         height=460,
         margin=dict(l=10, r=10, t=60, b=10),
+        template="plotly_white",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#2C2C2A", size=12),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
+        yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.18)"),
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -321,8 +327,10 @@ def breakdown_fixa_variavel(df_despesas: pd.DataFrame, key: str = "fixavar"):
             barmode="stack",
             height=120,
             margin=dict(l=10, r=10, t=10, b=10),
+            template="plotly_white",
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#2C2C2A", size=12),
             showlegend=True,
             legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
             xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
@@ -439,7 +447,7 @@ def comparativo_mensal(df_lancamentos: pd.DataFrame, df_tetos: pd.DataFrame, mod
         zmin=0, zmax=1.2,
         text=[[fmt_brl(v) for v in row] for row in pivot.values],
         texttemplate="%{text}",
-        textfont={"size": 11, "color": "white"},
+        textfont={"size": 11, "color": "#2C2C2A"},
         hovertemplate="<b>%{y}</b><br>%{x}<br>Gasto: %{text}<br>% teto: %{z:.0%}<extra></extra>",
         showscale=True,
         colorbar=dict(title="% teto", tickformat=".0%"),
@@ -448,8 +456,10 @@ def comparativo_mensal(df_lancamentos: pd.DataFrame, df_tetos: pd.DataFrame, mod
         title=f"🗓️ Evolução mensal por categoria — {modo}",
         height=max(350, 35 * len(pivot.index) + 100),
         margin=dict(l=10, r=10, t=50, b=10),
+        template="plotly_white",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#2C2C2A", size=12),
         xaxis=dict(side="top"),
     )
     st.plotly_chart(fig, use_container_width=True)
@@ -476,11 +486,13 @@ def comparativo_mensal(df_lancamentos: pd.DataFrame, df_tetos: pd.DataFrame, mod
         barmode="group",
         height=380,
         margin=dict(l=10, r=10, t=50, b=10),
+        template="plotly_white",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#2C2C2A", size=12),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
+        yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.18)"),
     )
     st.plotly_chart(fig2, use_container_width=True)
 
