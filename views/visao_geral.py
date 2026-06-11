@@ -1,4 +1,5 @@
 """Visão Geral — painel principal v4 (família, sem 'Casal', com auditoria)."""
+import re
 from datetime import datetime
 
 import pandas as pd
@@ -286,7 +287,10 @@ kpi_faturas = f"""
 </div>
 """
 
-st.markdown(f'<div class="kpi-grid">{kpi_receita}{kpi_gastos}{kpi_invest}{kpi_faturas}</div>', unsafe_allow_html=True)
+# Achata o HTML em 1 linha — markdown trata linhas com 4+ espaços de indentação
+# como code block e renderiza o HTML cru (bug visto em produção 11/06)
+_kpi_html = re.sub(r"\n\s*", "", f'<div class="kpi-grid">{kpi_receita}{kpi_gastos}{kpi_invest}{kpi_faturas}</div>')
+st.markdown(_kpi_html, unsafe_allow_html=True)
 
 st.divider()
 
@@ -301,7 +305,12 @@ comp_total = float(splits_comp["despesas"]["Valor"].sum()) if not splits_comp["d
 empurrado = comp_total - caixa_total
 
 empurrado_class = "warning" if empurrado > 0 else ""
-empurrado_sub = "parcelas que vão pesar próximos meses" if empurrado > 0 else "tudo decidido foi pago"
+if empurrado > 0:
+    empurrado_sub = "parcelas que vão pesar próximos meses"
+elif empurrado < 0:
+    empurrado_sub = "caixa pagou compromissos de meses anteriores (faturas)"
+else:
+    empurrado_sub = "tudo decidido foi pago"
 
 cx_html = f"""
 <div class="grid-3">
@@ -322,7 +331,7 @@ cx_html = f"""
   </div>
 </div>
 """
-st.markdown(cx_html, unsafe_allow_html=True)
+st.markdown(re.sub(r"\n\s*", "", cx_html), unsafe_allow_html=True)
 
 st.divider()
 
