@@ -17,17 +17,7 @@ from lib.ocr_fatura import dedupe_against_existing, extract_transactions
 from lib.sheets_writer import append_lancamentos
 
 
-st.set_page_config(page_title="Importar Fatura", page_icon="📥", layout="wide")
-
-# ----- Auth simples (mesmo schema do dashboard principal) -----
-if "auth_ok" not in st.session_state:
-    pwd_input = st.text_input("Senha", type="password")
-    if pwd_input == st.secrets["auth"]["password"]:
-        st.session_state["auth_ok"] = True
-        st.rerun()
-    elif pwd_input:
-        st.error("Senha incorreta")
-    st.stop()
+# set_page_config + auth ficam no router (streamlit_app.py)
 
 # ----- Header -----
 st.title("📥 Importar Fatura")

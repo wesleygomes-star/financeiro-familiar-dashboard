@@ -21,7 +21,7 @@ from lib.data import (
 )
 
 
-st.set_page_config(page_title="Visão Geral", page_icon="💰", layout="wide")
+# set_page_config + auth ficam no router (streamlit_app.py)
 
 # ============== CSS responsivo (mobile-first) ==============
 st.markdown(
@@ -149,17 +149,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
-# Auth
-if "auth_ok" not in st.session_state:
-    senha = st.text_input("🔐 Senha", type="password")
-    if senha == st.secrets.get("auth", {}).get("password", "familia2026"):
-        st.session_state["auth_ok"] = True
-        st.rerun()
-    elif senha:
-        st.error("Senha incorreta")
-    st.stop()
-
 
 def fmt(v: float, com_cifrao: bool = True) -> str:
     s = f"{abs(v):,.0f}".replace(",", ".")

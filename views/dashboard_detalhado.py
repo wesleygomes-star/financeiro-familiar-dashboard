@@ -14,12 +14,7 @@ from lib.data import load_lancamentos, load_recorrentes, load_tetos, meses_dispo
 from lib.components import kpi_card, donut_categorias, barras_categoria_vs_teto, projecao_6_meses, tabela_top_despesas, detalhar_categoria, comparativo_mensal, fmt_brl, breakdown_fixa_variavel, detalhar_fixa_variavel
 
 
-st.set_page_config(
-    page_title="Financeiro Familiar",
-    page_icon="💰",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+# set_page_config + auth ficam no router (streamlit_app.py)
 
 # ============== CSS RESPONSIVO (mobile-friendly) ==============
 st.markdown(
@@ -71,26 +66,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
-# Auth simples por senha (proteção mínima — só Wesley e Sabrina)
-def check_password():
-    if st.session_state.get("auth_ok"):
-        return True
-    senha_correta = st.secrets.get("auth", {}).get("password", "familia2026")
-    senha = st.sidebar.text_input("🔐 Senha", type="password", key="senha_input")
-    if senha == senha_correta:
-        st.session_state["auth_ok"] = True
-        st.rerun()
-    elif senha:
-        st.sidebar.error("Senha incorreta")
-    return False
-
-
-if not check_password():
-    st.title("💰 Financeiro Familiar")
-    st.info("👈 Digite a senha na barra lateral pra entrar.")
-    st.stop()
-
 
 # ============== DADOS ==============
 with st.spinner("Carregando dados..."):

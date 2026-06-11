@@ -45,23 +45,57 @@ def kpi_card(label: str, value: float, prefix: str = "R$", delta: str = None,
     st.metric(label=f"{emoji} {label}", value=formatted, delta=delta, delta_color=delta_color)
 
 
+# Paleta fixa por categoria (mesma família de cores do mockup aprovado)
+CORES_CATEGORIA = {
+    "Lazer & Restaurantes": "#7F77DD",
+    "Alimentação": "#1D9E75",
+    "Moradia": "#378ADD",
+    "Transporte": "#888780",
+    "Saúde": "#E24B4A",
+    "Educação": "#EF9F27",
+    "Vestuário": "#D4537E",
+    "Pessoal & Beleza": "#F0997B",
+    "Assinaturas & Streaming": "#5DCAA5",
+    "Financeiro & Cartão": "#85B7EB",
+    "Auxílio Familiar": "#FAC775",
+    "Outros Imóveis": "#AFA9EC",
+    "Investimentos em Imóvel": "#534AB7",
+    "Outros": "#B4B2A9",
+}
+COR_FALLBACK = "#B4B2A9"
+
+
 def donut_categorias(df_despesas: pd.DataFrame, titulo: str = "Despesas por Categoria"):
-    """Donut de despesas por categoria."""
+    """Donut de despesas por categoria — top 8 + 'Outras', legenda embaixo (sem callouts sobrepostos)."""
     if df_despesas.empty:
         st.info("Sem dados pra mostrar nesse filtro.")
         return
     agg = df_despesas.groupby("Categoria", as_index=False)["Valor"].sum().sort_values("Valor", ascending=False)
-    fig = px.pie(agg, values="Valor", names="Categoria", hole=0.55,
-                 color_discrete_sequence=px.colors.qualitative.Set2)
-    fig.update_traces(
-        textposition="outside",
-        textinfo="label+percent",
-        hovertemplate="<b>%{label}</b><br>R$ %{value:,.2f}<br>%{percent}<extra></extra>",
-    )
+    if len(agg) > 8:
+        top = agg.head(8)
+        outras = pd.DataFrame([{"Categoria": "Outras", "Valor": agg["Valor"].iloc[8:].sum()}])
+        agg = pd.concat([top, outras], ignore_index=True)
+
+    cores = [CORES_CATEGORIA.get(c, COR_FALLBACK) for c in agg["Categoria"]]
+    total = agg["Valor"].sum()
+    labels_legenda = [
+        f"{c} · {v / total:.0%}" for c, v in zip(agg["Categoria"], agg["Valor"])
+    ]
+
+    fig = go.Figure(go.Pie(
+        labels=labels_legenda,
+        values=agg["Valor"],
+        hole=0.62,
+        marker=dict(colors=cores),
+        textinfo="none",
+        hovertemplate="<b>%{label}</b><br>R$ %{value:,.2f}<extra></extra>",
+        sort=False,
+    ))
     fig.update_layout(
         title=titulo,
-        showlegend=False,
-        height=380,
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="top", y=-0.05, xanchor="center", x=0.5, font=dict(size=11)),
+        height=420,
         margin=dict(l=10, r=10, t=40, b=10),
         template="plotly_white",
         paper_bgcolor="rgba(0,0,0,0)",
@@ -82,35 +116,38 @@ def barras_categoria_vs_teto(df_despesas: pd.DataFrame, df_tetos: pd.DataFrame, 
     tetos_map = dict(zip(df_tetos["Categoria"], df_tetos["Teto Mensal"]))
     agg["Teto"] = agg["Categoria"].map(tetos_map).fillna(0)
     agg["Pct"] = agg.apply(lambda r: (r["Valor"] / r["Teto"]) if r["Teto"] > 0 else 0, axis=1)
+    # Maior gasto em cima (mockup), cor fixa por categoria — semáforo vai só no texto do %
+    agg = agg.sort_values("Valor", ascending=True)
+    agg["Cor"] = agg["Categoria"].map(lambda c: CORES_CATEGORIA.get(c, COR_FALLBACK))
 
-    def cor(p):
-        if p >= 1.0: return "#EF4444"
-        if p >= 0.8: return "#F59E0B"
-        return "#10B981"
-
-    agg["Cor"] = agg["Pct"].apply(cor)
-    agg = agg.sort_values("Pct", ascending=True)
+    def label(v, p, t):
+        if t <= 0:
+            return fmt_brl(v)
+        emoji = "🔴" if p >= 1.0 else ("🟡" if p >= 0.8 else "")
+        return f"{fmt_brl(v)} · {p:.0%} {emoji}".strip()
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
         y=agg["Categoria"],
         x=agg["Valor"],
         orientation="h",
-        marker_color=agg["Cor"],
-        text=[f"{fmt_brl(v)} ({p:.0%})" for v, p in zip(agg["Valor"], agg["Pct"])],
+        marker=dict(color=agg["Cor"], cornerradius=4),
+        text=[label(v, p, t) for v, p, t in zip(agg["Valor"], agg["Pct"], agg["Teto"])],
         textposition="outside",
+        cliponaxis=False,
+        textfont=dict(size=12),
         hovertemplate="<b>%{y}</b><br>Gasto: %{customdata[0]}<br>Teto: %{customdata[1]}<br>%{customdata[2]} do teto<br><i>👆 Clica pra ver detalhes</i><extra></extra>",
-        customdata=[[fmt_brl(v), fmt_brl(t), f"{p:.0%}"] for v, t, p in zip(agg["Valor"], agg["Teto"], agg["Pct"])],
+        customdata=[[fmt_brl(v), fmt_brl(t) if t > 0 else "sem teto", f"{p:.0%}"] for v, t, p in zip(agg["Valor"], agg["Teto"], agg["Pct"])],
     ))
     fig.update_layout(
         title=titulo,
-        height=max(300, 30 * len(agg) + 100),
-        margin=dict(l=10, r=80, t=40, b=10),
+        height=max(300, 34 * len(agg) + 100),
+        margin=dict(l=10, r=150, t=40, b=10),
         template="plotly_white",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#2C2C2A", size=12),
-        xaxis=dict(title="R$", showgrid=True, gridcolor="rgba(128,128,128,0.18)"),
+        xaxis=dict(title="", showgrid=True, gridcolor="rgba(128,128,128,0.18)"),
         yaxis=dict(title=""),
     )
     event = st.plotly_chart(fig, use_container_width=True, key=key, on_select="rerun")
