@@ -41,6 +41,36 @@ def _parse_data(s):
     return pd.NaT
 
 
+# Canonicalização de categorias (fix encoding inconsistente acumulado)
+CATEGORIAS_CANONICAS = {
+    "vestuario": "Vestuário",
+    "vestuário": "Vestuário",
+    "saude": "Saúde",
+    "saúde": "Saúde",
+    "educacao": "Educação",
+    "educação": "Educação",
+    "financeiro & cartao": "Financeiro & Cartão",
+    "financeiro & cartão": "Financeiro & Cartão",
+    "alimentacao": "Alimentação",
+    "alimentação": "Alimentação",
+    "auxilio familiar": "Auxílio Familiar",
+    "auxílio familiar": "Auxílio Familiar",
+    "assinaturas & streaming": "Assinaturas & Streaming",
+    "pro-labore": "Pró-labore",
+    "pró-labore": "Pró-labore",
+    "outros imoveis": "Outros Imóveis",
+    "outros imóveis": "Outros Imóveis",
+    "investimentos em imovel": "Investimentos em Imóvel",
+    "investimentos em imóvel": "Investimentos em Imóvel",
+}
+
+
+def _normalizar_categoria(c):
+    if not c or pd.isna(c):
+        return ""
+    return CATEGORIAS_CANONICAS.get(str(c).strip().lower(), str(c).strip())
+
+
 def _parse_valor(v):
     """Aceita '1.234,56' (PT-BR) ou '1234.56' ou int. Retorna float."""
     if v is None or v == "":
@@ -76,6 +106,8 @@ def load_lancamentos(incluir_cancelados: bool = False) -> pd.DataFrame:
     df["Valor"] = df["Valor"].apply(_parse_valor)
     df["Data_dt"] = df["Data"].apply(_parse_data)
     df["Data Caixa_dt"] = df["Data Caixa"].apply(_parse_data)
+    if "Categoria" in df.columns:
+        df["Categoria"] = df["Categoria"].apply(_normalizar_categoria)
     # Coluna Mês Caixa (MM/YYYY) extraída de Data Caixa pra usar como pivot na visão Caixa
     df["Mês Caixa"] = df["Data Caixa_dt"].apply(
         lambda d: f"{d.month:02d}/{d.year}" if pd.notna(d) else ""

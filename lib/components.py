@@ -425,44 +425,45 @@ def comparativo_mensal(df_lancamentos: pd.DataFrame, df_tetos: pd.DataFrame, mod
         else:
             pct.loc[cat] = 0
 
-    # Heatmap usando Plotly
-    fig = go.Figure(data=go.Heatmap(
-        z=pct.values,
-        x=pivot.columns,
-        y=pivot.index,
-        # Colorscale precisa estar normalizado em [0,1]. Como zmax=1.2,
-        # o valor 1.0 na escala = 120% do teto. Mapeamento:
-        #   0%   -> verde     (0/1.2 = 0.00)
-        #   60%  -> verde     (0.6/1.2 = 0.50)
-        #   80%  -> amarelo   (0.8/1.2 ≈ 0.67)
-        #   100% -> vermelho  (1.0/1.2 ≈ 0.83)
-        #   120% -> vinho     (1.2/1.2 = 1.00)
-        colorscale=[
-            [0.00, "#10B981"],   # verde
-            [0.50, "#10B981"],   # verde (até 60% do teto)
-            [0.67, "#F59E0B"],   # amarelo (~80%)
-            [0.83, "#EF4444"],   # vermelho (~100%)
-            [1.00, "#7F1D1D"],   # vinho (estouro forte, ≥120%)
-        ],
-        zmin=0, zmax=1.2,
-        text=[[fmt_brl(v) for v in row] for row in pivot.values],
-        texttemplate="%{text}",
-        textfont={"size": 11, "color": "#2C2C2A"},
-        hovertemplate="<b>%{y}</b><br>%{x}<br>Gasto: %{text}<br>% teto: %{z:.0%}<extra></extra>",
-        showscale=True,
-        colorbar=dict(title="% teto", tickformat=".0%"),
-    ))
-    fig.update_layout(
-        title=f"🗓️ Evolução mensal por categoria — {modo}",
-        height=max(350, 35 * len(pivot.index) + 100),
-        margin=dict(l=10, r=10, t=50, b=10),
-        template="plotly_white",
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#2C2C2A", size=12),
-        xaxis=dict(side="top"),
+    # Filtra categorias sem gasto em nenhum mês (deixa visual limpo)
+    pivot_filtrado = pivot[pivot.sum(axis=1) > 0]
+    pct_filtrado = pct.loc[pivot_filtrado.index]
+
+    st.markdown(f"#### 🗓️ Evolução mensal por categoria — {modo}")
+    st.caption("texto cinza = sem teto · verde até 60% · âmbar 60-80% · laranja 80-100% · vermelho >100%")
+
+    # Monta dataframe formatado pra st.dataframe com cores no TEXTO (sem fundo)
+    df_tabela = pd.DataFrame(index=pivot_filtrado.index, columns=pivot_filtrado.columns)
+    for cat in pivot_filtrado.index:
+        for mes in pivot_filtrado.columns:
+            v = pivot_filtrado.loc[cat, mes]
+            df_tabela.loc[cat, mes] = float(v)
+
+    def color_pct(val, cat_idx, mes_col):
+        try:
+            p = pct_filtrado.loc[cat_idx, mes_col]
+        except Exception:
+            p = 0
+        if p == 0 or val == 0:
+            return "color: #B4B2A9;"  # cinza claro pros zeros
+        if p < 0.6:
+            return "color: #1D9E75; font-weight: 500;"  # verde
+        if p < 0.8:
+            return "color: #BA7517; font-weight: 500;"  # âmbar
+        if p < 1.0:
+            return "color: #D85A30; font-weight: 500;"  # laranja
+        return "color: #A32D2D; font-weight: 600;"  # vermelho >100%
+
+    def style_row(row):
+        return [color_pct(row[col], row.name, col) for col in row.index]
+
+    styled = (
+        df_tabela.style
+        .apply(style_row, axis=1)
+        .format(lambda v: fmt_brl(v) if v else "—")
+        .set_properties(**{"text-align": "right"})
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.dataframe(styled, use_container_width=True, height=min(600, 40 + 35 * len(pivot_filtrado.index)))
 
     # Linha de total despesa × receita por mês (overview)
     receitas = df_lancamentos[df_lancamentos["Tipo"] == "Receita"]
