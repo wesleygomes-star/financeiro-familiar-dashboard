@@ -11,6 +11,7 @@ from lib.data import (
     auditar_contas_fixas,
     compromissos_proximos_meses,
     fatura_estimada,
+    fatura_split_pessoa,
     kpis_familia,
     load_faturas,
     load_lancamentos,
@@ -245,9 +246,13 @@ total_pend = 0
 qtd_pend = 0
 is_estimado = False
 if not df_faturas.empty and "Status" in df_faturas.columns and "Vencimento_dt" in df_faturas.columns:
-    pend = df_faturas[df_faturas["Status"].astype(str).str.lower() == "pendente"].copy()
+    # "A debitar" = ainda vai sair $ — inclui Carregada com vencimento futuro
+    # (Carregada ≠ paga; só Carregada COM vencimento passado já debitou)
+    ab = df_faturas[df_faturas["Status"].astype(str).str.lower().isin(["pendente", "carregada"])].copy()
     hoje = pd.Timestamp(datetime.now().date())
-    pend["_dias"] = (pend["Vencimento_dt"] - hoje).dt.days
+    ab["_dias"] = (ab["Vencimento_dt"] - hoje).dt.days
+    ab["_carregada"] = ab["Status"].astype(str).str.lower() == "carregada"
+    pend = ab[~(ab["_carregada"] & (ab["_dias"] < 0))]
     pend = pend[(pend["_dias"] >= -30) & (pend["_dias"] <= 30)].sort_values("_dias")
     qtd_pend = len(pend)
     # buckets
@@ -409,7 +414,7 @@ st.subheader("Faturas em aberto · auditoria fatura × lançamentos")
 if df_faturas.empty:
     st.info("Aba Faturas vazia.")
 else:
-    pend_f = df_faturas[df_faturas["Status"].astype(str).str.lower() == "pendente"]
+    pend_f = df_faturas[df_faturas["Status"].astype(str).str.lower().isin(["pendente", "carregada"])]
     if not pend_f.empty and "Vencimento_dt" in pend_f.columns:
         hoje = pd.Timestamp(datetime.now().date())
         pend_f = pend_f.assign(_dias=(pend_f["Vencimento_dt"] - hoje).dt.days)
@@ -421,22 +426,33 @@ else:
             d = int(r["_dias"])
             total = float(r.get("Total_num", 0))
             audit_st = str(r.get("Status Auditoria", "")).strip()
+            carregada = str(r.get("Status", "")).lower() == "carregada"
 
-            # Estima valor + conta lançamentos
+            # Carregada e já vencida = debitada, fecha o ciclo — linha compacta
+            if carregada and d < 0:
+                st.success(f"✔ **{cartao} · {mes_ref}** — {fmt(total)} debitado em {r.get('Vencimento','?')} (fatura carregada e reconciliada)")
+                continue
+
+            # Estima valor + conta lançamentos + rateio por pessoa (cartão único, ex.: XP Visa)
             total_estimado, qtd_lanc = fatura_estimada(cartao, mes_ref, df_lanc)
+            rateio = fatura_split_pessoa(cartao, mes_ref, df_lanc)
 
             label_prazo = f"venceu há {abs(d)}d" if d < 0 else (f"em {d}d" if d > 0 else "HOJE")
-            emoji = "🔴" if d < 0 else ("🟠" if d <= 5 else "🟡" if d <= 15 else "⚪")
+            emoji = "✅" if carregada else ("🔴" if d < 0 else ("🟠" if d <= 5 else "🟡" if d <= 15 else "⚪"))
 
             with st.container(border=True):
                 cf1, cf2, cf3 = st.columns([3, 2, 1])
                 with cf1:
                     st.markdown(f"**{emoji} {cartao} · {mes_ref}**")
                     st.caption(f"vence {r.get('Vencimento','?')} · {label_prazo}")
-                    if audit_st:
+                    if carregada:
+                        st.caption(f"✅ fatura carregada · debita {label_prazo} · {qtd_lanc} lançamentos")
+                    elif audit_st:
                         st.caption(f"🔍 auditoria: {audit_st}")
                     else:
                         st.caption(f"⏳ aguardando fatura · **{qtd_lanc} lançamentos individuais** no Zap")
+                    if len(rateio) > 1:
+                        st.caption("👥 " + " · ".join(f"{p}: {fmt(v)}" for p, v in rateio.items()))
                 with cf2:
                     if total > 0:
                         st.metric("Total fatura", fmt(total), help="total real reconciliado")

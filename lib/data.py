@@ -385,19 +385,35 @@ def aportes_historico(df_lanc: pd.DataFrame, n_meses: int = 12) -> pd.DataFrame:
     return aportes
 
 
-def fatura_estimada(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame) -> tuple:
-    """Retorna (valor_estimado, qtd_lancamentos) pra uma fatura ainda não carregada."""
+def _lancamentos_da_fatura(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame) -> pd.DataFrame:
+    """Lançamentos de crédito que pertencem a uma fatura (cartão substring + competência)."""
     if df_lanc.empty or "Cartão" not in df_lanc.columns:
-        return (0.0, 0)
+        return pd.DataFrame()
     primeira = cartao_str.split()[0] if cartao_str else ""
     if not primeira or not mes_ref:
-        return (0.0, 0)
-    sub = df_lanc[
+        return pd.DataFrame()
+    return df_lanc[
         df_lanc["Cartão"].astype(str).str.lower().str.contains(primeira.lower(), na=False)
         & (df_lanc["Competência"] == mes_ref)
         & df_lanc["Forma Pgto"].astype(str).str.lower().str.contains("crédito|credito", na=False, regex=True)
     ]
+
+
+def fatura_estimada(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame) -> tuple:
+    """Retorna (valor_estimado, qtd_lancamentos) pra uma fatura ainda não carregada."""
+    sub = _lancamentos_da_fatura(cartao_str, mes_ref, df_lanc)
+    if sub.empty:
+        return (0.0, 0)
     return (float(sub["Valor"].sum()), len(sub))
+
+
+def fatura_split_pessoa(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame) -> dict:
+    """Rateio do consumo da fatura por pessoa (cartão único com portadores múltiplos, ex.: XP Visa).
+    Retorna {pessoa: total}."""
+    sub = _lancamentos_da_fatura(cartao_str, mes_ref, df_lanc)
+    if sub.empty or "Pessoa" not in sub.columns:
+        return {}
+    return sub.groupby("Pessoa")["Valor"].sum().sort_values(ascending=False).to_dict()
 
 
 # ============================================================================
