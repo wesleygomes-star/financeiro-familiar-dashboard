@@ -433,9 +433,10 @@ else:
                 st.success(f"✔ **{cartao} · {mes_ref}** — {fmt(total)} debitado em {r.get('Vencimento','?')} (fatura carregada e reconciliada)")
                 continue
 
-            # Estima valor + conta lançamentos + rateio por pessoa (cartão único, ex.: XP Visa)
-            total_estimado, qtd_lanc = fatura_estimada(cartao, mes_ref, df_lanc)
-            rateio = fatura_split_pessoa(cartao, mes_ref, df_lanc)
+            # Estima valor + conta lançamentos + rateio por pessoa (chave: Data Caixa == Vencimento)
+            venc_str = str(r.get("Vencimento", "")).strip()
+            total_estimado, qtd_lanc = fatura_estimada(cartao, mes_ref, df_lanc, vencimento=venc_str)
+            rateio = fatura_split_pessoa(cartao, mes_ref, df_lanc, vencimento=venc_str)
 
             label_prazo = f"venceu há {abs(d)}d" if d < 0 else (f"em {d}d" if d > 0 else "HOJE")
             emoji = "✅" if carregada else ("🔴" if d < 0 else ("🟠" if d <= 5 else "🟡" if d <= 15 else "⚪"))
@@ -447,12 +448,19 @@ else:
                     st.caption(f"vence {r.get('Vencimento','?')} · {label_prazo}")
                     if carregada:
                         st.caption(f"✅ fatura carregada · debita {label_prazo} · {qtd_lanc} lançamentos")
+                        sobra = (float(df_lanc[
+                            df_lanc["Cartão"].astype(str).str.lower().str.contains(cartao.split()[0].lower(), na=False)
+                            & (df_lanc["Data Caixa"].astype(str).str.strip() == venc_str)
+                        ]["Valor"].sum()) - total) if total > 0 else 0
+                        if abs(sobra) > 1:
+                            st.caption(f"⚠️ {fmt(abs(sobra))} de lançamentos no Zap {'acima' if sobra > 0 else 'abaixo'} do total da fatura — auditar divergência")
                     elif audit_st:
                         st.caption(f"🔍 auditoria: {audit_st}")
                     else:
                         st.caption(f"⏳ aguardando fatura · **{qtd_lanc} lançamentos individuais** no Zap")
                     if len(rateio) > 1:
-                        st.caption("👥 " + " · ".join(f"{p}: {fmt(v)}" for p, v in rateio.items()))
+                        rotulo = "👥 rateio aproximado: " if carregada else "👥 "
+                        st.caption(rotulo + " · ".join(f"{p}: {fmt(v)}" for p, v in rateio.items()))
                 with cf2:
                     if total > 0:
                         st.metric("Total fatura", fmt(total), help="total real reconciliado")

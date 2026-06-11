@@ -385,32 +385,46 @@ def aportes_historico(df_lanc: pd.DataFrame, n_meses: int = 12) -> pd.DataFrame:
     return aportes
 
 
-def _lancamentos_da_fatura(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame) -> pd.DataFrame:
-    """Lançamentos de crédito que pertencem a uma fatura (cartão substring + competência)."""
+def _lancamentos_da_fatura(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame, vencimento: str = None) -> pd.DataFrame:
+    """Lançamentos de crédito que pertencem a uma fatura.
+
+    Chave correta: Data Caixa == Vencimento da fatura (o WF1 calcula Data Caixa
+    pelo ciclo do cartão exatamente pra isso). Competência NÃO serve — a fatura
+    de junho carrega compras de maio (lição de 11/06: rateio não batia).
+    Fallback por competência só quando o vencimento não é informado.
+    """
     if df_lanc.empty or "Cartão" not in df_lanc.columns:
         return pd.DataFrame()
     primeira = cartao_str.split()[0] if cartao_str else ""
-    if not primeira or not mes_ref:
+    if not primeira:
         return pd.DataFrame()
-    return df_lanc[
+    base = df_lanc[
         df_lanc["Cartão"].astype(str).str.lower().str.contains(primeira.lower(), na=False)
-        & (df_lanc["Competência"] == mes_ref)
         & df_lanc["Forma Pgto"].astype(str).str.lower().str.contains("crédito|credito", na=False, regex=True)
     ]
+    if vencimento:
+        return base[base["Data Caixa"].astype(str).str.strip() == str(vencimento).strip()]
+    if mes_ref:
+        return base[base["Competência"] == mes_ref]
+    return pd.DataFrame()
 
 
-def fatura_estimada(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame) -> tuple:
+def fatura_estimada(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame, vencimento: str = None) -> tuple:
     """Retorna (valor_estimado, qtd_lancamentos) pra uma fatura ainda não carregada."""
-    sub = _lancamentos_da_fatura(cartao_str, mes_ref, df_lanc)
+    sub = _lancamentos_da_fatura(cartao_str, mes_ref, df_lanc, vencimento)
     if sub.empty:
         return (0.0, 0)
     return (float(sub["Valor"].sum()), len(sub))
 
 
-def fatura_split_pessoa(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame) -> dict:
+def fatura_split_pessoa(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame, vencimento: str = None) -> dict:
     """Rateio do consumo da fatura por pessoa (cartão único com portadores múltiplos, ex.: XP Visa).
-    Retorna {pessoa: total}."""
-    sub = _lancamentos_da_fatura(cartao_str, mes_ref, df_lanc)
+    Retorna {pessoa: total}.
+
+    ATENÇÃO: pra fatura CARREGADA o rateio exato exige que a carga marque as
+    duplicatas com o lote hash (pendente no WF1) — até lá esse rateio é
+    aproximação pelos lançamentos com Data Caixa == Vencimento."""
+    sub = _lancamentos_da_fatura(cartao_str, mes_ref, df_lanc, vencimento)
     if sub.empty or "Pessoa" not in sub.columns:
         return {}
     return sub.groupby("Pessoa")["Valor"].sum().sort_values(ascending=False).to_dict()
