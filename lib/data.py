@@ -715,3 +715,132 @@ def kpis_familia(df_lanc: pd.DataFrame, df_saldo: pd.DataFrame, competencia: str
         "saldo_estocado_total": sum(saldo_estocado.values()),
         "saldo_mes": float(receitas["Valor"].sum() if not receitas.empty else 0) - float(despesas["Valor"].sum() if not despesas.empty else 0) - float(aportes["Valor"].sum() if not aportes.empty else 0),
     }
+
+
+# ============================================================================
+# Redesign v2 (16/06/2026): baldes, livre-pra-gastar, metas, rendimento
+# ============================================================================
+
+@st.cache_data(ttl=60)
+def load_metas() -> pd.DataFrame:
+    try:
+        rows = _records_formatted("Metas")
+    except Exception:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    if "Alvo" in df.columns:
+        df["Alvo_num"] = df["Alvo"].apply(_parse_valor)
+    return df
+
+
+def meta_valor(df_metas: pd.DataFrame, nome_contem: str) -> float:
+    """Retorna o alvo numérico da primeira meta cujo nome contém `nome_contem` (case-insensitive)."""
+    if df_metas.empty or "Meta" not in df_metas.columns:
+        return 0.0
+    mask = df_metas["Meta"].astype(str).str.lower().str.contains(nome_contem.lower(), na=False)
+    sub = df_metas[mask]
+    if sub.empty:
+        return 0.0
+    return float(sub.iloc[0].get("Alvo_num", 0) or 0)
+
+
+def classificar_baldes(df_desp: pd.DataFrame, df_rec: pd.DataFrame) -> dict:
+    """Classifica despesas em 3 baldes: Fixo / Recorrente-parcela / Flexível.
+
+    - Recorrente/parcela: lançamento com Parcela preenchida (compra parcelada no cartão)
+    - Fixo: bate com uma recorrente ativa cadastrada (conta fixa mensal)
+    - Flexível: o resto (gasto variável à vista — o que dá pra cortar)
+
+    Retorna {'Fixo': {total, itens[]}, 'Recorrente': {...}, 'Flexível': {...}}.
+    """
+    vazio = {b: {"total": 0.0, "itens": []} for b in ("Fixo", "Recorrente", "Flexível")}
+    if df_desp.empty:
+        return vazio
+
+    df = classificar_fixa_variavel(df_desp, df_rec)  # adiciona 'Tipo Despesa' = Fixa/Variável
+
+    def balde_de(row):
+        parc = str(row.get("Parcela", "")).strip()
+        if parc:
+            return "Recorrente"
+        return "Fixo" if str(row.get("Tipo Despesa", "")) == "Fixa" else "Flexível"
+
+    df = df.copy()
+    df["_Balde"] = df.apply(balde_de, axis=1)
+
+    out = {}
+    for balde in ("Fixo", "Recorrente", "Flexível"):
+        sub = df[df["_Balde"] == balde]
+        total = float(sub["Valor"].sum()) if not sub.empty else 0.0
+        # detalhe agrupado por Descrição (top 6) + "outros"
+        if not sub.empty:
+            g = sub.groupby("Descrição")["Valor"].sum().sort_values(ascending=False)
+            itens = [{"desc": d, "valor": float(v)} for d, v in g.head(6).items()]
+            if len(g) > 6:
+                itens.append({"desc": f"+ {len(g) - 6} itens", "valor": float(g.iloc[6:].sum())})
+        else:
+            itens = []
+        out[balde] = {"total": total, "itens": itens}
+    return out
+
+
+def livre_para_gastar(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, df_faturas: pd.DataFrame, df_saldo: pd.DataFrame, competencia: str) -> dict:
+    """Quanto ainda dá pra gastar este mês com tranquilidade.
+
+    livre = receita − contas fixas − faturas a pagar − gastos flexíveis já feitos
+    (estilo Finanzguru/Rocket 'safe to spend'). Retorna o número + a conta de chegada.
+    """
+    k = kpis_familia(df_lanc, df_saldo, competencia, modo="Competência")
+    receita = k["receita_total"]
+
+    rec_desp = _recorrentes_despesa(df_rec)
+    fixas = float(rec_desp["Valor"].sum()) if not rec_desp.empty and "Valor" in rec_desp.columns else 0.0
+
+    # faturas pendentes (a debitar) na janela do mês
+    faturas_pagar = 0.0
+    if not df_faturas.empty and "Vencimento_dt" in df_faturas.columns:
+        hoje = pd.Timestamp(datetime.now().date())
+        pend = df_faturas[df_faturas["Status"].astype(str).str.lower() == "pendente"].copy()
+        pend["_dias"] = (pend["Vencimento_dt"] - hoje).dt.days
+        pend = pend[(pend["_dias"] >= -5) & (pend["_dias"] <= 35)]
+        for _, fr in pend.iterrows():
+            v = float(fr.get("Total_num", 0) or 0)
+            if v <= 0:
+                v, _q = fatura_estimada(str(fr.get("Cartão", "")), str(fr.get("Mês Referência", "")), df_lanc)
+            faturas_pagar += v
+
+    # gastos flexíveis já feitos (competência) que NÃO são fixos nem parcela
+    no_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df_lanc.columns else df_lanc
+    splits = split_movimentos(no_mes)
+    bald = classificar_baldes(splits["despesas"], df_rec)
+    flex_gasto = bald["Flexível"]["total"]
+
+    livre = receita - fixas - faturas_pagar - flex_gasto
+    return {
+        "livre": livre,
+        "receita": receita,
+        "fixas": fixas,
+        "faturas_pagar": faturas_pagar,
+        "flex_gasto": flex_gasto,
+    }
+
+
+def rendimento_investido(df_saldo: pd.DataFrame) -> dict:
+    """Rendimento entre o snapshot mais antigo e o mais recente, descontando aportes.
+    Precisa de >= 2 snapshots. Retorna {pct, valor} ou {} se insuficiente."""
+    if df_saldo.empty or "Data Snapshot_dt" not in df_saldo.columns:
+        return {}
+    datas = df_saldo["Data Snapshot_dt"].dropna().sort_values().unique()
+    if len(datas) < 2:
+        return {}
+    primeiro = df_saldo[df_saldo["Data Snapshot_dt"] == datas[0]]
+    ultimo = df_saldo[df_saldo["Data Snapshot_dt"] == datas[-1]]
+    saldo_ini = float(primeiro["Saldo Total"].sum()) if "Saldo Total" in primeiro.columns else 0.0
+    saldo_fim = float(ultimo["Saldo Total"].sum()) if "Saldo Total" in ultimo.columns else 0.0
+    aportes = float(df_saldo["Aportado no Mês"].sum()) if "Aportado no Mês" in df_saldo.columns else 0.0
+    if saldo_ini <= 0:
+        return {}
+    ganho = saldo_fim - saldo_ini - aportes
+    return {"pct": ganho / saldo_ini * 100, "valor": ganho}
