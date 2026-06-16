@@ -33,7 +33,8 @@ from lib.data import (
 st.markdown(
     """
     <style>
-    .block-container { max-width: 940px !important; padding-top: 1.5rem !important; }
+    .block-container { max-width: 940px !important; padding-top: 3.5rem !important; }
+    header[data-testid="stHeader"] { background: transparent; }
     h1,h2,h3 { letter-spacing: -0.01em; }
     .stApp h2 { font-size: 1.15rem !important; margin: 0.4rem 0 0.2rem !important; }
     .hero { background: rgba(55,138,221,0.04); border: 1px solid rgba(55,138,221,0.25);
