@@ -358,17 +358,31 @@ def is_investimento(row) -> bool:
     return tipo == "investimento" or cat == CAT_INVESTIMENTO.lower()
 
 
+def is_pagamento_fatura(row) -> bool:
+    """Pagamento de fatura = transferência conta→cartão, NÃO consumo.
+    As compras individuais da fatura já representam o gasto (com categoria + Data Caixa
+    = vencimento). Contar o pagamento separado DUPLICA o valor. Por isso é excluído
+    dos totais de despesa, igual ao investimento. (descoberto 16/06/2026)"""
+    tipo = str(row.get("Tipo", "")).strip().lower()
+    if tipo != "despesa":
+        return False
+    desc = str(row.get("Descrição", "")).strip().lower()
+    return ("pagamento" in desc and "fatura" in desc)
+
+
 def split_movimentos(df: pd.DataFrame) -> dict:
-    """Separa em receitas, despesas (excluindo investimento) e aportes."""
+    """Separa em receitas, despesas reais (sem investimento e sem pagamento de fatura) e aportes."""
     if df.empty:
-        return {"receitas": df, "despesas": df, "aportes": df}
-    mask_inv = df.apply(is_investimento, axis=1) if not df.empty else pd.Series(dtype=bool)
+        return {"receitas": df, "despesas": df, "aportes": df, "pagamentos": df}
+    mask_inv = df.apply(is_investimento, axis=1)
+    mask_pgto = df.apply(is_pagamento_fatura, axis=1)
     mask_rec = df["Tipo"].astype(str).str.strip().str.lower() == "receita"
-    mask_desp = (df["Tipo"].astype(str).str.strip().str.lower() == "despesa") & (~mask_inv)
+    mask_desp = (df["Tipo"].astype(str).str.strip().str.lower() == "despesa") & (~mask_inv) & (~mask_pgto)
     return {
         "receitas": df[mask_rec].copy(),
         "despesas": df[mask_desp].copy(),
         "aportes": df[mask_inv].copy(),
+        "pagamentos": df[mask_pgto].copy(),
     }
 
 
