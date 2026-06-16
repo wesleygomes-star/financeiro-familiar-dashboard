@@ -33,24 +33,34 @@ from lib.data import (
 st.markdown(
     """
     <style>
-    .block-container { max-width: 100% !important; padding-top: 1rem !important; }
-    .hero { background: var(--background-color, #fff); border: 2px solid rgba(55,138,221,0.35);
-            border-radius: 16px; padding: 22px; text-align: center; margin-bottom: 14px; }
-    .hero-num { font-size: 42px; font-weight: 500; line-height: 1.05; margin: 4px 0; }
-    .hero-calc { font-size: 11px; opacity: 0.65; }
-    .kgrid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 18px; }
-    .kc { background: rgba(128,128,128,0.08); border-radius: 8px; padding: 12px 14px; }
-    .kc-l { font-size: 11px; opacity: 0.7; }
-    .kc-v { font-size: 18px; font-weight: 500; margin-top: 2px; }
-    .kc-s { font-size: 10px; opacity: 0.6; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
-    .gcard { border: 0.5px solid rgba(128,128,128,0.25); border-radius: 12px; padding: 13px 15px; }
-    .balde-bar { height: 7px; background: rgba(128,128,128,0.2); border-radius: 4px; margin-top: 7px; }
-    .balde-fill { height: 100%; border-radius: 4px; }
+    .block-container { max-width: 940px !important; padding-top: 1.5rem !important; }
+    h1,h2,h3 { letter-spacing: -0.01em; }
+    .stApp h2 { font-size: 1.15rem !important; margin: 0.4rem 0 0.2rem !important; }
+    .hero { background: rgba(55,138,221,0.04); border: 1px solid rgba(55,138,221,0.25);
+            border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 14px; }
+    .hero-num { font-size: 40px; font-weight: 500; line-height: 1.05; margin: 2px 0; }
+    .hero-calc { font-size: 11px; opacity: 0.6; }
+    .kgrid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 14px; }
+    .kc { background: rgba(128,128,128,0.07); border-radius: 10px; padding: 11px 13px; }
+    .kc-l { font-size: 11px; opacity: 0.65; text-transform: lowercase; }
+    .kc-v { font-size: 21px; font-weight: 500; margin-top: 1px; line-height: 1.15; }
+    .kc-s { font-size: 10px; opacity: 0.55; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+    .gcard { border: 0.5px solid rgba(128,128,128,0.22); border-radius: 10px; padding: 12px 14px; }
+    .mcard { border: 0.5px solid rgba(128,128,128,0.22); border-radius: 10px; padding: 11px 13px; }
+    .bar { height: 6px; background: rgba(128,128,128,0.18); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+    .bar > div { height: 100%; border-radius: 3px; }
+    .balde-bar { height: 6px; background: rgba(128,128,128,0.18); border-radius: 3px; margin-top: 6px; }
+    .balde-fill { height: 100%; border-radius: 3px; }
+    div[data-testid="stExpander"] { border: 0.5px solid rgba(128,128,128,0.22) !important; border-radius: 10px !important; margin-bottom: 6px; }
+    div[data-testid="stExpander"] summary { font-size: 13px !important; padding: 10px 12px !important; }
+    div[data-testid="stExpander"] summary:hover { background: rgba(128,128,128,0.05); }
+    hr { margin: 0.8rem 0 !important; }
     @media (max-width: 768px) {
       .kgrid { grid-template-columns: 1fr 1fr !important; }
-      .grid2 { grid-template-columns: 1fr !important; }
-      .hero-num { font-size: 34px !important; }
+      .grid2, .grid3 { grid-template-columns: 1fr !important; }
+      .hero-num { font-size: 32px !important; }
     }
     </style>
     """,
@@ -141,19 +151,29 @@ no_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df
 baldes = classificar_baldes(split_movimentos(no_mes)["despesas"], df_rec)
 flex_real = baldes["Flexível"]["total"]
 poup_real = (k["saldo_mes"] / k["receita_total"] * 100) if k["receita_total"] > 0 else 0
-mc1, mc2, mc3 = st.columns(3)
-def meta_card(col, label, atual, alvo, sufixo, cor, melhor_maior=True):
+
+VERDE, AMBAR, VERMELHO, INFO = "#1D9E75", "#BA7517", "#E24B4A", "#378ADD"
+def meta_html(label, atual, alvo, sufixo, melhor_maior=True):
     pct = (atual / alvo * 100) if alvo > 0 else 0
-    pct_bar = min(pct, 100)
-    ok = (atual >= alvo) if melhor_maior else (atual <= alvo)
-    with col.container(border=True):
-        st.caption(label)
-        st.markdown(f"**{atual:,.0f}{sufixo}** / {alvo:,.0f}{sufixo}".replace(",", "."))
-        st.progress(pct_bar / 100)
-        st.caption(f"{'✅ ok' if ok else f'{pct:.0f}%'}")
-meta_card(mc1, "investir / mês", aporte, mInvest, "", "info")
-meta_card(mc2, "poupança", poup_real, mPoup, "%", "success")
-meta_card(mc3, "teto flexível", flex_real, mFlex, "", "warning", melhor_maior=False)
+    if melhor_maior:
+        cor, txt = (VERDE, "meta batida") if pct >= 100 else (INFO, f"{pct:.0f}% do caminho")
+    else:
+        cor = VERDE if pct <= 85 else (AMBAR if pct <= 100 else VERMELHO)
+        txt = "dentro do teto" if pct <= 100 else f"estourou {pct-100:.0f}%"
+    a = f"{atual:,.0f}".replace(",", ".") + sufixo
+    b = f"{alvo:,.0f}".replace(",", ".") + sufixo
+    return (f'<div class="mcard"><div style="font-size:11px;opacity:0.65;">{label}</div>'
+            f'<div style="font-size:16px;font-weight:500;margin:2px 0 0;">{a} <span style="opacity:0.45;font-weight:400;font-size:12px;">/ {b}</span></div>'
+            f'<div class="bar"><div style="width:{min(pct,100):.0f}%;background:{cor};"></div></div>'
+            f'<div style="font-size:10px;color:{cor};margin-top:4px;">{txt}</div></div>')
+st.markdown(
+    '<div class="grid3">'
+    + meta_html("investir / mês", aporte, mInvest, "")
+    + meta_html("poupança", poup_real, mPoup, "%")
+    + meta_html("teto flexível", flex_real, mFlex, "", melhor_maior=False)
+    + "</div>",
+    unsafe_allow_html=True,
+)
 
 # ============== Para onde foi (3 baldes com drill-down) ==============
 st.subheader("Para onde foi")
