@@ -83,13 +83,30 @@ df_metas = load_metas()
 
 # ============== Header ==============
 c1, c2, c3 = st.columns([2, 2, 1])
-meses = meses_disponiveis(df_lanc, "Caixa") or meses_disponiveis(df_lanc, "Competência") or [f"{datetime.now().month:02d}/{datetime.now().year}"]
+# Meses = união de Competência + Caixa, ordenados: mês atual no topo, passados desc, futuros (parcelas) no fim
+_todos = set(meses_disponiveis(df_lanc, "Competência")) | set(meses_disponiveis(df_lanc, "Caixa"))
 mes_atual = f"{datetime.now().month:02d}/{datetime.now().year}"
-idx = meses.index(mes_atual) if mes_atual in meses else 0
+_todos.add(mes_atual)
+def _key(c):
+    try:
+        m, y = c.split("/"); return int(y) * 100 + int(m)
+    except Exception:
+        return 0
+_hoje = datetime.now().year * 100 + datetime.now().month
+_passados = sorted([c for c in _todos if _key(c) <= _hoje], key=_key, reverse=True)
+_futuros = sorted([c for c in _todos if _key(c) > _hoje], key=_key)
+meses = _passados + _futuros  # mês atual sempre no topo
+_NOMES = {"01": "jan", "02": "fev", "03": "mar", "04": "abr", "05": "mai", "06": "jun",
+          "07": "jul", "08": "ago", "09": "set", "10": "out", "11": "nov", "12": "dez"}
+def _label(c):
+    try:
+        m, y = c.split("/"); return f"{_NOMES.get(m, m)}/{y}" + ("  ·  futuro" if _key(c) > _hoje else "")
+    except Exception:
+        return c
 with c1:
     st.markdown("### Família Gomes")
 with c2:
-    competencia = st.selectbox("Mês", meses, index=idx, label_visibility="collapsed")
+    competencia = st.selectbox("Mês", meses, index=0, format_func=_label, label_visibility="collapsed")
 with c3:
     if st.button("🔄", use_container_width=True, help="Atualizar dados"):
         st.cache_data.clear(); st.rerun()
