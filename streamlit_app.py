@@ -28,5 +28,6 @@ pages = [
     st.Page("views/visao_anual.py", title="Visão Anual", icon="📅"),
     st.Page("views/importar_fatura.py", title="Importar Fatura", icon="📥"),
     st.Page("views/dashboard_detalhado.py", title="Dashboard Detalhado", icon="📊"),
+    st.Page("views/custos.py", title="Custo da Ferramenta", icon="🛠️"),
 ]
 st.navigation(pages).run()

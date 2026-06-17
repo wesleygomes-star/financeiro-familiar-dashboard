@@ -848,3 +848,18 @@ def rendimento_investido(df_saldo: pd.DataFrame) -> dict:
         return {}
     ganho = saldo_fim - saldo_ini - aportes
     return {"pct": ganho / saldo_ini * 100, "valor": ganho}
+
+
+@st.cache_data(ttl=60)
+def load_custos() -> pd.DataFrame:
+    """Custos das ferramentas do sistema (aba Custos Ferramenta)."""
+    try:
+        rows = _records_formatted("Custos Ferramenta")
+    except Exception:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    if "Custo Mensal" in df.columns:
+        df["Custo_num"] = df["Custo Mensal"].apply(_parse_valor)
+    return df
