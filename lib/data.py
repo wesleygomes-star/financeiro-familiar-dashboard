@@ -352,10 +352,14 @@ CAT_INVESTIMENTO = "Investimentos"  # modelo temporário; quando WF1 suportar Ti
 
 
 def is_investimento(row) -> bool:
-    """Aceita modelo atual (Tipo=Despesa + Categoria=Investimentos) e modelo futuro (Tipo=Investimento)."""
+    """Investimento = aplicação de patrimônio (não consumo). Cobre:
+    - Tipo='Investimento' (modelo novo, aporte via Zap CDB/Tesouro)
+    - Categoria 'Investimentos' (Plínio, financeiro)
+    - Categoria 'Investimentos em Imóvel' (entrada/aporte imobiliário) — junta no mesmo balde (16/06)
+    NÃO confundir com 'Outros Imóveis' (IPTU/condomínio = despesa recorrente)."""
     tipo = str(row.get("Tipo", "")).strip().lower()
     cat = str(row.get("Categoria", "")).strip().lower()
-    return tipo == "investimento" or cat == CAT_INVESTIMENTO.lower()
+    return tipo == "investimento" or cat.startswith("investiment")
 
 
 def is_pagamento_fatura(row) -> bool:
