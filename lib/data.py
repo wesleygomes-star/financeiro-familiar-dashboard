@@ -206,65 +206,24 @@ def meses_disponiveis(df: pd.DataFrame, modo: str = "Competência") -> list:
 def classificar_fixa_variavel(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame) -> pd.DataFrame:
     """Adiciona coluna 'Tipo Despesa' = 'Fixa' ou 'Variável'.
 
-    Heurística: um lançamento é considerado FIXO se a descrição bater
-    (substring case-insensitive) com a descrição de alguma recorrente ATIVA
-    e a categoria também coincidir. Caso contrário é VARIÁVEL.
+    FIXA = o lançamento foi emparelhado com uma recorrente ATIVA pelo casamento robusto
+    multi-sinal (valor ±20% + token de descrição ou categoria, melhor par global com consumo
+    único — ver _emparelhar_recorrentes). Caso contrário, VARIÁVEL.
 
     Receitas mantêm 'Tipo Despesa' = '' (não se aplica).
     """
     out = df_lancamentos.copy()
     out["Tipo Despesa"] = ""
 
-    if df_recorrentes.empty or "Ativo_bool" not in df_recorrentes.columns:
+    if df_recorrentes.empty or "Ativo_bool" not in df_recorrentes.columns or _recorrentes_despesa(df_recorrentes).empty:
         out.loc[out["Tipo"] == "Despesa", "Tipo Despesa"] = "Variável"
         return out
 
-    rec_ativas = df_recorrentes[df_recorrentes["Ativo_bool"]].copy()
-    if rec_ativas.empty:
-        out.loc[out["Tipo"] == "Despesa", "Tipo Despesa"] = "Variável"
-        return out
-
-    # Coluna de descrição na planilha de recorrentes pode variar
-    col_desc_rec = None
-    for c in ("Descrição", "Descricao", "Item", "Nome"):
-        if c in rec_ativas.columns:
-            col_desc_rec = c
-            break
-
-    if col_desc_rec is None:
-        # Fallback: matching só por Categoria
-        cats_fixas = set(rec_ativas["Categoria"].dropna().astype(str).str.lower().str.strip())
-        def eh_fixa_por_cat(row):
-            if row.get("Tipo") != "Despesa":
-                return ""
-            cat = str(row.get("Categoria", "")).lower().strip()
-            return "Fixa" if cat in cats_fixas else "Variável"
-        out["Tipo Despesa"] = out.apply(eh_fixa_por_cat, axis=1)
-        return out
-
-    # Constrói lista de tuplas (categoria_lower, descricao_lower) das recorrentes ativas
-    pares_fixos = []
-    for _, r in rec_ativas.iterrows():
-        cat = str(r.get("Categoria", "")).lower().strip()
-        desc = str(r.get(col_desc_rec, "")).lower().strip()
-        if desc:
-            pares_fixos.append((cat, desc))
-
-    def classificar(row):
-        if row.get("Tipo") != "Despesa":
-            return ""
-        cat_l = str(row.get("Categoria", "")).lower().strip()
-        desc_l = str(row.get("Descrição", "")).lower().strip()
-        for cat_rec, desc_rec in pares_fixos:
-            # match se descrição da recorrente está contida na do lançamento (ou vice-versa)
-            # e a categoria coincide (se categoria da recorrente foi informada)
-            desc_match = (desc_rec in desc_l) or (desc_l and desc_l in desc_rec)
-            cat_match = (not cat_rec) or (cat_rec == cat_l)
-            if desc_match and cat_match:
-                return "Fixa"
-        return "Variável"
-
-    out["Tipo Despesa"] = out.apply(classificar, axis=1)
+    desp = out[out["Tipo"] == "Despesa"] if "Tipo" in out.columns else out
+    casados = set(_emparelhar_recorrentes(desp, df_recorrentes).values())
+    out.loc[out["Tipo"] == "Despesa", "Tipo Despesa"] = "Variável"
+    for i in casados:
+        out.at[i, "Tipo Despesa"] = "Fixa"
     return out
 
 
@@ -479,6 +438,71 @@ def _recorrentes_despesa(df_rec: pd.DataFrame) -> pd.DataFrame:
     return ativas[~cat_lower.isin(CATEGORIAS_RECEITA)].copy()
 
 
+_STOP_REC = {"para", "com", "theo", "arthur", "wesley", "sabrina", "mensal", "conta", "pagamento", "clube", "vista"}
+
+
+def _toks_rec(s) -> set:
+    """Tokens significativos (>=4 letras, sem stopwords) de um texto, normalizado sem acento."""
+    import re
+    return {t for t in re.split(r"[^a-z0-9]+", _norm(s)) if len(t) >= 4 and t not in _STOP_REC}
+
+
+def _num_rec(v) -> float:
+    """Converte valor BR ('R$ 1.234,56') ou numérico em float."""
+    v = str(v).replace("R$", "").replace(" ", "").strip()
+    if not v:
+        return 0.0
+    if "," in v:
+        v = v.replace(".", "").replace(",", ".")
+    try:
+        return float(v)
+    except Exception:
+        return 0.0
+
+
+def _emparelhar_recorrentes(df_desp: pd.DataFrame, df_rec: pd.DataFrame) -> dict:
+    """Empareiha cada recorrente ATIVA (despesa) com no máx. 1 lançamento de despesa.
+
+    Casamento ROBUSTO multi-sinal (não depende de descrição exata nem de data): exige
+    valor ±20% E (token de descrição compartilhado OU mesma categoria), pontua token > categoria,
+    e resolve por MELHOR PAR GLOBAL com consumo único. Casa descrições divergentes
+    (Empregada Ceiça↔Salário Doméstica, Cemig↔Energia, Pelada Futvolei↔Futevôlei) e desambigua
+    quase-duplicados (Futebol Academia↔Escola Futebol Galo vs Futebol PecBol↔Futebol Theo PecBol).
+
+    Retorna {índice_no_df_rec_ativas: índice_no_df_desp} — só recorrentes que casaram.
+    """
+    rec_ativas = _recorrentes_despesa(df_rec)
+    if df_desp is None or df_desp.empty or rec_ativas.empty:
+        return {}
+    col_desc = next((c for c in ("Descrição", "Descricao", "Item", "Nome") if c in rec_ativas.columns), None)
+    desp = df_desp[df_desp["Tipo"].astype(str).str.lower() == "despesa"] if "Tipo" in df_desp.columns else df_desp
+    lanc = [(i, _toks_rec(r.get("Descrição", "")), _norm(r.get("Categoria", "")), _num_rec(r.get("Valor", 0)))
+            for i, r in desp.iterrows()]
+    recs = [(j, _num_rec(r.get("Valor", 0)), _norm(r.get("Categoria", "")),
+             _toks_rec(r.get(col_desc, "")) if col_desc else set()) for j, r in rec_ativas.iterrows()]
+    pares = []
+    for ri, (_j, rval, rcat, rtoks) in enumerate(recs):
+        if rval <= 0:
+            continue
+        for li, (_i, ltoks, lcat, lval) in enumerate(lanc):
+            diff = abs(lval - rval)
+            if diff > rval * 0.20:
+                continue
+            shared = len(rtoks & ltoks)
+            cat_ok = bool(rcat) and rcat == lcat
+            if shared >= 1 or cat_ok:
+                pares.append((shared * 100 + (10 if cat_ok else 0) + (20 - 20 * diff / (rval * 0.20)), ri, li))
+    pares.sort(key=lambda p: p[0], reverse=True)
+    r_used, l_used, mp = set(), set(), {}
+    for _score, ri, li in pares:
+        if ri in r_used or li in l_used:
+            continue
+        r_used.add(ri)
+        l_used.add(li)
+        mp[recs[ri][0]] = lanc[li][0]
+    return mp
+
+
 def auditar_contas_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competencia: str) -> pd.DataFrame:
     """Retorna DataFrame com 1 linha por recorrente ATIVA, status do mês.
 
@@ -507,8 +531,9 @@ def auditar_contas_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competenci
     eh_mes_corrente = (hoje.month == m and hoje.year == y)
     dia_hoje = hoje.day if eh_mes_corrente else 31  # se mês passado, considera "fim do mês"
 
+    emparelhamento = _emparelhar_recorrentes(lanc_mes, df_rec)
     out_rows = []
-    for _, rec in rec_ativas.iterrows():
+    for ridx, rec in rec_ativas.iterrows():
         desc_rec = str(rec.get("Descrição") or rec.get("Descricao") or rec.get("Item") or rec.get("Nome") or "").strip()
         cat_rec = str(rec.get("Categoria", "")).strip()
         pessoa_rec = str(rec.get("Pessoa", "")).strip()
@@ -518,18 +543,8 @@ def auditar_contas_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competenci
         except Exception:
             dia_cobranca = 0
 
-        # Match em lançamentos
-        desc_n = _norm(desc_rec)
-        cat_n = _norm(cat_rec)
-        match = None
-        for _, lan in lanc_mes.iterrows():
-            ld = _norm(lan.get("Descrição", ""))
-            lc = _norm(lan.get("Categoria", ""))
-            desc_match = (desc_n and (desc_n in ld or ld in desc_n))
-            cat_match = (not cat_n) or (cat_n == lc)
-            if desc_match and cat_match:
-                match = lan
-                break
+        # Match robusto multi-sinal (valor ±20% + token de descrição ou categoria, melhor par global)
+        match = lanc_mes.loc[emparelhamento[ridx]] if ridx in emparelhamento else None
 
         if match is not None:
             status = "Paga"
