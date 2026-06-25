@@ -59,7 +59,7 @@ CORES_CATEGORIA = {
     "Financeiro & Cartão": "#85B7EB",
     "Auxílio Familiar": "#FAC775",
     "Outros Imóveis": "#AFA9EC",
-    "Investimentos em Imóvel": "#534AB7",
+    "Investimentos em Imóvel": "#185FA5",
     "Outros": "#B4B2A9",
 }
 COR_FALLBACK = "#B4B2A9"

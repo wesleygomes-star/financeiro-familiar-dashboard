@@ -41,7 +41,7 @@ if not pagos.empty:
     p = pagos.sort_values("Custo_num", ascending=True)
     fig = go.Figure(go.Bar(
         x=p["Custo_num"], y=p["Ferramenta"], orientation="h",
-        marker=dict(color="#534AB7", cornerradius=4),
+        marker=dict(color="#0F6E56", cornerradius=4),
         text=[fmt(v) for v in p["Custo_num"]], textposition="outside",
     ))
     fig.update_layout(height=max(200, 50 * len(p)), margin=dict(l=10, r=80, t=10, b=10),

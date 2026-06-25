@@ -81,7 +81,7 @@ def serie(sub):
     return [float(g.get(m, 0)) for m in MESES]
 fig = go.Figure()
 fig.add_bar(name="Despesa", x=meses_lbl, y=serie(splits["Despesas"]), marker_color="#E24B4A")
-fig.add_bar(name="Investido", x=meses_lbl, y=serie(splits["Investimentos"]), marker_color="#534AB7")
+fig.add_bar(name="Investido", x=meses_lbl, y=serie(splits["Investimentos"]), marker_color="#185FA5")
 fig.add_bar(name="Receita", x=meses_lbl, y=serie(splits["Receitas"]), marker_color="#1D9E75")
 fig.update_layout(barmode="group", height=260, margin=dict(l=10, r=10, t=10, b=10),
                   template="plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -94,7 +94,7 @@ NUMCOLS = {c: st.column_config.NumberColumn(format="%.0f", width="small") for c 
 NUMCOLS["Total"] = st.column_config.NumberColumn(format="R$ %.0f")
 NUMCOLS["Média"] = st.column_config.NumberColumn(format="R$ %.0f")
 
-for nome, cor in [("Despesas", "#E24B4A"), ("Receitas", "#1D9E75"), ("Investimentos", "#534AB7")]:
+for nome, cor in [("Despesas", "#E24B4A"), ("Receitas", "#1D9E75"), ("Investimentos", "#185FA5")]:
     disp, totais, total = matriz(splits[nome], nome, cor)
     if disp is None or disp.empty:
         continue

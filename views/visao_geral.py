@@ -37,7 +37,7 @@ st.markdown(
     header[data-testid="stHeader"] { background: transparent; }
     h1,h2,h3 { letter-spacing: -0.01em; }
     .stApp h2 { font-size: 1.15rem !important; margin: 0.4rem 0 0.2rem !important; }
-    .hero { background: rgba(55,138,221,0.04); border: 1px solid rgba(55,138,221,0.25);
+    .hero { background: rgba(15,110,86,0.05); border: 1px solid rgba(15,110,86,0.28);
             border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 14px; }
     .hero-num { font-size: 40px; font-weight: 500; line-height: 1.05; margin: 2px 0; }
     .hero-calc { font-size: 11px; opacity: 0.6; }
@@ -199,7 +199,7 @@ st.caption("3 baldes em vez de 14 categorias — clique pra abrir o detalhe")
 BALDE_META = {
     "Fixo": ("🔒 fixo · não muda", "#888780"),
     "Recorrente": ("🔁 recorrente / parcelas", "#BA7517"),
-    "Flexível": ("☕ flexível · dá pra cortar", "#534AB7"),
+    "Flexível": ("☕ flexível · dá pra cortar", "#0F6E56"),
 }
 tot_baldes = sum(baldes[b]["total"] for b in baldes) or 1
 for b in ["Fixo", "Recorrente", "Flexível"]:
