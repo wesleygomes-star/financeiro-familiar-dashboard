@@ -29,27 +29,29 @@ def _tags_app_tela_inicial():
     O Streamlit não serve /apple-touch-icon.png na raiz, então o iOS cai no
     fallback feio (screenshot da página). O Safari, porém, lê o DOM vivo na
     hora do 'Adicionar à Tela de Início' — injetar a <link> via JS resolve.
-    Ícones servidos por enableStaticServing em /app/static/.
+    Ícones via jsDelivr (CDN do repo GitHub): o Community Cloud não ativou o
+    enableStaticServing sem reboot manual, e o CDN serve image/png correto.
     """
+    cdn = "https://cdn.jsdelivr.net/gh/wesleygomes-star/financeiro-familiar-dashboard@main/static"
     components.html(
-        """<script>
-        (function () {
+        f"""<script>
+        (function () {{
           const head = window.parent.document.head;
           if (head.querySelector('#fg-pwa')) return;
           const tags = [
-            ['link',  {id: 'fg-pwa', rel: 'apple-touch-icon', sizes: '180x180', href: '/app/static/icon-180.png'}],
-            ['link',  {rel: 'manifest', href: '/app/static/manifest.json'}],
-            ['meta',  {name: 'apple-mobile-web-app-capable', content: 'yes'}],
-            ['meta',  {name: 'apple-mobile-web-app-status-bar-style', content: 'default'}],
-            ['meta',  {name: 'apple-mobile-web-app-title', content: 'Financeiro'}],
-            ['meta',  {name: 'theme-color', content: '#0F6E56'}],
+            ['link',  {{id: 'fg-pwa', rel: 'apple-touch-icon', sizes: '180x180', href: '{cdn}/icon-180.png'}}],
+            ['link',  {{rel: 'manifest', href: '{cdn}/manifest.json', crossorigin: 'anonymous'}}],
+            ['meta',  {{name: 'apple-mobile-web-app-capable', content: 'yes'}}],
+            ['meta',  {{name: 'apple-mobile-web-app-status-bar-style', content: 'default'}}],
+            ['meta',  {{name: 'apple-mobile-web-app-title', content: 'Financeiro'}}],
+            ['meta',  {{name: 'theme-color', content: '#0F6E56'}}],
           ];
-          for (const [tag, attrs] of tags) {
+          for (const [tag, attrs] of tags) {{
             const el = window.parent.document.createElement(tag);
             for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
             head.appendChild(el);
-          }
-        })();
+          }}
+        }})();
         </script>""",
         height=0,
     )
