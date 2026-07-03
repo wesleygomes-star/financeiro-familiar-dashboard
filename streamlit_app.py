@@ -36,8 +36,15 @@ def _tags_app_tela_inicial():
     components.html(
         f"""<script>
         (function () {{
-          const head = window.parent.document.head;
+          // No Community Cloud o app roda num iframe (/~/+/) DENTRO de uma página
+          // wrapper do mesmo domínio — o iOS lê o head da página DE CIMA (top).
+          let doc;
+          try {{ doc = window.top.document; }} catch (e) {{ doc = window.parent.document; }}
+          const head = doc.head;
           if (head.querySelector('#fg-pwa')) return;
+          // remove o ícone/manifest padrão do Streamlit (senão o iOS usa o deles)
+          head.querySelectorAll('link[rel="apple-touch-icon"], link[rel="manifest"]')
+              .forEach((el) => el.remove());
           const tags = [
             ['link',  {{id: 'fg-pwa', rel: 'apple-touch-icon', sizes: '180x180', href: '{cdn}/icon-180.png'}}],
             ['link',  {{rel: 'manifest', href: '{cdn}/manifest.json', crossorigin: 'anonymous'}}],
@@ -47,7 +54,7 @@ def _tags_app_tela_inicial():
             ['meta',  {{name: 'theme-color', content: '#0F6E56'}}],
           ];
           for (const [tag, attrs] of tags) {{
-            const el = window.parent.document.createElement(tag);
+            const el = doc.createElement(tag);
             for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
             head.appendChild(el);
           }}
