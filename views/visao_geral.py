@@ -1,10 +1,9 @@
-"""Visão Geral — painel principal v3 (redesign 16/06: hero, baldes, metas, patrimônio).
+"""Visão Geral — v5 'Verde Premium' (mockup aprovado 02/07).
 
-Combina o melhor dos benchmarks: hero 'livre pra gastar' (Finanzguru/Rocket),
-transferência ≠ gasto (Copilot), 3 baldes + projeção (Monarch).
+Cabeçalho imersivo verde com hero + cards flutuando por cima, KPIs 2×2 com
+ícones SVG, metas em anéis de progresso, faturas com faixa de status.
 set_page_config + auth ficam no router (streamlit_app.py).
 """
-import re
 from datetime import datetime
 
 import pandas as pd
@@ -31,39 +30,103 @@ from lib.data import (
     split_movimentos,
 )
 
+# ============== Tema Verde Premium ==============
 st.markdown(
     """
     <style>
-    .block-container { max-width: 940px !important; padding-top: 3.5rem !important; }
+    .stApp { background: #F2F7F4; }
+    .block-container { max-width: 680px !important; padding-top: 2.2rem !important; }
     header[data-testid="stHeader"] { background: transparent; }
     h1,h2,h3 { letter-spacing: -0.01em; }
-    .stApp h2 { font-size: 1.3rem !important; font-weight: 600 !important; margin: 1.1rem 0 0.2rem !important; }
-    .hero { background: rgba(15,110,86,0.05); border: 1px solid rgba(15,110,86,0.28);
-            border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 14px; }
-    .hero-num { font-size: 40px; font-weight: 500; line-height: 1.05; margin: 2px 0; }
-    .hero-calc { font-size: 11px; opacity: 0.6; }
-    .kgrid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 14px; }
-    .kc { background: rgba(128,128,128,0.07); border-radius: 10px; padding: 11px 13px; }
-    .kc-l { font-size: 11px; opacity: 0.65; text-transform: lowercase; }
-    .kc-v { font-size: 21px; font-weight: 500; margin-top: 1px; line-height: 1.15; }
-    .kc-s { font-size: 10px; opacity: 0.55; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
-    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px; }
-    .gcard { border: 0.5px solid rgba(128,128,128,0.22); border-radius: 10px; padding: 12px 14px; }
-    .mcard { border: 0.5px solid rgba(128,128,128,0.22); border-radius: 10px; padding: 11px 13px; }
-    .bar { height: 6px; background: rgba(128,128,128,0.18); border-radius: 3px; margin-top: 6px; overflow: hidden; }
-    .bar > div { height: 100%; border-radius: 3px; }
-    .balde-bar { height: 6px; background: rgba(128,128,128,0.18); border-radius: 3px; margin-top: 6px; }
-    .balde-fill { height: 100%; border-radius: 3px; }
-    div[data-testid="stExpander"] { border: 0.5px solid rgba(128,128,128,0.22) !important; border-radius: 10px !important; margin-bottom: 6px; }
-    div[data-testid="stExpander"] summary { font-size: 13px !important; padding: 10px 12px !important; }
-    div[data-testid="stExpander"] summary:hover { background: rgba(128,128,128,0.05); }
-    hr { margin: 0.8rem 0 !important; }
-    @media (max-width: 768px) {
-      .kgrid { grid-template-columns: 1fr 1fr !important; }
-      .grid2, .grid3 { grid-template-columns: 1fr !important; }
-      .hero-num { font-size: 32px !important; }
+    .stApp h2 { font-size: 1.25rem !important; font-weight: 700 !important; margin: 1.1rem 0 0.2rem !important; }
+
+    /* hero imersivo (sangra além da coluna) */
+    .hero5 {
+      background: linear-gradient(160deg, #0C5949 0%, #0A4A3A 55%, #07382C 100%);
+      color: #F2FBF6; border-radius: 22px; padding: 20px 22px 24px;
+      box-shadow: 0 14px 38px rgba(10,60,45,0.30); position: relative; overflow: hidden;
+      margin-bottom: 14px;
     }
+    .h5-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .h5-ola { font-size: 12.5px; opacity: 0.75; }
+    .h5-nome { font-size: 17px; font-weight: 700; }
+    .h5-right { display: flex; align-items: center; gap: 8px; }
+    .h5-mes { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+              background: rgba(255,255,255,0.14); }
+    .h5-av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+             font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.18); }
+    .h5-rot { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; opacity: 0.75; }
+    .h5-num { font-size: 42px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05;
+              margin: 4px 0 10px; color: #fff; font-variant-numeric: tabular-nums; }
+    .h5-num .mais { color: #7CE0B8; }
+    .h5-num .menos { color: #FFAFA8; }
+    .h5-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .h5-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600;
+               padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,0.13);
+               font-variant-numeric: tabular-nums; }
+    .h5-chip svg { width: 13px; height: 13px; }
+    .h5-spark { position: absolute; right: 20px; bottom: 22px; width: 116px; height: 42px; opacity: 0.9; }
+    @media (max-width: 640px) { .h5-spark { display: none; } .h5-num { font-size: 36px; } }
+
+    /* cards brancos com sombra */
+    .c5 { background: #fff; border-radius: 16px; padding: 14px 16px;
+          box-shadow: 0 3px 14px rgba(12,60,45,0.07); margin-bottom: 12px; }
+    .c5 h4 { margin: 0 0 10px; font-size: 13.5px; font-weight: 700; color: #1C2420; }
+
+    /* KPIs 2x2 */
+    .k5grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .k5 { background: #fff; border-radius: 16px; padding: 13px 14px;
+          box-shadow: 0 3px 14px rgba(12,60,45,0.07); }
+    .k5-l { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em;
+            color: #6C7A70; display: flex; align-items: center; gap: 6px; }
+    .k5-l svg { width: 13px; height: 13px; }
+    .k5-v { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin-top: 5px;
+            color: #1C2420; font-variant-numeric: tabular-nums; }
+    .k5-s { font-size: 10.5px; margin-top: 3px; color: #8B978F; }
+
+    /* baldes */
+    .segbar { display: flex; height: 10px; border-radius: 6px; overflow: hidden; margin-bottom: 12px; }
+    .brow { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-size: 13px; color: #1C2420; }
+    .brow .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+    .brow .bl { flex: 1; font-weight: 500; }
+    .brow .bv { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .brow .bp { font-size: 11px; color: #8B978F; width: 34px; text-align: right; }
+
+    /* metas em anéis */
+    .rings { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; text-align: center; }
+    .ring { display: flex; flex-direction: column; align-items: center; }
+    .ring svg { width: 62px; height: 62px; transform: rotate(-90deg); }
+    .ring .rv { font-size: 12.5px; font-weight: 700; color: #1C2420; margin-top: -41px; height: 36px;
+                display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+    .ring .rl { font-size: 10.5px; font-weight: 600; color: #6C7A70; margin-top: 9px; line-height: 1.3; }
+
+    /* faturas */
+    .frow { display: flex; align-items: center; gap: 11px; padding: 9px 0; }
+    .frow + .frow { border-top: 1px solid #EDF2EE; }
+    .fstripe { width: 4px; height: 34px; border-radius: 2px; flex: none; }
+    .fmeio { flex: 1; min-width: 0; }
+    .fmeio .ft { font-size: 13.5px; font-weight: 600; color: #1C2420; }
+    .fmeio .fs { font-size: 11px; color: #8B978F; margin-top: 1px; }
+    .fval { font-size: 14px; font-weight: 700; color: #1C2420; font-variant-numeric: tabular-nums; }
+
+    /* casal */
+    .casal { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .pss { background: #fff; border-radius: 16px; padding: 13px 14px; box-shadow: 0 3px 14px rgba(12,60,45,0.07); }
+    .pss .ph { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .pss .pa { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+               font-size: 10px; font-weight: 700; color: #fff; }
+    .pss .pn { font-size: 13px; font-weight: 700; color: #1C2420; }
+    .pss .pr { display: flex; justify-content: space-between; font-size: 12px; padding: 2.5px 0;
+               color: #4A564E; font-variant-numeric: tabular-nums; }
+    .pss .pr b { color: #1C2420; }
+    @media (max-width: 640px) { .casal { grid-template-columns: 1fr; } }
+
+    /* widgets streamlit no clima do tema */
+    div[data-testid="stExpander"] { background: #fff; border: 0 !important; border-radius: 16px !important;
+      box-shadow: 0 3px 14px rgba(12,60,45,0.07); margin-bottom: 12px; }
+    div[data-testid="stExpander"] summary { font-size: 13px !important; font-weight: 600; padding: 12px 14px !important; }
+    div[data-testid="stSelectbox"] > div > div { border-radius: 999px !important; }
+    hr { margin: 0.8rem 0 !important; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -75,6 +138,13 @@ def fmt(v: float) -> str:
     return ("-" if v < 0 else "") + f"R$ {s}"
 
 
+def fmt_mil(v: float) -> str:
+    """R$ compacto pros chips: 63,9 mil."""
+    if abs(v) >= 1000:
+        return f"{v/1000:,.1f}".replace(".", ",") + " mil"
+    return f"{v:,.0f}".replace(",", ".")
+
+
 # ============== Dados ==============
 df_lanc = load_lancamentos(False)
 df_rec = load_recorrentes()
@@ -82,9 +152,7 @@ df_faturas = load_faturas()
 df_saldo = load_saldo_investido()
 df_metas = load_metas()
 
-# ============== Header ==============
-c1, c2, c3 = st.columns([2, 2, 1])
-# Meses = união de Competência + Caixa, ordenados: mês atual no topo, passados desc, futuros (parcelas) no fim
+# ============== Seletor de mês (pill) ==============
 _todos = set(meses_disponiveis(df_lanc, "Competência")) | set(meses_disponiveis(df_lanc, "Caixa"))
 mes_atual = f"{datetime.now().month:02d}/{datetime.now().year}"
 _todos.add(mes_atual)
@@ -96,7 +164,7 @@ def _key(c):
 _hoje = datetime.now().year * 100 + datetime.now().month
 _passados = sorted([c for c in _todos if _key(c) <= _hoje], key=_key, reverse=True)
 _futuros = sorted([c for c in _todos if _key(c) > _hoje], key=_key)
-meses = _passados + _futuros  # mês atual sempre no topo
+meses = _passados + _futuros
 _NOMES = {"01": "jan", "02": "fev", "03": "mar", "04": "abr", "05": "mai", "06": "jun",
           "07": "jul", "08": "ago", "09": "set", "10": "out", "11": "nov", "12": "dez"}
 def _label(c):
@@ -104,40 +172,90 @@ def _label(c):
         m, y = c.split("/"); return f"{_NOMES.get(m, m)}/{y}" + ("  ·  futuro" if _key(c) > _hoje else "")
     except Exception:
         return c
-with c1:
-    st.markdown("### Família Gomes")
-with c2:
+sc1, sc2 = st.columns([3, 1])
+with sc1:
     competencia = st.selectbox("Mês", meses, index=0, format_func=_label, label_visibility="collapsed")
-with c3:
-    if st.button("🔄", use_container_width=True, help="Atualizar dados"):
+with sc2:
+    if st.button("Atualizar", use_container_width=True):
         st.cache_data.clear(); st.rerun()
 
-# ============== Hero: livre pra gastar ==============
+# ============== Cálculos ==============
 lpg = livre_para_gastar(df_lanc, df_rec, df_faturas, df_saldo, competencia)
 livre = lpg["livre"]
-cor_livre = "var(--color-text-success)" if livre >= 0 else "var(--color-text-danger)"
-st.markdown(
-    f"""
-    <div class="hero">
-      <div style="font-size:13px; opacity:0.7;">livre pra gastar este mês</div>
-      <div class="hero-num" style="color:{cor_livre};">{fmt(livre)}</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# ============== KPIs ==============
 k = kpis_familia(df_lanc, df_saldo, competencia, "Competência")
 caixa = kpis_familia(df_lanc, df_saldo, competencia, "Caixa")
 estocado = k["saldo_estocado_total"]
 aporte = k["aporte_total"]
+
+# sparkline: saldo (receita−despesa) dos últimos 6 meses fechados + selecionado
+_spark_pts = ""
+try:
+    _meses_hist = [c for c in _passados if _key(c) <= _key(competencia)][:6][::-1]
+    _saldos = []
+    for c in _meses_hist:
+        mm = df_lanc[df_lanc["Competência"] == c]
+        r = mm[mm["Tipo"].astype(str).str.lower() == "receita"]["Valor"].sum()
+        d = mm[mm["Tipo"].astype(str).str.lower() == "despesa"]["Valor"].sum()
+        _saldos.append(float(r - d))
+    if len(_saldos) >= 3:
+        lo, hi = min(_saldos), max(_saldos)
+        rng = (hi - lo) or 1.0
+        n = len(_saldos)
+        pts = [
+            f"{2 + i * (112 / (n - 1)):.0f},{38 - (v - lo) / rng * 30:.0f}"
+            for i, v in enumerate(_saldos)
+        ]
+        _ult = pts[-1].split(",")
+        _spark_pts = (
+            f'<svg class="h5-spark" viewBox="0 0 118 44" aria-hidden="true">'
+            f'<polyline points="{" ".join(pts)}" fill="none" stroke="rgba(255,255,255,0.55)" '
+            f'stroke-width="2" stroke-linecap="round"/>'
+            f'<circle cx="{_ult[0]}" cy="{_ult[1]}" r="3.5" fill="#7CE0B8"/></svg>'
+        )
+except Exception:
+    _spark_pts = ""
+
+# contas fixas + próxima fatura (pros KPIs)
+audit = auditar_contas_fixas(df_lanc, df_rec, competencia)
+n_pagas = int((audit["Status"] == "Paga").sum()) if not audit.empty else 0
+n_fixas = len(audit)
+
+_prox_fat_txt, _prox_fat_val = "—", ""
+ab = pd.DataFrame()
+if not df_faturas.empty and "Vencimento_dt" in df_faturas.columns:
+    ab = df_faturas[df_faturas["Status"].astype(str).str.lower().isin(["pendente", "carregada"])].copy()
+    hoje_ts = pd.Timestamp(datetime.now().date())
+    ab["_dias"] = (ab["Vencimento_dt"] - hoje_ts).dt.days
+    ab = ab[(ab["_dias"] >= -40) & (ab["_dias"] <= 35)].sort_values("_dias")
+    pend = ab[ab["Status"].astype(str).str.lower() != "carregada"]
+    if not pend.empty:
+        r0 = pend.iloc[0]
+        _c0 = str(r0.get("Cartão", "?"))
+        _t0 = float(r0.get("Total_num", 0) or 0)
+        if _t0 <= 0:
+            _t0, _ = fatura_estimada(_c0, str(r0.get("Mês Referência", "")), df_lanc, vencimento=str(r0.get("Vencimento", "")))
+        _d0 = int(r0["_dias"])
+        _prox_fat_val = ("~" if float(r0.get("Total_num", 0) or 0) <= 0 else "") + fmt(_t0) if _t0 > 0 else "—"
+        _prox_fat_txt = f"{_c0} · " + (f"vence em {_d0}d" if _d0 >= 0 else f"venceu há {abs(_d0)}d")
+
+# ============== Hero ==============
+_h = datetime.now().hour
+saud = "bom dia" if _h < 12 else ("boa tarde" if _h < 18 else "boa noite")
+sinal = '<span class="mais">+</span>' if livre >= 0 else '<span class="menos">−</span>'
 st.markdown(
     f"""
-    <div class="kgrid">
-      <div class="kc"><div class="kc-l">entrou</div><div class="kc-v" style="color:var(--color-text-success);">{fmt(k['receita_total'])}</div></div>
-      <div class="kc"><div class="kc-l">gastou</div><div class="kc-v">{fmt(k['despesa_total'])}</div><div class="kc-s">saiu da conta {fmt(caixa['despesa_total'])}</div></div>
-      <div class="kc"><div class="kc-l">investiu (mês)</div><div class="kc-v" style="color:var(--color-text-info);">{fmt(aporte) if aporte>0 else '—'}</div><div class="kc-s">{'aporte 5000 cdb no zap' if aporte==0 else ''}</div></div>
-      <div class="kc"><div class="kc-l">patrimônio</div><div class="kc-v">{fmt(estocado) if estocado>0 else '—'}</div><div class="kc-s">{'preencha Saldo Investido' if estocado==0 else ''}</div></div>
+    <div class="hero5">
+      <div class="h5-bar">
+        <div><div class="h5-ola">{saud},</div><div class="h5-nome">Família Gomes</div></div>
+        <div class="h5-right"><span class="h5-mes">{_label(competencia)}</span><span class="h5-av">WG</span></div>
+      </div>
+      <div class="h5-rot">livre pra gastar</div>
+      <div class="h5-num">{sinal}R$ {f"{abs(livre):,.0f}".replace(",", ".")}</div>
+      <div class="h5-chips">
+        <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#7CE0B8" stroke-width="2.2"><path d="M8 13V3M4 7l4-4 4 4"/></svg>entrou {fmt_mil(k['receita_total'])}</span>
+        <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#FFAFA8" stroke-width="2.2"><path d="M8 3v10M4 9l4 4 4-4"/></svg>gastou {fmt_mil(k['despesa_total'])}</span>
+      </div>
+      {_spark_pts}
     </div>
     """,
     unsafe_allow_html=True,
@@ -155,81 +273,96 @@ with st.popover("ver a conta do mês"):
         f"o que efetivamente debitou. Saldo do mês: **{fmt(k['saldo_mes'])}**."
     )
 
-# ============== Metas ==============
-st.subheader("Metas")
-st.caption("serão calibradas com o histórico do ano — edite na aba Metas")
-mInvest = meta_valor(df_metas, "investir")
-mPoup = meta_valor(df_metas, "poupança")
-mFlex = meta_valor(df_metas, "flexível")
-no_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df_lanc.columns else df_lanc
-baldes = classificar_baldes(split_movimentos(no_mes)["despesas"], df_rec)
-flex_real = baldes["Flexível"]["total"]
-poup_real = (k["saldo_mes"] / k["receita_total"] * 100) if k["receita_total"] > 0 else 0
-
-VERDE, AMBAR, VERMELHO, INFO = COR["receita"], COR["alerta"], COR["despesa"], COR["investimento"]
-def meta_html(label, atual, alvo, sufixo, melhor_maior=True):
-    pct = (atual / alvo * 100) if alvo > 0 else 0
-    if melhor_maior:
-        cor, txt = (VERDE, "meta batida") if pct >= 100 else (INFO, f"{pct:.0f}% do caminho")
-    else:
-        cor = VERDE if pct <= 85 else (AMBAR if pct <= 100 else VERMELHO)
-        txt = "dentro do teto" if pct <= 100 else f"estourou {pct-100:.0f}%"
-    a = f"{atual:,.0f}".replace(",", ".") + sufixo
-    b = f"{alvo:,.0f}".replace(",", ".") + sufixo
-    return (f'<div class="mcard"><div style="font-size:11px;opacity:0.65;">{label}</div>'
-            f'<div style="font-size:16px;font-weight:500;margin:2px 0 0;">{a} <span style="opacity:0.45;font-weight:400;font-size:12px;">/ {b}</span></div>'
-            f'<div class="bar"><div style="width:{min(pct,100):.0f}%;background:{cor};"></div></div>'
-            f'<div style="font-size:10px;color:{cor};margin-top:4px;">{txt}</div></div>')
+# ============== KPIs 2×2 ==============
+IC_INV = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13l4-5 3 3 5-7"/></svg>'
+IC_PAT = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="12" height="8" rx="2"/><path d="M5 5V3.5A1.5 1.5 0 016.5 2h3A1.5 1.5 0 0111 3.5V5"/></svg>'
+IC_FIX = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>'
+IC_FAT = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="4" width="12" height="9" rx="2"/><path d="M2 7h12"/></svg>'
 st.markdown(
-    '<div class="grid3">'
-    + meta_html("investir / mês", aporte, mInvest, "")
-    + meta_html("poupança", poup_real, mPoup, "%")
-    + meta_html("teto flexível", flex_real, mFlex, "", melhor_maior=False)
-    + "</div>",
+    f"""
+    <div class="k5grid">
+      <div class="k5"><div class="k5-l">{IC_INV} investiu</div>
+        <div class="k5-v">{fmt(aporte) if aporte > 0 else '—'}</div>
+        <div class="k5-s">{'este mês' if aporte > 0 else 'aporte 5000 CDB no Zap'}</div></div>
+      <div class="k5"><div class="k5-l">{IC_PAT} patrimônio</div>
+        <div class="k5-v">{fmt(estocado) if estocado > 0 else '—'}</div>
+        <div class="k5-s">{'saldo investido' if estocado > 0 else 'preencha Saldo Investido'}</div></div>
+      <div class="k5"><div class="k5-l">{IC_FIX} fixas pagas</div>
+        <div class="k5-v">{n_pagas} <span style="font-size:13px;font-weight:600;color:#8B978F">/ {n_fixas}</span></div>
+        <div class="k5-s">{'todas confirmadas' if n_pagas == n_fixas and n_fixas > 0 else 'a confirmar no mês'}</div></div>
+      <div class="k5"><div class="k5-l">{IC_FAT} faturas a pagar</div>
+        <div class="k5-v">{_prox_fat_val or '—'}</div>
+        <div class="k5-s">{_prox_fat_txt}</div></div>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
 
-# ============== Para onde foi (3 baldes com drill-down) ==============
-st.subheader("Para onde foi")
-st.caption("3 baldes em vez de 14 categorias — clique pra abrir o detalhe")
+# ============== Para onde foi (baldes) ==============
+no_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df_lanc.columns else df_lanc
+baldes = classificar_baldes(split_movimentos(no_mes)["despesas"], df_rec)
 BALDE_META = {
-    "Fixo": ("fixo · não muda", COR["neutro"]),
-    "Recorrente": ("recorrente / parcelas", COR["alerta"]),
-    "Flexível": ("flexível · dá pra cortar", COR["flexivel"]),
+    "Fixo": ("Fixo · não muda", COR["neutro"]),
+    "Recorrente": ("Recorrente / parcelas", COR["alerta"]),
+    "Flexível": ("Flexível · dá pra cortar", COR["flexivel"]),
 }
 tot_baldes = sum(baldes[b]["total"] for b in baldes) or 1
-for b in ["Fixo", "Recorrente", "Flexível"]:
-    label, cor = BALDE_META[b]
-    total = baldes[b]["total"]
-    pct = total / tot_baldes * 100
-    with st.expander(f"{label} — {fmt(total)}", expanded=(b == "Flexível")):
-        st.markdown(f'<div class="balde-bar"><div class="balde-fill" style="width:{pct:.0f}%;background:{cor};"></div></div>', unsafe_allow_html=True)
-        st.write("")
+_seg = "".join(
+    f'<div style="width:{baldes[b]["total"] / tot_baldes * 100:.1f}%;background:{BALDE_META[b][1]}"></div>'
+    for b in ["Fixo", "Recorrente", "Flexível"]
+)
+_rows = "".join(
+    f'<div class="brow"><span class="dot" style="background:{BALDE_META[b][1]}"></span>'
+    f'<span class="bl">{BALDE_META[b][0]}</span><span class="bv">{fmt(baldes[b]["total"])}</span>'
+    f'<span class="bp">{baldes[b]["total"] / tot_baldes * 100:.0f}%</span></div>'
+    for b in ["Fixo", "Recorrente", "Flexível"]
+)
+st.markdown(f'<div class="c5"><h4>Para onde foi</h4><div class="segbar">{_seg}</div>{_rows}</div>',
+            unsafe_allow_html=True)
+with st.expander("Ver itens dos baldes"):
+    for b in ["Fixo", "Recorrente", "Flexível"]:
+        st.markdown(f"**{BALDE_META[b][0]}** — {fmt(baldes[b]['total'])}")
         for it in baldes[b]["itens"]:
             cc1, cc2 = st.columns([3, 1])
             cc1.caption(it["desc"])
             cc2.caption(fmt(it["valor"]))
 
-# ============== Investimentos & Patrimônio ==============
-with st.expander("Investimentos & patrimônio", expanded=(estocado == 0 and aporte == 0)):
-    ic1, ic2, ic3 = st.columns(3)
-    ic1.metric("aporte do mês", fmt(aporte) if aporte > 0 else "—")
-    ic2.metric("saldo estocado", fmt(estocado) if estocado > 0 else "—")
-    rend = rendimento_investido(df_saldo)
-    ic3.metric("rendimento", f"+{rend['pct']:.1f}%" if rend else "—",
-               help="precisa de ≥2 registros na aba Saldo Investido")
-    if estocado == 0 and aporte == 0:
-        st.info("No Zap: `aporte 5000 CDB XP` registra investimento. Preencha a aba `Saldo Investido` pro patrimônio aparecer.")
+# ============== Metas (anéis) ==============
+mInvest = meta_valor(df_metas, "investir")
+mPoup = meta_valor(df_metas, "poupança")
+mFlex = meta_valor(df_metas, "flexível")
+flex_real = baldes["Flexível"]["total"]
+poup_real = (k["saldo_mes"] / k["receita_total"] * 100) if k["receita_total"] > 0 else 0
 
-# ============== Faturas (auditoria) ==============
+def _ring(pct, cor, valor_txt, label):
+    C = 163.4
+    off = C * (1 - min(max(pct, 0), 1))
+    return (
+        f'<div class="ring"><svg viewBox="0 0 62 62">'
+        f'<circle cx="31" cy="31" r="26" fill="none" stroke="#EDF2EE" stroke-width="7"/>'
+        f'<circle cx="31" cy="31" r="26" fill="none" stroke="{cor}" stroke-width="7" '
+        f'stroke-linecap="round" stroke-dasharray="{C}" stroke-dashoffset="{off:.0f}"/></svg>'
+        f'<div class="rv">{valor_txt}</div><div class="rl">{label}</div></div>'
+    )
+
+p_inv = (aporte / mInvest) if mInvest > 0 else 0
+p_poup = (poup_real / mPoup) if mPoup > 0 else 0
+p_flex = (flex_real / mFlex) if mFlex > 0 else 0
+cor_flex = COR["flexivel"] if p_flex <= 1 else COR["despesa"]
+st.markdown(
+    '<div class="c5"><h4>Metas do mês</h4><div class="rings">'
+    + _ring(p_inv, COR["investimento"], f"{p_inv*100:.0f}%", f"investir<br>{fmt_mil(aporte)} / {fmt_mil(mInvest)}")
+    + _ring(p_poup, COR["receita"], f"{p_poup*100:.0f}%", f"poupança<br>{poup_real:.0f}% / {mPoup:.0f}%")
+    + _ring(p_flex, cor_flex, f"{p_flex*100:.0f}%", f"teto flexível<br>{fmt_mil(flex_real)} / {fmt_mil(mFlex)}")
+    + "</div></div>",
+    unsafe_allow_html=True,
+)
+
+# ============== Faturas ==============
 st.subheader("Faturas")
-st.caption("auditadas contra os lançamentos individuais")
 st.warning("Faltam as 2 faturas Bradesco da Sabrina — os gastos dela estão subestimados até carregar.")
-if not df_faturas.empty and "Vencimento_dt" in df_faturas.columns:
-    ab = df_faturas[df_faturas["Status"].astype(str).str.lower().isin(["pendente", "carregada"])].copy()
-    hoje = pd.Timestamp(datetime.now().date())
-    ab["_dias"] = (ab["Vencimento_dt"] - hoje).dt.days
-    ab = ab[(ab["_dias"] >= -40) & (ab["_dias"] <= 35)].sort_values("_dias")
+if not ab.empty:
+    _frows = ""
     for _, r in ab.iterrows():
         cartao = str(r.get("Cartão", "?")); mes_ref = str(r.get("Mês Referência", "?"))
         carregada = str(r.get("Status", "")).lower() == "carregada"
@@ -239,41 +372,44 @@ if not df_faturas.empty and "Vencimento_dt" in df_faturas.columns:
             total, _q = fatura_estimada(cartao, mes_ref, df_lanc, vencimento=venc)
         d = int(r["_dias"])
         if carregada:
-            cor_bg = "var(--color-background-success)"; cor_tx = "var(--color-text-success)"; ic = "✓"; status = "carregada · conciliada"
+            cor_s, status = COR["receita"], "carregada · conciliada"
         elif d < 0:
-            cor_bg = "var(--color-background-danger)"; cor_tx = "var(--color-text-danger)"; ic = "🔴"; status = f"venceu há {abs(d)}d"
+            cor_s, status = COR["despesa"], f"venceu há {abs(d)}d"
         else:
-            cor_bg = "var(--color-background-warning)"; cor_tx = "var(--color-text-warning)"; ic = "⏳"; status = f"vence em {d}d · aguardando fatura"
+            cor_s, status = COR["alerta"], f"vence em {d}d · aguardando fatura"
         val_txt = fmt(total) if (carregada or total > 0) else "—"
         prefixo = "" if carregada else "~ "
-        st.markdown(
-            f'<div style="display:flex;justify-content:space-between;padding:9px 12px;background:{cor_bg};border-radius:8px;margin-bottom:6px;font-size:13px;">'
-            f'<span style="color:{cor_tx};">{ic} {cartao} · {mes_ref} <span style="opacity:0.8;font-size:11px;">{status}</span></span>'
-            f'<span style="color:{cor_tx};font-weight:500;">{prefixo}{val_txt}</span></div>',
-            unsafe_allow_html=True,
+        _frows += (
+            f'<div class="frow"><span class="fstripe" style="background:{cor_s}"></span>'
+            f'<span class="fmeio"><span class="ft">{cartao} · {mes_ref}</span>'
+            f'<div class="fs">{status}</div></span>'
+            f'<span class="fval">{prefixo if val_txt != "—" else ""}{val_txt}</span></div>'
         )
+    st.markdown(f'<div class="c5">{_frows}</div>', unsafe_allow_html=True)
 else:
     st.info("Aba Faturas vazia.")
 
-# ============== Contas fixas (alertas + projeção) ==============
-st.subheader("Contas fixas")
-audit = auditar_contas_fixas(df_lanc, df_rec, competencia)
+# ============== Contas fixas (detalhe) ==============
 if not audit.empty:
-    dias_unicos = audit["Dia Cobrança"].nunique()
-    pagas = audit[audit["Status"] == "Paga"]
-    pend = audit[audit["Status"].isin(["Pendente", "Atrasada"])]
-    fc1, fc2, fc3 = st.columns(3)
-    fc1.metric("pagas", len(pagas))
-    fc2.metric("a confirmar", len(pend))
-    fc3.metric("comprometido/mês", fmt(audit["Valor Esperado"].sum()))
-    with st.expander(f"{len(audit)} contas fixas — detalhe e dias de cobrança", expanded=False):
+    with st.expander(f"Contas fixas — {n_pagas} pagas / {n_fixas} no mês · {fmt(audit['Valor Esperado'].sum())} comprometido"):
         audit_show = audit.sort_values("Dia Cobrança")
         st.dataframe(
             audit_show[["Status", "Descrição", "Valor Esperado", "Dia Cobrança", "Pessoa Pagou"]],
             use_container_width=True, hide_index=True,
             column_config={"Valor Esperado": st.column_config.NumberColumn(format="R$ %.0f")},
         )
-    st.caption("o cadastro dispara os alertas (dia 10/15 no Zap) e alimenta a projeção abaixo")
+        st.caption("o cadastro dispara os alertas (dia 10/15 no Zap) e alimenta a projeção abaixo")
+
+# ============== Investimentos (detalhe) ==============
+with st.expander("Investimentos & patrimônio", expanded=(estocado == 0 and aporte == 0)):
+    ic1, ic2, ic3 = st.columns(3)
+    ic1.metric("aporte do mês", fmt(aporte) if aporte > 0 else "—")
+    ic2.metric("saldo estocado", fmt(estocado) if estocado > 0 else "—")
+    rend = rendimento_investido(df_saldo)
+    ic3.metric("rendimento", f"+{rend['pct']:.1f}%" if rend else "—",
+               help="precisa de ≥2 registros na aba Saldo Investido")
+    if estocado == 0 and aporte == 0:
+        st.info("No Zap: `aporte 5000 CDB XP` registra investimento. Preencha a aba `Saldo Investido` pro patrimônio aparecer.")
 
 # ============== Projeção ==============
 st.subheader("Projeção")
@@ -298,18 +434,21 @@ if not cron.empty:
     st.plotly_chart(fig_mobile(fig), use_container_width=True, config=PLOTLY_CONFIG)
     st.caption("conforme as faturas grandes saem, sua folga cresce mês a mês")
 
-# ============== Wesley vs Sabrina ==============
-st.subheader("Quem movimenta o quê")
-wc1, wc2 = st.columns(2)
-for col, pessoa in zip([wc1, wc2], ["Wesley", "Sabrina"]):
-    with col.container(border=True):
-        rec = k["receita_por_pessoa"].get(pessoa, 0)
-        desp = k["despesa_por_pessoa"].get(pessoa, 0)
-        apo = k["aporte_por_pessoa"].get(pessoa, 0)
-        saldo = rec - desp - apo
-        st.markdown(f"**{pessoa}**")
-        st.write(f"receita: **{fmt(rec) if rec>0 else '—'}**" + ("" if rec > 0 else " _(não lança)_"))
-        st.write(f"gastos: **{fmt(desp)}**")
-        if apo > 0:
-            st.write(f"investido: **{fmt(apo)}**")
-        st.write(f"saldo: **{fmt(saldo)}**")
+# ============== Wesley × Sabrina ==============
+st.subheader("Quem movimenta")
+_cards = ""
+for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexivel"])]:
+    rec = k["receita_por_pessoa"].get(pessoa, 0)
+    desp = k["despesa_por_pessoa"].get(pessoa, 0)
+    apo = k["aporte_por_pessoa"].get(pessoa, 0)
+    saldo = rec - desp - apo
+    cor_saldo = COR["receita"] if saldo >= 0 else COR["despesa"]
+    _inv = f'<div class="pr"><span>investido</span><b>{fmt(apo)}</b></div>' if apo > 0 else ""
+    _cards += (
+        f'<div class="pss"><div class="ph"><span class="pa" style="background:{cor_av}">{pessoa[0]}</span>'
+        f'<span class="pn">{pessoa}</span></div>'
+        f'<div class="pr"><span>entrou</span><b>{fmt(rec) if rec > 0 else "—"}</b></div>'
+        f'<div class="pr"><span>gastou</span><b>{fmt(desp)}</b></div>{_inv}'
+        f'<div class="pr"><span>saldo</span><b style="color:{cor_saldo}">{"+" if saldo >= 0 else ""}{fmt(saldo)}</b></div></div>'
+    )
+st.markdown(f'<div class="casal">{_cards}</div>', unsafe_allow_html=True)
