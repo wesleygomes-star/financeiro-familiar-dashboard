@@ -156,6 +156,9 @@ def tema_verde_premium():
            consumir gap do layout — eram a origem do espaço morto no topo */
         div[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child),
         div[data-testid="stElementContainer"]:has(iframe[height="0"]) { display: none !important; }
+        /* o invólucro da barra fixa também não pode ocupar slot de gap (16px) */
+        [data-testid="stVerticalBlock"] > div:has(.st-key-tabbar5) { display: contents !important; }
+        [data-testid="stVerticalBlock"] > div:has(.st-key-tabbar5) > div { display: contents !important; }
 
         /* barra de navegação inferior (estilo app) — .st-key-tabbar5 É o próprio
            stVerticalBlock (flex column por padrão): vira row direto nele */
