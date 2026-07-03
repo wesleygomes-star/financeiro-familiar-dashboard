@@ -37,10 +37,10 @@ st.markdown(
     """<style>
     .block-container { max-width: 680px !important; padding-top: 0.9rem !important; position: relative; }
     /* seletor de mês vira o pill do hero (sobreposto no canto direito, ao lado do avatar) */
-    .st-key-mespill { position: absolute; top: 44px; right: 76px; width: 128px; z-index: 20; }
+    .st-key-mespill { position: absolute !important; top: 44px; right: 64px; width: 126px; z-index: 20; }
     .st-key-mespill div[data-testid="stSelectbox"] > div > div {
-      background: rgba(255,255,255,0.16) !important; border: 0 !important;
-      border-radius: 999px !important; min-height: 34px; height: 34px;
+      background: rgba(7,56,44,0.55) !important; border: 1px solid rgba(255,255,255,0.28) !important;
+      border-radius: 999px !important; min-height: 32px; height: 32px;
     }
     .st-key-mespill div[data-testid="stSelectbox"] * { color: #EAF7F0 !important; font-size: 12px !important; }
     .st-key-mespill svg { fill: #EAF7F0 !important; }

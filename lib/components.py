@@ -152,21 +152,23 @@ def tema_verde_premium():
         /* espaço pro conteúdo não ficar atrás da barra de navegação */
         .block-container { padding-bottom: 96px !important; }
 
-        /* barra de navegação inferior (estilo app) */
+        /* blocos "fantasma" (markdown só-de-CSS e iframes de altura 0) não podem
+           consumir gap do layout — eram a origem do espaço morto no topo */
+        div[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child),
+        div[data-testid="stElementContainer"]:has(iframe[height="0"]) { display: none !important; }
+
+        /* barra de navegação inferior (estilo app) — .st-key-tabbar5 É o próprio
+           stVerticalBlock (flex column por padrão): vira row direto nele */
         .st-key-tabbar5 {
           position: fixed; left: 0; right: 0; bottom: 0; z-index: 999;
+          flex-direction: row !important; gap: 0 !important; align-items: stretch;
           background: rgba(255,255,255,0.94) !important;
           backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
           border-top: 1px solid #E3EBE5; border-radius: 0 !important;
           box-shadow: 0 -2px 14px rgba(12,60,45,0.08) !important;
-          padding: 6px 6px calc(8px + env(safe-area-inset-bottom));
+          padding: 6px max(6px, calc((100% - 680px) / 2)) calc(8px + env(safe-area-inset-bottom)) !important;
         }
-        /* links lado a lado SEMPRE (sem st.columns → nada de empilhar no celular) */
-        .st-key-tabbar5 [data-testid="stVerticalBlock"] {
-          flex-direction: row !important; gap: 0 !important;
-          max-width: 680px; margin: 0 auto; align-items: stretch;
-        }
-        .st-key-tabbar5 [data-testid="stVerticalBlock"] > div {
+        .st-key-tabbar5 > div {
           flex: 1 1 0 !important; width: auto !important; min-width: 0 !important; margin: 0 !important;
         }
         .st-key-tabbar5 a {
@@ -201,9 +203,9 @@ def barra_navegacao(ativa: str = "inicio"):
         # destaca a aba ativa (verde marca) pelo índice do link na barra
         idx = next((i for i, a in enumerate(ABAS) if a[0] == ativa), 0) + 1
         st.markdown(
-            f"<style>.st-key-tabbar5 [data-testid='stVerticalBlock'] > div:nth-child({idx}) a, "
-            f".st-key-tabbar5 [data-testid='stVerticalBlock'] > div:nth-child({idx}) a p, "
-            f".st-key-tabbar5 [data-testid='stVerticalBlock'] > div:nth-child({idx}) a span "
+            f"<style>.st-key-tabbar5 > div:nth-child({idx}) a, "
+            f".st-key-tabbar5 > div:nth-child({idx}) a p, "
+            f".st-key-tabbar5 > div:nth-child({idx}) a span "
             f"{{ color: #0F6E56 !important; }}</style>",
             unsafe_allow_html=True,
         )
