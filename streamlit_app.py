@@ -75,19 +75,51 @@ def _oidc_disponivel() -> bool:
         return False
 
 
+def _tela_login():
+    """Visual da tela de login no padrão Verde Premium (mockup A)."""
+    st.markdown(
+        """
+        <style>
+        .stApp { background: linear-gradient(160deg, #0C5949 0%, #0A4A3A 55%, #07382C 100%) !important; }
+        [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+        header[data-testid="stHeader"] { background: transparent; }
+        .block-container { max-width: 380px !important; padding-top: 16vh !important; }
+        .login-card { text-align: center; color: #F2FBF6; margin-bottom: 22px; }
+        .login-logo { width: 74px; height: 74px; border-radius: 22px; background: rgba(255,255,255,0.14);
+          display: grid; place-items: center; margin: 0 auto 14px;
+          font-size: 36px; font-weight: 800; color: #7CE0B8;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+        .login-nome { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+        .login-sub { font-size: 13px; opacity: 0.72; margin-top: 3px; }
+        div[data-testid="stTextInput"] input { border-radius: 12px !important; text-align: center;
+          font-size: 16px !important; height: 48px; }
+        div[data-testid="stTextInput"] > div { border-radius: 12px !important; }
+        .stButton button { border-radius: 12px !important; height: 46px; font-weight: 700; }
+        .login-hint { text-align: center; font-size: 11.5px; color: rgba(242,251,246,0.55); margin-top: 14px; }
+        </style>
+        <div class="login-card">
+          <div class="login-logo">$</div>
+          <div class="login-nome">Financeiro</div>
+          <div class="login-sub">Família Gomes</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _gate_google():
     """Login por conta Google + allowlist de e-mails (secrets['auth']['allowed_emails'])."""
     if not st.user.is_logged_in:
-        st.title("💰 Financeiro Família Gomes")
-        st.caption("Entre com a sua conta Google autorizada.")
-        st.button("Entrar com Google", type="primary", on_click=st.login)
+        _tela_login()
+        st.button("Entrar com Google", type="primary", on_click=st.login, use_container_width=True)
+        st.markdown('<div class="login-hint">acesso restrito à família</div>', unsafe_allow_html=True)
         st.stop()
     allowed = [e.strip().lower() for e in st.secrets.get("auth", {}).get("allowed_emails", [])]
     email = (getattr(st.user, "email", "") or "").lower()
     if allowed and email not in allowed:
-        st.title("💰 Financeiro Família Gomes")
+        _tela_login()
         st.error(f"A conta {email} não está autorizada para este painel.")
-        st.button("Sair", on_click=st.logout)
+        st.button("Sair", on_click=st.logout, use_container_width=True)
         st.stop()
     with st.sidebar:
         st.caption(f"👤 {email}")
@@ -97,13 +129,17 @@ def _gate_google():
 def _gate_senha():
     """Fallback: senha única (secrets['auth']['password'] ou 'familia2026')."""
     if "auth_ok" not in st.session_state:
-        st.title("💰 Financeiro Família Gomes")
-        senha = st.text_input("🔐 Senha", type="password")
+        _tela_login()
+        senha = st.text_input(
+            "Senha", type="password", placeholder="senha da família",
+            label_visibility="collapsed",
+        )
         if senha == st.secrets.get("auth", {}).get("password", "familia2026"):
             st.session_state["auth_ok"] = True
             st.rerun()
         elif senha:
             st.error("Senha incorreta")
+        st.markdown('<div class="login-hint">digite a senha e aperte Enter</div>', unsafe_allow_html=True)
         st.stop()
 
 

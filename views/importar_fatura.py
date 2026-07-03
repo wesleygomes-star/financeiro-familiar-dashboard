@@ -12,7 +12,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-from lib.components import tema_verde_premium
+from lib.components import barra_navegacao, tema_verde_premium
 from lib.data import load_lancamentos
 from lib.ocr_fatura import dedupe_against_existing, extract_transactions
 from lib.sheets_writer import append_lancamentos
@@ -21,6 +21,7 @@ from lib.sheets_writer import append_lancamentos
 # set_page_config + auth ficam no router (streamlit_app.py)
 
 tema_verde_premium()
+barra_navegacao("importar")
 st.markdown(
     """<style>.block-container { max-width: 900px !important; padding-top: 2.2rem !important; }</style>""",
     unsafe_allow_html=True,

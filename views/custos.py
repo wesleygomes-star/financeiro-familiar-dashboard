@@ -4,10 +4,11 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from lib.components import PLOTLY_CONFIG, fig_mobile, tema_verde_premium
+from lib.components import barra_navegacao, PLOTLY_CONFIG, fig_mobile, tema_verde_premium
 from lib.data import load_custos
 
 tema_verde_premium()
+barra_navegacao("custos")
 st.markdown(
     """<style>
     .block-container { max-width: 900px !important; padding-top: 2.2rem !important; }

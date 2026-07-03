@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from lib.components import COR, PLOTLY_CONFIG, fig_mobile, tema_verde_premium
+from lib.components import COR, PLOTLY_CONFIG, barra_navegacao, fig_mobile, tema_verde_premium
 from lib.data import (
     auditar_contas_fixas,
     classificar_baldes,
@@ -32,6 +32,7 @@ from lib.data import (
 
 # ============== Tema Verde Premium (compartilhado) ==============
 tema_verde_premium()
+barra_navegacao("inicio")
 st.markdown(
     """<style>
     .block-container { max-width: 680px !important; padding-top: 2.2rem !important; }
@@ -170,14 +171,20 @@ st.markdown(
 
 with st.popover("ver a conta do mês"):
     st.markdown(
-        f"**Livre pra gastar = {fmt(livre)}**\n"
-        f"- entrou: **{fmt(lpg['receita'])}**\n"
-        f"- contas fixas: **−{fmt(lpg['fixas'])}**\n"
-        f"- faturas a pagar: **−{fmt(lpg['faturas_pagar'])}**\n"
-        f"- já gastei (flexível): **−{fmt(lpg['flex_gasto'])}**\n\n"
-        f"**Consumo (competência)** {fmt(k['despesa_total'])} = o que este mês consumiu, "
-        f"mesmo que pague depois. **Saiu da conta (caixa)** {fmt(caixa['despesa_total'])} = "
-        f"o que efetivamente debitou. Saldo do mês: **{fmt(k['saldo_mes'])}**."
+        f"""
+| a conta do mês | |
+| :-- | --: |
+| entrou | **{fmt(lpg['receita'])}** |
+| contas fixas | **−{fmt(lpg['fixas'])}** |
+| faturas a pagar | **−{fmt(lpg['faturas_pagar'])}** |
+| já gastei (flexível) | **−{fmt(lpg['flex_gasto'])}** |
+| **livre pra gastar** | **{fmt(livre)}** |
+"""
+    )
+    st.caption(
+        f"Consumo (competência): {fmt(k['despesa_total'])} — o que o mês consumiu, mesmo pagando depois. "
+        f"Saiu da conta (caixa): {fmt(caixa['despesa_total'])} — o que efetivamente debitou. "
+        f"Saldo do mês: {fmt(k['saldo_mes'])}."
     )
 
 # ============== KPIs 2×2 ==============

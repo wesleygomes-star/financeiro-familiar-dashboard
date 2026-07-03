@@ -146,11 +146,70 @@ def tema_verde_premium():
           box-shadow: 0 3px 14px rgba(12,60,45,0.07); }
         div[data-testid="stVerticalBlockBorderWrapper"] > div { border: 0 !important; }
         div[data-testid="stSelectbox"] > div > div { border-radius: 999px !important; }
+        div[data-testid="stPopoverBody"] { min-width: min(360px, 92vw); }
         hr { margin: 0.8rem 0 !important; }
+
+        /* espaço pro conteúdo não ficar atrás da barra de navegação */
+        .block-container { padding-bottom: 96px !important; }
+
+        /* barra de navegação inferior (estilo app) */
+        .st-key-tabbar5 {
+          position: fixed; left: 0; right: 0; bottom: 0; z-index: 999;
+          background: rgba(255,255,255,0.92);
+          backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+          border-top: 1px solid #E3EBE5;
+          padding: 6px 6px calc(8px + env(safe-area-inset-bottom));
+        }
+        .st-key-tabbar5 > div { max-width: 680px; margin: 0 auto; }
+        /* colunas da barra nunca empilham (vence o CSS mobile das views) */
+        .st-key-tabbar5 div[data-testid="column"] {
+          flex: 1 1 0 !important; min-width: 0 !important; width: auto !important; margin-bottom: 0 !important;
+        }
+        .st-key-tabbar5 a {
+          display: flex !important; flex-direction: column; align-items: center; gap: 1px;
+          padding: 4px 2px !important; border-radius: 10px;
+          font-size: 10px !important; font-weight: 600; color: #6C7A70 !important;
+          text-decoration: none !important; background: transparent !important;
+        }
+        .st-key-tabbar5 a:hover { background: #EDF3EE !important; }
+        .st-key-tabbar5 a p { font-size: 10px !important; margin: 0 !important; }
+        .st-key-tabbar5 a span[data-testid="stIconMaterial"] { font-size: 22px !important; }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
+
+def barra_navegacao(ativa: str = "inicio"):
+    """Barra de navegação inferior estilo app (mockup A). Chamar em toda view.
+
+    Usa st.page_link (troca de página SEM recarregar → mantém o login).
+    `ativa` destaca a aba da página atual: inicio|anual|importar|detalhes|custos.
+    """
+    ABAS = [
+        ("inicio", "views/visao_geral.py", "Início", ":material/home:"),
+        ("anual", "views/visao_anual.py", "Anual", ":material/calendar_month:"),
+        ("importar", "views/importar_fatura.py", "Importar", ":material/upload_file:"),
+        ("detalhes", "views/dashboard_detalhado.py", "Detalhes", ":material/monitoring:"),
+        ("custos", "views/custos.py", "Custos", ":material/build:"),
+    ]
+    try:
+        # destaca a aba ativa (verde marca)
+        st.markdown(
+            f"<style>.st-key-tab5-{ativa} a, .st-key-tab5-{ativa} a p, "
+            f".st-key-tab5-{ativa} a span[data-testid='stIconMaterial'] "
+            f"{{ color: #0F6E56 !important; }}</style>",
+            unsafe_allow_html=True,
+        )
+        with st.container(key="tabbar5"):
+            cols = st.columns(len(ABAS))
+            for col, (key, page, label, icone) in zip(cols, ABAS):
+                with col:
+                    with st.container(key=f"tab5-{key}"):
+                        st.page_link(page, label=label, icon=icone, use_container_width=True)
+    except Exception:
+        # fora do contexto de navegação (ex: testes) a barra simplesmente não renderiza
+        pass
 
 
 def kpi_card(label: str, value: float, prefix: str = "R$", delta: str = None,

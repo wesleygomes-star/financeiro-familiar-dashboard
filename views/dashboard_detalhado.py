@@ -11,12 +11,13 @@ Estrutura:
 import streamlit as st
 from datetime import datetime
 from lib.data import load_lancamentos, load_recorrentes, load_tetos, meses_disponiveis, filtrar, mes_anterior, progresso_mes, classificar_fixa_variavel
-from lib.components import kpi_card, donut_categorias, barras_categoria_vs_teto, projecao_6_meses, tabela_top_despesas, detalhar_categoria, comparativo_mensal, fmt_brl, breakdown_fixa_variavel, detalhar_fixa_variavel, tema_verde_premium
+from lib.components import barra_navegacao, kpi_card, donut_categorias, barras_categoria_vs_teto, projecao_6_meses, tabela_top_despesas, detalhar_categoria, comparativo_mensal, fmt_brl, breakdown_fixa_variavel, detalhar_fixa_variavel, tema_verde_premium
 
 
 # set_page_config + auth ficam no router (streamlit_app.py)
 
 tema_verde_premium()
+barra_navegacao("detalhes")
 
 # ============== CSS RESPONSIVO (mobile-friendly) ==============
 st.markdown(
