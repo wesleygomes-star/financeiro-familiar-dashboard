@@ -35,7 +35,15 @@ tema_verde_premium()
 barra_navegacao("inicio")
 st.markdown(
     """<style>
-    .block-container { max-width: 680px !important; padding-top: 2.2rem !important; }
+    .block-container { max-width: 680px !important; padding-top: 0.9rem !important; position: relative; }
+    /* seletor de mês vira o pill do hero (sobreposto no canto direito, ao lado do avatar) */
+    .st-key-mespill { position: absolute; top: 44px; right: 76px; width: 128px; z-index: 20; }
+    .st-key-mespill div[data-testid="stSelectbox"] > div > div {
+      background: rgba(255,255,255,0.16) !important; border: 0 !important;
+      border-radius: 999px !important; min-height: 34px; height: 34px;
+    }
+    .st-key-mespill div[data-testid="stSelectbox"] * { color: #EAF7F0 !important; font-size: 12px !important; }
+    .st-key-mespill svg { fill: #EAF7F0 !important; }
     </style>""",
     unsafe_allow_html=True,
 )
@@ -80,12 +88,10 @@ def _label(c):
         m, y = c.split("/"); return f"{_NOMES.get(m, m)}/{y}" + ("  ·  futuro" if _key(c) > _hoje else "")
     except Exception:
         return c
-sc1, sc2 = st.columns([3, 1])
-with sc1:
+# o widget fica no fluxo do código AQUI, mas o CSS o posiciona DENTRO do hero
+# (canto superior direito, estilo pill do mockup)
+with st.container(key="mespill"):
     competencia = st.selectbox("Mês", meses, index=0, format_func=_label, label_visibility="collapsed")
-with sc2:
-    if st.button("Atualizar", use_container_width=True):
-        st.cache_data.clear(); st.rerun()
 
 # ============== Cálculos ==============
 lpg = livre_para_gastar(df_lanc, df_rec, df_faturas, df_saldo, competencia)
@@ -155,7 +161,7 @@ st.markdown(
     <div class="hero5">
       <div class="h5-bar">
         <div><div class="h5-ola">{saud},</div><div class="h5-nome">Família Gomes</div></div>
-        <div class="h5-right"><span class="h5-mes">{_label(competencia)}</span><span class="h5-av">WG</span></div>
+        <div class="h5-right"><span class="h5-av">WG</span></div>
       </div>
       <div class="h5-rot">livre pra gastar</div>
       <div class="h5-num">{sinal}R$ {f"{abs(livre):,.0f}".replace(",", ".")}</div>
@@ -170,16 +176,20 @@ st.markdown(
 )
 
 with st.popover("ver a conta do mês"):
+    _cor_livre_pop = COR["receita"] if livre >= 0 else COR["despesa"]
     st.markdown(
         f"""
-| a conta do mês | |
-| :-- | --: |
-| entrou | **{fmt(lpg['receita'])}** |
-| contas fixas | **−{fmt(lpg['fixas'])}** |
-| faturas a pagar | **−{fmt(lpg['faturas_pagar'])}** |
-| já gastei (flexível) | **−{fmt(lpg['flex_gasto'])}** |
-| **livre pra gastar** | **{fmt(livre)}** |
-"""
+        <div style="min-width:280px">
+          <div class="brow"><span class="bl">entrou</span><span class="bv" style="color:{COR['receita']}">{fmt(lpg['receita'])}</span></div>
+          <div class="brow"><span class="bl">contas fixas</span><span class="bv">−{fmt(lpg['fixas'])}</span></div>
+          <div class="brow"><span class="bl">faturas a pagar</span><span class="bv">−{fmt(lpg['faturas_pagar'])}</span></div>
+          <div class="brow"><span class="bl">já gastei (flexível)</span><span class="bv">−{fmt(lpg['flex_gasto'])}</span></div>
+          <div class="brow" style="border-top:1px solid #EDF2EE;margin-top:4px;padding-top:9px;">
+            <span class="bl" style="font-weight:700;">livre pra gastar</span>
+            <span class="bv" style="color:{_cor_livre_pop};">{fmt(livre)}</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
     st.caption(
         f"Consumo (competência): {fmt(k['despesa_total'])} — o que o mês consumiu, mesmo pagando depois. "

@@ -155,15 +155,19 @@ def tema_verde_premium():
         /* barra de navegação inferior (estilo app) */
         .st-key-tabbar5 {
           position: fixed; left: 0; right: 0; bottom: 0; z-index: 999;
-          background: rgba(255,255,255,0.92);
+          background: rgba(255,255,255,0.94) !important;
           backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-          border-top: 1px solid #E3EBE5;
+          border-top: 1px solid #E3EBE5; border-radius: 0 !important;
+          box-shadow: 0 -2px 14px rgba(12,60,45,0.08) !important;
           padding: 6px 6px calc(8px + env(safe-area-inset-bottom));
         }
-        .st-key-tabbar5 > div { max-width: 680px; margin: 0 auto; }
-        /* colunas da barra nunca empilham (vence o CSS mobile das views) */
-        .st-key-tabbar5 div[data-testid="column"] {
-          flex: 1 1 0 !important; min-width: 0 !important; width: auto !important; margin-bottom: 0 !important;
+        /* links lado a lado SEMPRE (sem st.columns → nada de empilhar no celular) */
+        .st-key-tabbar5 [data-testid="stVerticalBlock"] {
+          flex-direction: row !important; gap: 0 !important;
+          max-width: 680px; margin: 0 auto; align-items: stretch;
+        }
+        .st-key-tabbar5 [data-testid="stVerticalBlock"] > div {
+          flex: 1 1 0 !important; width: auto !important; min-width: 0 !important; margin: 0 !important;
         }
         .st-key-tabbar5 a {
           display: flex !important; flex-direction: column; align-items: center; gap: 1px;
@@ -172,7 +176,7 @@ def tema_verde_premium():
           text-decoration: none !important; background: transparent !important;
         }
         .st-key-tabbar5 a:hover { background: #EDF3EE !important; }
-        .st-key-tabbar5 a p { font-size: 10px !important; margin: 0 !important; }
+        .st-key-tabbar5 a p { font-size: 10px !important; margin: 0 !important; color: inherit !important; }
         .st-key-tabbar5 a span[data-testid="stIconMaterial"] { font-size: 22px !important; }
         </style>
         """,
@@ -194,19 +198,18 @@ def barra_navegacao(ativa: str = "inicio"):
         ("custos", "views/custos.py", "Custos", ":material/build:"),
     ]
     try:
-        # destaca a aba ativa (verde marca)
+        # destaca a aba ativa (verde marca) pelo índice do link na barra
+        idx = next((i for i, a in enumerate(ABAS) if a[0] == ativa), 0) + 1
         st.markdown(
-            f"<style>.st-key-tab5-{ativa} a, .st-key-tab5-{ativa} a p, "
-            f".st-key-tab5-{ativa} a span[data-testid='stIconMaterial'] "
+            f"<style>.st-key-tabbar5 [data-testid='stVerticalBlock'] > div:nth-child({idx}) a, "
+            f".st-key-tabbar5 [data-testid='stVerticalBlock'] > div:nth-child({idx}) a p, "
+            f".st-key-tabbar5 [data-testid='stVerticalBlock'] > div:nth-child({idx}) a span "
             f"{{ color: #0F6E56 !important; }}</style>",
             unsafe_allow_html=True,
         )
         with st.container(key="tabbar5"):
-            cols = st.columns(len(ABAS))
-            for col, (key, page, label, icone) in zip(cols, ABAS):
-                with col:
-                    with st.container(key=f"tab5-{key}"):
-                        st.page_link(page, label=label, icon=icone, use_container_width=True)
+            for _key, page, label, icone in ABAS:
+                st.page_link(page, label=label, icon=icone, use_container_width=True)
     except Exception:
         # fora do contexto de navegação (ex: testes) a barra simplesmente não renderiza
         pass
