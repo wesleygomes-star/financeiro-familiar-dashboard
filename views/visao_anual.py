@@ -6,12 +6,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from lib.components import COR, PLOTLY_CONFIG, fig_mobile
 from lib.data import is_investimento, is_pagamento_fatura, load_lancamentos
 
 st.markdown(
     """<style>
     .block-container { max-width: 1100px !important; padding-top: 3.5rem !important; }
-    .stApp h2 { font-size: 1.15rem !important; }
+    .stApp h2 { font-size: 1.3rem !important; font-weight: 600 !important; margin-top: 1.1rem !important; }
     </style>""",
     unsafe_allow_html=True,
 )
@@ -49,10 +50,13 @@ def matriz(sub, titulo, cor_total):
     piv = piv.sort_values("Total", ascending=False)
     totais_mes = [float(piv[m].sum()) for m in MESES]
     total_ano = float(piv["Total"].sum())
-    # montar dataframe de exibição
+    # exibição: Total/Média primeiro (a decisão antes do detalhe) e zeros vazios
     disp = piv.copy()
-    disp.columns = [MNOME.get(c, c) for c in MESES] + ["Total"]
+    meses_nm = [MNOME.get(c, c) for c in MESES]
+    disp.columns = meses_nm + ["Total"]
     disp["Média"] = (piv["Total"] / 12)
+    disp[meses_nm] = disp[meses_nm].astype("Float64").where(lambda x: x.abs() >= 0.5)
+    disp = disp[["Total", "Média"] + meses_nm]
     return disp, totais_mes, total_ano
 
 
@@ -80,14 +84,14 @@ def serie(sub):
     g = sub.groupby("_m")["Valor"].sum()
     return [float(g.get(m, 0)) for m in MESES]
 fig = go.Figure()
-fig.add_bar(name="Despesa", x=meses_lbl, y=serie(splits["Despesas"]), marker_color="#E24B4A")
-fig.add_bar(name="Investido", x=meses_lbl, y=serie(splits["Investimentos"]), marker_color="#185FA5")
-fig.add_bar(name="Receita", x=meses_lbl, y=serie(splits["Receitas"]), marker_color="#1D9E75")
-fig.update_layout(barmode="group", height=260, margin=dict(l=10, r=10, t=10, b=10),
+fig.add_bar(name="Despesa", x=meses_lbl, y=serie(splits["Despesas"]), marker_color=COR["despesa"])
+fig.add_bar(name="Investido", x=meses_lbl, y=serie(splits["Investimentos"]), marker_color=COR["investimento"])
+fig.add_bar(name="Receita", x=meses_lbl, y=serie(splits["Receitas"]), marker_color=COR["receita"])
+fig.update_layout(barmode="group", height=280, margin=dict(l=10, r=10, t=10, b=10),
                   template="plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                   font=dict(color="#2C2C2A", size=12),
-                  legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-st.plotly_chart(fig, use_container_width=True)
+                  legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5))
+st.plotly_chart(fig_mobile(fig), use_container_width=True, config=PLOTLY_CONFIG)
 
 # Tabelas matriz
 NUMCOLS = {c: st.column_config.NumberColumn(format="%.0f", width="small") for c in meses_lbl}
@@ -102,7 +106,7 @@ for nome, cor in [("Despesas", "#E24B4A"), ("Receitas", "#1D9E75"), ("Investimen
     st.dataframe(disp.round(0), use_container_width=True, column_config=NUMCOLS,
                  height=min(40 + len(disp) * 35, 560))
 
-# Resultado mensal (receita − despesa − investido)
+# Resultado mensal (receita − despesa − investido) — Saldo colorido salta da grade
 st.subheader("Resultado mensal")
 rd = serie(splits["Receitas"]); dd = serie(splits["Despesas"]); ii = serie(splits["Investimentos"])
 res = pd.DataFrame({
@@ -110,12 +114,28 @@ res = pd.DataFrame({
     "Receita": rd, "Despesa": dd, "Investido": ii,
     "Saldo": [rd[i] - dd[i] - ii[i] for i in range(12)],
 })
-st.dataframe(res, use_container_width=True, hide_index=True, column_config={
-    "Receita": st.column_config.NumberColumn(format="R$ %.0f"),
-    "Despesa": st.column_config.NumberColumn(format="R$ %.0f"),
-    "Investido": st.column_config.NumberColumn(format="R$ %.0f"),
-    "Saldo": st.column_config.NumberColumn(format="R$ %.0f"),
-})
 
-st.caption("ℹ️ Jan-Abr vêm do seu Controle 2026 (só despesas). Maio+ do uso real via Zap. "
+def _fmt_saldo(v):
+    s = f"{abs(v):,.0f}".replace(",", ".")
+    return ("-" if v < -0.5 else "") + f"R$ {s}"
+
+def _cor_saldo(col):
+    return [
+        f"color: {COR['receita'] if v >= 0 else COR['despesa']}; font-weight: 600;"
+        for v in col
+    ]
+
+saldo_view = res[["Mês", "Saldo"]].copy()
+styled = saldo_view.style.apply(_cor_saldo, subset=["Saldo"]).format({"Saldo": _fmt_saldo})
+st.dataframe(styled, use_container_width=True, hide_index=True)
+
+with st.expander("Detalhe: receita × despesa × investido por mês"):
+    st.dataframe(res, use_container_width=True, hide_index=True, column_config={
+        "Receita": st.column_config.NumberColumn(format="R$ %.0f"),
+        "Despesa": st.column_config.NumberColumn(format="R$ %.0f"),
+        "Investido": st.column_config.NumberColumn(format="R$ %.0f"),
+        "Saldo": st.column_config.NumberColumn(format="R$ %.0f"),
+    })
+
+st.caption("Jan-Abr vêm do seu Controle 2026 (só despesas). Maio+ do uso real via Zap. "
            "Pagamento de fatura é excluído (transferência, não consumo).")

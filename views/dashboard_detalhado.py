@@ -82,24 +82,24 @@ df_lanc = classificar_fixa_variavel(df_lanc, df_rec)
 
 
 # ============== HEADER ==============
-st.title("💰 Financeiro Família Gomes")
+st.title("Financeiro Família Gomes")
 
 # ============== FILTROS (card único agrupado) ==============
 with st.container(border=True):
-    st.markdown("### 🔍 Filtros")
+    st.markdown("#### Filtros")
 
     # Linha 1: Modo (Competência/Caixa) + Atualizar
     col_modo, col_refresh = st.columns([4, 1])
     with col_modo:
         modo = st.radio(
-            "🎯 Visão",
+            "Visão",
             ["Competência", "Caixa"],
             horizontal=True,
             help="Competência = a qual mês a despesa pertence (ideal pra controle de teto). Caixa = quando o dinheiro efetivamente sai (ideal pra fluxo de caixa).",
             label_visibility="collapsed",
         )
     with col_refresh:
-        if st.button("🔄 Atualizar", use_container_width=True):
+        if st.button("Atualizar", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
@@ -111,24 +111,24 @@ with st.container(border=True):
     f1, f2, f3, f4 = st.columns(4)
     with f1:
         competencia = st.selectbox(
-            f"📅 Mês ({modo})",
+            f"Mês ({modo})",
             meses,
             index=idx_default,
             key=f"mes_{modo}",
         )
     with f2:
-        pessoa = st.selectbox("👥 Pessoa", ["Família (todos)", "Wesley", "Sabrina"])
+        pessoa = st.selectbox("Pessoa", ["Família (todos)", "Wesley", "Sabrina"])
     with f3:
         cats_disponiveis = ["Todas"] + sorted(df_lanc["Categoria"].dropna().unique().tolist())
-        cat_avancada = st.selectbox("📂 Categoria", cats_disponiveis, key="filtro_cat")
+        cat_avancada = st.selectbox("Categoria", cats_disponiveis, key="filtro_cat")
     with f4:
         formas = ["Todas"] + sorted(df_lanc["Forma Pgto"].dropna().unique().tolist())
-        forma_avancada = st.selectbox("💳 Forma Pgto", formas, key="filtro_forma")
+        forma_avancada = st.selectbox("Forma de pagamento", formas, key="filtro_forma")
 
     # Linha 3: Cartões (multiselect ocupa linha inteira pra acomodar várias chips)
     cartoes_disp = sorted([c for c in df_lanc["Cartão"].dropna().unique().tolist() if c])
     cartoes_selecionados = st.multiselect(
-        "💳 Cartões (vazio = todos)",
+        "Cartões (vazio = todos)",
         cartoes_disp,
         default=[],
         key="filtro_cartao_multi",
@@ -137,26 +137,20 @@ with st.container(border=True):
     )
 
 # Linha-resumo do que tá filtrado (logo abaixo do card)
-_resumo_parts = [f"**{modo}** {competencia}"]
-if pessoa != "Família (todos)":
-    _resumo_parts.append(f"👥 {pessoa}")
-else:
-    _resumo_parts.append("👥 Família (todos)")
+_resumo_parts = [f"**{modo}** {competencia}", pessoa]
 if cat_avancada != "Todas":
-    _resumo_parts.append(f"📂 {cat_avancada}")
+    _resumo_parts.append(cat_avancada)
 if forma_avancada != "Todas":
-    _resumo_parts.append(f"💳 {forma_avancada}")
+    _resumo_parts.append(forma_avancada)
 if cartoes_selecionados:
-    _resumo_parts.append(f"💳 Cartões: {', '.join(cartoes_selecionados)}")
-_filtros_extras_ativos = (cat_avancada != "Todas") or (forma_avancada != "Todas") or bool(cartoes_selecionados)
-_emoji_resumo = "🔎" if _filtros_extras_ativos else "📊"
-st.caption(f"{_emoji_resumo} **Mostrando:** {' • '.join(_resumo_parts)}")
+    _resumo_parts.append(f"Cartões: {', '.join(cartoes_selecionados)}")
+st.caption(f"**Mostrando:** {' • '.join(_resumo_parts)}")
 
 # Caption explicativo do modo (mantido, mas em fonte menor)
 if modo == "Competência":
-    st.caption("ℹ️ **Competência:** gastos pelo mês a que pertencem (compra de cartão em maio fica em maio, mesmo que pague em junho). Ideal pra **controle de tetos**.")
+    st.caption("**Competência:** gastos pelo mês a que pertencem (compra de cartão em maio fica em maio, mesmo que pague em junho). Ideal pra **controle de tetos**.")
 else:
-    st.caption("ℹ️ **Caixa:** quando o dinheiro efetivamente sai da conta (compra de cartão em maio aparece em junho). Ideal pra **fluxo de caixa**.")
+    st.caption("**Caixa:** quando o dinheiro efetivamente sai da conta (compra de cartão em maio aparece em junho). Ideal pra **fluxo de caixa**.")
 
 # Aplicar filtros
 pessoa_filter = None if pessoa == "Família (todos)" else pessoa
@@ -202,31 +196,31 @@ saldo_ant = receita_ant - despesa_ant
 pct_teto_ant = despesa_ant / total_tetos if total_tetos > 0 else 0
 
 if modo == "Caixa":
-    saldo_label = f"💵 Caixa parcial (até {hoje.strftime('%d/%m')})" if mes_em_andamento else "💵 Saldo de Caixa"
+    saldo_label = f"Caixa parcial (até {hoje.strftime('%d/%m')})" if mes_em_andamento else "Saldo de caixa"
 else:
-    saldo_label = f"📊 Saldo parcial (até {hoje.strftime('%d/%m')})" if mes_em_andamento else "📊 Saldo do mês"
+    saldo_label = f"Saldo parcial (até {hoje.strftime('%d/%m')})" if mes_em_andamento else "Saldo do mês"
 
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    kpi_card("Receitas", total_receita, emoji="💚", valor_anterior=receita_ant)
+    kpi_card("Receitas", total_receita, valor_anterior=receita_ant)
 with c2:
     # Despesa: subir é ruim → delta_inverso (vermelho quando sobe)
-    kpi_card("Despesas", total_despesa, emoji="💸", valor_anterior=despesa_ant, delta_inverso=True)
+    kpi_card("Despesas", total_despesa, valor_anterior=despesa_ant, delta_inverso=True)
 with c3:
-    kpi_card(saldo_label, saldo, emoji="", valor_anterior=saldo_ant)
+    kpi_card(saldo_label, saldo, valor_anterior=saldo_ant)
 with c4:
-    kpi_card("Uso do teto", pct_teto, prefix="%", emoji="🎯", valor_anterior=pct_teto_ant, delta_inverso=True)
+    kpi_card("Uso do teto", pct_teto, prefix="%", valor_anterior=pct_teto_ant, delta_inverso=True)
 
 # Aviso pra mês em andamento (sem dar percepção falsa de sobra)
 if mes_em_andamento:
     if modo == "Caixa":
         st.info(
-            f"🔄 **Mês em andamento.** Esse caixa é parcial até {hoje.strftime('%d/%m')}. "
+            f"**Mês em andamento.** Esse caixa é parcial até {hoje.strftime('%d/%m')}. "
             f"Pagamentos previstos (faturas de cartão, recorrentes) ainda podem entrar/sair."
         )
     else:
         st.info(
-            f"🔄 **Mês em andamento.** Esse saldo é parcial até {hoje.strftime('%d/%m')}. "
+            f"**Mês em andamento.** Esse saldo é parcial até {hoje.strftime('%d/%m')}. "
             f"Despesas ainda podem ser lançadas até fim do mês. "
             f"O 'disponível pra investir' aparece só quando o mês fecha."
         )
@@ -265,8 +259,8 @@ else:
 
 # ============== FIXA vs VARIÁVEL ==============
 st.divider()
-st.subheader("💰 Composição da despesa — Fixa vs Variável")
-st.caption("👆 **Clique numa fatia da barra** pra ver os lançamentos do tipo")
+st.subheader("Fixa × variável")
+st.caption("clique numa fatia da barra pra ver os lançamentos do tipo")
 tipo_clicado = breakdown_fixa_variavel(df_despesas, key=f"fixavar_{modo}_{competencia}_{pessoa}")
 if tipo_clicado:
     st.divider()
@@ -275,8 +269,8 @@ if tipo_clicado:
 
 # ============== GASTOS POR CATEGORIA vs TETO ==============
 st.divider()
-st.subheader(f"📋 Gastos por Categoria — {modo} {competencia}")
-st.caption("👆 **Clique numa barra** pra ver os lançamentos da categoria")
+st.subheader("Gastos por categoria")
+st.caption("clique numa barra pra ver os lançamentos da categoria")
 col_a, col_b = st.columns([3, 2])
 with col_a:
     cat_clicada = barras_categoria_vs_teto(df_despesas, df_tetos, titulo="", key=f"barras_{modo}_{competencia}_{pessoa}")
@@ -289,31 +283,31 @@ if cat_clicada:
     detalhar_categoria(df_despesas, cat_clicada)
 
 
-# ============== EVOLUÇÃO MENSAL (HEATMAP) ==============
+# ============== EVOLUÇÃO MENSAL ==============
 st.divider()
-st.subheader(f"🗓️ Evolução Mensal — últimos 6 meses ({modo})")
+st.subheader("Evolução mensal")
 df_evolucao_base = df_lanc if pessoa_filter is None else filtrar(df_lanc, pessoa=pessoa_filter, modo=modo)
 comparativo_mensal(df_evolucao_base, df_tetos, modo=modo, n_meses=6)
 
 
 # ============== PROJEÇÃO 6 MESES ==============
 st.divider()
-st.subheader(f"🔮 Projeção dos próximos 6 meses ({modo})")
+st.subheader("Projeção 6 meses")
 projecao_6_meses(df_evolucao_base, df_rec, modo=modo)
 
 
 # ============== TOP DESPESAS ==============
 st.divider()
-st.subheader(f"🔝 Top 10 maiores despesas — {modo} {competencia}")
+st.subheader("Maiores despesas")
 tabela_top_despesas(df_despesas, n=10)
 
 
 # ============== TODOS OS LANÇAMENTOS (drill-down) ==============
 st.divider()
-with st.expander(f"📜 Ver TODOS os lançamentos ({modo} {competencia}) — {len(df_filtrado)} registros"):
+with st.expander(f"Todos os lançamentos ({len(df_filtrado)})"):
     col_search, col_tipo, col_cat = st.columns([2, 1, 1])
     with col_search:
-        busca = st.text_input("🔍 Buscar (descrição/categoria)", "")
+        busca = st.text_input("Buscar (descrição/categoria)", "")
     with col_tipo:
         tipo_filter = st.selectbox("Tipo", ["Todos", "Despesa", "Receita"])
     with col_cat:
@@ -346,4 +340,4 @@ with st.expander(f"📜 Ver TODOS os lançamentos ({modo} {competencia}) — {le
 
 # ============== FOOTER ==============
 st.divider()
-st.caption(f"💾 Dados atualizados automaticamente do Google Sheets (cache 60s) • Última carga: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+st.caption(f"Dados do Google Sheets (cache 60s) • Última carga: {datetime.now().strftime('%d/%m/%Y %H:%M')}")

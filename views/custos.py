@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from lib.components import PLOTLY_CONFIG, fig_mobile
 from lib.data import load_custos
 
 st.markdown(
@@ -47,11 +48,17 @@ if not pagos.empty:
     fig.update_layout(height=max(200, 50 * len(p)), margin=dict(l=10, r=80, t=10, b=10),
                       template="plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                       font=dict(color="#2C2C2A", size=12), xaxis=dict(title=""))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig_mobile(fig), use_container_width=True, config=PLOTLY_CONFIG)
 
-# Tabela completa
-cols = [c for c in ["Ferramenta", "Categoria", "Custo Mensal", "Tipo", "Pago Por", "Notas"] if c in df.columns]
-st.dataframe(df[cols], use_container_width=True, hide_index=True)
+# Tabela completa (colapsada — o gráfico já conta a história)
+with st.expander("Ver tabela completa"):
+    cols = [c for c in ["Ferramenta", "Categoria", "Custo Mensal", "Tipo", "Pago Por", "Notas"] if c in df.columns]
+    tab = df.copy()
+    colcfg = {}
+    if "Custo_num" in tab.columns and "Custo Mensal" in cols:
+        tab["Custo Mensal"] = tab["Custo_num"]
+        colcfg["Custo Mensal"] = st.column_config.NumberColumn(format="R$ %.2f")
+    st.dataframe(tab[cols], use_container_width=True, hide_index=True, column_config=colcfg)
 
 # ROI — custo vs valor gerado
 st.subheader("Vale a pena?")
@@ -67,4 +74,4 @@ Estimativa de tempo economizado: **~7h/mês** de planilha manual. A qualquer cus
 razoável, o retorno é de muitas vezes o que se gasta.
 """
 )
-st.caption("ℹ️ Os custos das IAs (Anthropic/OpenAI) são variáveis — atualize na aba conforme o consumo real do mês.")
+st.caption("Os custos das IAs (Anthropic/OpenAI) são variáveis — atualize na aba conforme o consumo real do mês.")

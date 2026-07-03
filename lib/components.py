@@ -12,6 +12,31 @@ def fmt_brl(v) -> str:
         return "R$ 0,00"
 
 
+# ---- Tokens semânticos de cor: cada cor tem UM significado no painel inteiro ----
+COR = {
+    "receita": "#1D9E75",         # verde — dinheiro que entra / positivo
+    "despesa": "#E24B4A",         # vermelho — gasto
+    "despesa_escura": "#B23434",  # camada secundária de despesa (stacks)
+    "investimento": "#185FA5",    # azul — investimento / saldo / progresso
+    "alerta": "#BA7517",          # âmbar — atenção
+    "flexivel": "#7F77DD",        # roxo — gasto discricionário (flexível/variável)
+    "neutro": "#888780",          # cinza — fixo / secundário
+    "neutro_claro": "#B4B2A9",
+}
+
+# Config padrão dos gráficos (mobile-first: sem barra de ferramentas, sem zoom por gesto)
+PLOTLY_CONFIG = {"displayModeBar": False, "scrollZoom": False}
+
+
+def fig_mobile(fig):
+    """Padroniza gráfico pro celular: eixos fixos (devolvem o scroll da página
+    ao usuário) e separadores numéricos pt-BR (1.234,56)."""
+    fig.update_layout(separators=",.", dragmode=False)
+    fig.update_xaxes(fixedrange=True)
+    fig.update_yaxes(fixedrange=True)
+    return fig
+
+
 def kpi_card(label: str, value: float, prefix: str = "R$", delta: str = None,
              delta_color="normal", emoji: str = "",
              valor_anterior: float = None, delta_inverso: bool = False):
@@ -42,7 +67,8 @@ def kpi_card(label: str, value: float, prefix: str = "R$", delta: str = None,
         if delta_inverso:
             delta_color = "inverse"
 
-    st.metric(label=f"{emoji} {label}", value=formatted, delta=delta, delta_color=delta_color)
+    rotulo = f"{emoji} {label}".strip()
+    st.metric(label=rotulo, value=formatted, delta=delta, delta_color=delta_color)
 
 
 # Paleta fixa por categoria (mesma família de cores do mockup aprovado)
@@ -51,7 +77,7 @@ CORES_CATEGORIA = {
     "Alimentação": "#1D9E75",
     "Moradia": "#378ADD",
     "Transporte": "#888780",
-    "Saúde": "#E24B4A",
+    "Saúde": "#2E9EA4",  # teal — o vermelho é reservado pra 'despesa total'
     "Educação": "#EF9F27",
     "Vestuário": "#D4537E",
     "Pessoal & Beleza": "#F0997B",
@@ -102,7 +128,7 @@ def donut_categorias(df_despesas: pd.DataFrame, titulo: str = "Despesas por Cate
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#2C2C2A", size=12),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig_mobile(fig), use_container_width=True, config=PLOTLY_CONFIG)
 
 
 def barras_categoria_vs_teto(df_despesas: pd.DataFrame, df_tetos: pd.DataFrame, titulo: str = "Gasto vs Teto", key: str = "barras_cat"):
@@ -136,7 +162,7 @@ def barras_categoria_vs_teto(df_despesas: pd.DataFrame, df_tetos: pd.DataFrame, 
         textposition="outside",
         cliponaxis=False,
         textfont=dict(size=12),
-        hovertemplate="<b>%{y}</b><br>Gasto: %{customdata[0]}<br>Teto: %{customdata[1]}<br>%{customdata[2]} do teto<br><i>👆 Clica pra ver detalhes</i><extra></extra>",
+        hovertemplate="<b>%{y}</b><br>Gasto: %{customdata[0]}<br>Teto: %{customdata[1]}<br>%{customdata[2]} do teto<br><i>clique para ver os lançamentos</i><extra></extra>",
         customdata=[[fmt_brl(v), fmt_brl(t) if t > 0 else "sem teto", f"{p:.0%}"] for v, t, p in zip(agg["Valor"], agg["Teto"], agg["Pct"])],
     ))
     fig.update_layout(
@@ -150,7 +176,7 @@ def barras_categoria_vs_teto(df_despesas: pd.DataFrame, df_tetos: pd.DataFrame, 
         xaxis=dict(title="", showgrid=True, gridcolor="rgba(128,128,128,0.18)"),
         yaxis=dict(title=""),
     )
-    event = st.plotly_chart(fig, use_container_width=True, key=key, on_select="rerun")
+    event = st.plotly_chart(fig_mobile(fig), use_container_width=True, key=key, on_select="rerun", config=PLOTLY_CONFIG)
     # extrai categoria clicada
     if event and hasattr(event, "selection"):
         pts = event.selection.get("points", [])
@@ -166,7 +192,7 @@ def detalhar_categoria(df_despesas: pd.DataFrame, categoria: str):
         st.info(f"Sem lançamentos em {categoria}.")
         return
     total = df_cat["Valor"].sum()
-    st.markdown(f"### 🔎 Detalhes de **{categoria}** — {len(df_cat)} lançamentos, total {fmt_brl(total)}")
+    st.markdown(f"#### {categoria} — {len(df_cat)} lançamentos · {fmt_brl(total)}")
     cols_show = ["Data", "Subcategoria", "Descrição", "Pessoa", "Forma Pgto", "Cartão", "Valor"]
     cols_show = [c for c in cols_show if c in df_cat.columns]
     df_display = df_cat[cols_show].copy()
@@ -255,23 +281,23 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame,
 
     # Receita: 1 barra única
     fig.add_trace(go.Bar(
-        x=df["Mês"], y=df["Receita"], name="💚 Receita",
-        marker_color="#10B981",
+        x=df["Mês"], y=df["Receita"], name="Receita",
+        marker_color=COR["receita"],
         text=[fmt_brl(v) for v in df["Receita"]], textposition="outside",
         offsetgroup="rec",
     ))
     # Despesa: stacked dentro do mesmo offsetgroup
-    label_lancada = "💸 Já lançado (parcelas + variáveis)" if modo == "Caixa" else "💸 Já lançado"
+    label_lancada = "Já lançado (parcelas + variáveis)" if modo == "Caixa" else "Já lançado"
     fig.add_trace(go.Bar(
         x=df["Mês"], y=df["Desp_Lancada"], name=label_lancada,
-        marker_color="#EF4444",
+        marker_color=COR["despesa"],
         text=[fmt_brl(v) if v > 0 else "" for v in df["Desp_Lancada"]],
         textposition="inside",
         offsetgroup="desp",
     ))
     fig.add_trace(go.Bar(
-        x=df["Mês"], y=df["Desp_Recorrente"], name="🔁 Recorrentes projetadas",
-        marker_color="#B91C1C",
+        x=df["Mês"], y=df["Desp_Recorrente"], name="Recorrentes projetadas",
+        marker_color=COR["despesa_escura"],
         text=[fmt_brl(v) if v > 0 else "" for v in df["Desp_Recorrente"]],
         textposition="inside",
         offsetgroup="desp",
@@ -279,7 +305,7 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame,
 
     titulo_modo = "Caixa (quando entra/sai)" if modo == "Caixa" else "Competência (mês de pertencimento)"
     fig.update_layout(
-        title=f"📊 Receita × Despesa nos próximos 6 meses — {titulo_modo}",
+        title=f"Receita × Despesa — próximos 6 meses · {titulo_modo}",
         barmode="relative",  # stacked dentro do mesmo offsetgroup, agrupado por offsetgroup
         height=460,
         margin=dict(l=10, r=10, t=60, b=10),
@@ -287,11 +313,11 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#2C2C2A", size=12),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="center", x=0.5),
         xaxis=dict(showgrid=False),
         yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.18)"),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig_mobile(fig), use_container_width=True, config=PLOTLY_CONFIG)
 
     # Tabela detalhada
     df_display = df[["Mês", "Receita", "Despesa", "Desp_Lancada", "Desp_Recorrente", "Saldo", "Status"]].copy()
@@ -301,7 +327,7 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame,
     })
     for col in ["Receita", "Despesa", "Já lançado", "Recorrentes proj.", "Saldo"]:
         df_display[col] = df_display[col].apply(fmt_brl)
-    with st.expander("📋 Ver detalhamento dos próximos 6 meses"):
+    with st.expander("Ver detalhamento dos próximos 6 meses"):
         st.dataframe(df_display, hide_index=True, use_container_width=True)
         if modo == "Caixa":
             st.caption(
@@ -338,27 +364,27 @@ def breakdown_fixa_variavel(df_despesas: pd.DataFrame, key: str = "fixavar"):
 
     col1, col2, col3 = st.columns([1, 1, 3])
     with col1:
-        st.metric("🔒 Despesa Fixa", fmt_brl(fixa), delta=f"{pct_fixa*100:.0f}% do total")
+        st.metric("Despesa fixa", fmt_brl(fixa), delta=f"{pct_fixa*100:.0f}% do total")
         st.caption("Recorrentes: aluguel, escola, assinaturas...")
     with col2:
-        st.metric("🎲 Despesa Variável", fmt_brl(variavel), delta=f"{pct_var*100:.0f}% do total")
+        st.metric("Despesa variável", fmt_brl(variavel), delta=f"{pct_var*100:.0f}% do total")
         st.caption("Discricionário: mercado, lazer, eventual...")
     with col3:
         # Barra empilhada horizontal
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            y=["Composição"], x=[fixa], name="🔒 Fixa",
-            orientation="h", marker_color="#6366F1",
+            y=["Composição"], x=[fixa], name="Fixa",
+            orientation="h", marker_color=COR["neutro"],
             text=f"{fmt_brl(fixa)} ({pct_fixa*100:.0f}%)",
             textposition="inside", insidetextanchor="middle",
-            hovertemplate="<b>Fixa</b><br>%{x:,.2f}<extra></extra>",
+            hovertemplate="<b>Fixa</b><br>R$ %{x:,.2f}<extra></extra>",
         ))
         fig.add_trace(go.Bar(
-            y=["Composição"], x=[variavel], name="🎲 Variável",
-            orientation="h", marker_color="#F97316",
+            y=["Composição"], x=[variavel], name="Variável",
+            orientation="h", marker_color=COR["flexivel"],
             text=f"{fmt_brl(variavel)} ({pct_var*100:.0f}%)",
             textposition="inside", insidetextanchor="middle",
-            hovertemplate="<b>Variável</b><br>%{x:,.2f}<extra></extra>",
+            hovertemplate="<b>Variável</b><br>R$ %{x:,.2f}<extra></extra>",
         ))
         fig.update_layout(
             barmode="stack",
@@ -373,7 +399,7 @@ def breakdown_fixa_variavel(df_despesas: pd.DataFrame, key: str = "fixavar"):
             xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
             yaxis=dict(showgrid=False, showticklabels=False),
         )
-        event = st.plotly_chart(fig, use_container_width=True, key=key, on_select="rerun")
+        event = st.plotly_chart(fig_mobile(fig), use_container_width=True, key=key, on_select="rerun", config=PLOTLY_CONFIG)
         if event and hasattr(event, "selection"):
             pts = event.selection.get("points", [])
             if pts:
@@ -393,9 +419,8 @@ def detalhar_fixa_variavel(df_despesas: pd.DataFrame, tipo: str):
     if df.empty:
         st.info(f"Sem despesas {tipo.lower()}s nesse filtro.")
         return
-    icone = "🔒" if tipo == "Fixa" else "🎲"
     total = df["Valor"].sum()
-    st.markdown(f"### {icone} Despesas **{tipo}s** — {len(df)} lançamentos, total {fmt_brl(total)}")
+    st.markdown(f"#### Despesas {tipo.lower()}s — {len(df)} lançamentos · {fmt_brl(total)}")
 
     # Resumo por categoria
     resumo = df.groupby("Categoria", as_index=False).agg(
@@ -466,7 +491,7 @@ def comparativo_mensal(df_lancamentos: pd.DataFrame, df_tetos: pd.DataFrame, mod
     pivot_filtrado = pivot[pivot.sum(axis=1) > 0]
     pct_filtrado = pct.loc[pivot_filtrado.index]
 
-    st.markdown(f"#### 🗓️ Evolução mensal por categoria — {modo}")
+    st.markdown(f"#### Evolução mensal por categoria — {modo}")
     st.caption("texto cinza = sem teto · verde até 60% · âmbar 60-80% · laranja 80-100% · vermelho >100%")
 
     # Monta dataframe formatado pra st.dataframe com cores no TEXTO (sem fundo)
@@ -509,18 +534,18 @@ def comparativo_mensal(df_lancamentos: pd.DataFrame, df_tetos: pd.DataFrame, mod
     saldo_total = receitas_total - despesas_total
 
     fig2 = go.Figure()
-    fig2.add_trace(go.Bar(x=meses, y=receitas_total, name="💚 Receita", marker_color="#10B981"))
-    fig2.add_trace(go.Bar(x=meses, y=despesas_total, name="💸 Despesa", marker_color="#EF4444"))
+    fig2.add_trace(go.Bar(x=meses, y=receitas_total, name="Receita", marker_color=COR["receita"]))
+    fig2.add_trace(go.Bar(x=meses, y=despesas_total, name="Despesa", marker_color=COR["despesa"]))
     fig2.add_trace(go.Scatter(
         x=meses, y=saldo_total,
-        name="📊 Saldo", mode="lines+markers+text",
-        line=dict(color="#FCD34D", width=3),
+        name="Saldo", mode="lines+markers+text",
+        line=dict(color=COR["investimento"], width=3),
         marker=dict(size=10),
         text=[fmt_brl(v) for v in saldo_total],
         textposition="top center",
     ))
     fig2.update_layout(
-        title=f"📊 Receita × Despesa × Saldo (últimos {n_meses} meses)",
+        title=f"Receita × Despesa × Saldo (últimos {n_meses} meses)",
         barmode="group",
         height=380,
         margin=dict(l=10, r=10, t=50, b=10),
@@ -528,11 +553,11 @@ def comparativo_mensal(df_lancamentos: pd.DataFrame, df_tetos: pd.DataFrame, mod
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#2C2C2A", size=12),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="center", x=0.5),
         xaxis=dict(showgrid=False),
         yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.18)"),
     )
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(fig_mobile(fig2), use_container_width=True, config=PLOTLY_CONFIG)
 
 
 def tabela_top_despesas(df_despesas: pd.DataFrame, n: int = 10):

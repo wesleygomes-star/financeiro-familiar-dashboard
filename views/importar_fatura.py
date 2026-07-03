@@ -20,7 +20,7 @@ from lib.sheets_writer import append_lancamentos
 # set_page_config + auth ficam no router (streamlit_app.py)
 
 # ----- Header -----
-st.title("📥 Importar Fatura")
+st.title("Importar Fatura")
 st.markdown(
     """
 **Como funciona:**
@@ -50,7 +50,7 @@ if not has_anthropic and not has_openai:
     st.stop()
 
 provider_label = "Claude Sonnet 4.5" if has_anthropic else "GPT-4o"
-st.caption(f"🤖 IA configurada: **{provider_label}**")
+st.caption(f"IA configurada: **{provider_label}**")
 
 # ----- Upload -----
 file = st.file_uploader("Arraste sua fatura PDF aqui", type=["pdf"])
@@ -60,7 +60,7 @@ if file is None:
     st.stop()
 
 pdf_bytes = file.read()
-st.success(f"📄 **{file.name}** — {len(pdf_bytes) / 1024:.1f} KB")
+st.success(f"**{file.name}** — {len(pdf_bytes) / 1024:.1f} KB")
 
 # Limpar resultado anterior se subir arquivo novo
 if st.session_state.get("ocr_filename") != file.name:
@@ -69,7 +69,7 @@ if st.session_state.get("ocr_filename") != file.name:
 
 # ----- Extrair via IA -----
 if "ocr_result" not in st.session_state:
-    if st.button("🔍 Extrair transações com IA", type="primary"):
+    if st.button("Extrair transações com IA", type="primary"):
         with st.spinner(f"{provider_label} analisando fatura... (~30s)"):
             try:
                 result = extract_transactions(pdf_bytes)
@@ -87,7 +87,7 @@ fatura_info = result.get("fatura", {})
 transacoes = result.get("transacoes", [])
 
 st.divider()
-st.subheader("📋 Fatura extraída")
+st.subheader("Fatura extraída")
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Banco", fatura_info.get("banco", "?"))
@@ -119,7 +119,7 @@ if n_filtrado > 0:
 n_dup = sum(1 for t in transacoes_visiveis if t.get("duplicata_provavel"))
 n_novo = len(transacoes_visiveis) - n_dup
 st.subheader(
-    f"💰 {len(transacoes_visiveis)} transações — {n_novo} novas · {n_dup} prováveis duplicatas"
+    f"{len(transacoes_visiveis)} transações — {n_novo} novas · {n_dup} prováveis duplicatas"
 )
 
 # ----- Tabela editável -----
@@ -138,20 +138,17 @@ def _flag(t: dict) -> str:
     return "✨ Nova"
 
 
+# Colunas de decisão primeiro (Inserir/Flag/Descrição/Valor cabem na tela do celular).
+# Parcela sai da tabela (já aparece na Flag) — na inserção vem de transacoes_visiveis.
 df_review = pd.DataFrame(
     [
         {
             "Inserir": not t.get("duplicata_provavel", False),
-            "Data": t.get("data", ""),
+            "Flag": _flag(t),
             "Descrição": t.get("descricao", ""),
             "Valor": float(t.get("valor", 0) or 0),
             "Categoria": t.get("categoria_sugerida", "Outros"),
-            "Parcela": (
-                f"{t['parcela_atual']}/{t['parcela_total']}"
-                if t.get("parcela_atual")
-                else ""
-            ),
-            "Flag": _flag(t),
+            "Data": t.get("data", ""),
         }
         for t in transacoes_visiveis
     ]
@@ -178,11 +175,10 @@ edited_df = st.data_editor(
     df_review,
     column_config={
         "Inserir": st.column_config.CheckboxColumn(default=True, width="small"),
+        "Flag": st.column_config.TextColumn(disabled=True, width="medium"),
         "Valor": st.column_config.NumberColumn(format="R$ %.2f", width="small"),
         "Categoria": st.column_config.SelectboxColumn(options=CATEGORIAS, width="medium"),
-        "Flag": st.column_config.TextColumn(disabled=True, width="medium"),
         "Data": st.column_config.TextColumn(width="small"),
-        "Parcela": st.column_config.TextColumn(width="small"),
     },
     hide_index=True,
     use_container_width=True,
@@ -192,11 +188,12 @@ edited_df = st.data_editor(
 
 # ----- Config de inserção -----
 st.divider()
-st.subheader("⚙️ Configuração da inserção")
+st.subheader("Configuração da inserção")
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    pessoa = st.selectbox("Pessoa", ["Wesley", "Sabrina", "Casal"], index=0)
+    # regra do projeto: lançamento é SEMPRE individual (nunca "Casal")
+    pessoa = st.selectbox("Pessoa", ["Wesley", "Sabrina"], index=0)
 with col2:
     cartao_label = st.text_input(
         "Nome do cartão (planilha)",
@@ -213,21 +210,28 @@ competencia = data_pgto.strftime("%m/%Y")
 n_inserir = int(edited_df["Inserir"].sum())
 total_inserir = float(edited_df.loc[edited_df["Inserir"], "Valor"].sum())
 st.info(
-    f"📊 **Vai inserir {n_inserir} transações** totalizando "
+    f"**Vai inserir {n_inserir} transações** totalizando "
     f"R$ {total_inserir:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     + f" — competência **{competencia}** (mês do pagamento)"
 )
 
 # ----- Insert -----
 if st.button(
-    f"📥 Inserir {n_inserir} transações na planilha",
+    f"Inserir {n_inserir} transações na planilha",
     type="primary",
     disabled=(n_inserir == 0),
 ):
     rows_to_insert = []
     msg_orig = f"[fatura ANEXO {cartao_label} pago em {data_pgto_str}]"
 
-    for _, r in edited_df[edited_df["Inserir"]].iterrows():
+    # data_editor preserva a ordem das linhas → i alinha com transacoes_visiveis
+    for i, r in edited_df.reset_index(drop=True).iterrows():
+        if not r["Inserir"]:
+            continue
+        t = transacoes_visiveis[i]
+        parcela = (
+            f"{t['parcela_atual']}/{t['parcela_total']}" if t.get("parcela_atual") else ""
+        )
         rows_to_insert.append(
             [
                 r["Data"],          # Data
@@ -242,7 +246,7 @@ if st.button(
                 msg_orig,           # Mensagem Original
                 data_pgto_str,      # Data Caixa = data do pagamento
                 cartao_label,       # Cartão
-                r["Parcela"],       # Parcela
+                parcela,            # Parcela
                 "Ativo",            # Status
             ]
         )
