@@ -4,12 +4,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from lib.components import PLOTLY_CONFIG, fig_mobile
+from lib.components import PLOTLY_CONFIG, fig_mobile, tema_verde_premium
 from lib.data import load_custos
 
+tema_verde_premium()
 st.markdown(
     """<style>
-    .block-container { max-width: 900px !important; padding-top: 3.5rem !important; }
+    .block-container { max-width: 900px !important; padding-top: 2.2rem !important; }
     </style>""",
     unsafe_allow_html=True,
 )
@@ -30,12 +31,18 @@ if df.empty:
 ativos = df[df.get("Status", "Ativo").astype(str).str.lower() != "inativo"] if "Status" in df.columns else df
 total = float(ativos["Custo_num"].sum()) if "Custo_num" in ativos.columns else 0.0
 
-# KPIs
-k1, k2, k3 = st.columns(3)
-k1.metric("custo mensal", fmt(total))
-k2.metric("custo anual", fmt(total * 12))
+# Número-herói: o custo mensal domina; o resto é sublinha
 pagos = ativos[ativos["Custo_num"] > 0] if "Custo_num" in ativos.columns else ativos
-k3.metric("ferramentas pagas", f"{len(pagos)} de {len(ativos)}")
+st.markdown(
+    f"""
+    <div class="heronum">
+      <div class="hn-l">custo mensal do sistema</div>
+      <div class="hn-v">{fmt(total)}</div>
+      <div class="hn-s">{fmt(total * 12)}/ano · {len(pagos)} de {len(ativos)} ferramentas pagas</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # Gráfico: custo por ferramenta (só as pagas)
 if not pagos.empty:

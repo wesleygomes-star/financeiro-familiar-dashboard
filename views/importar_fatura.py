@@ -12,6 +12,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
+from lib.components import tema_verde_premium
 from lib.data import load_lancamentos
 from lib.ocr_fatura import dedupe_against_existing, extract_transactions
 from lib.sheets_writer import append_lancamentos
@@ -19,18 +20,24 @@ from lib.sheets_writer import append_lancamentos
 
 # set_page_config + auth ficam no router (streamlit_app.py)
 
+tema_verde_premium()
+st.markdown(
+    """<style>.block-container { max-width: 900px !important; padding-top: 2.2rem !important; }</style>""",
+    unsafe_allow_html=True,
+)
+
 # ----- Header -----
 st.title("Importar Fatura")
-st.markdown(
-    """
-**Como funciona:**
+with st.expander("Como funciona"):
+    st.markdown(
+        """
 1. Faça upload do PDF da fatura paga (qualquer cartão)
 2. IA extrai todas as transações
 3. Sistema marca duplicatas (compras já lançadas via WhatsApp)
 4. Você revisa, ajusta categorias e marca quais inserir
 5. Lança em batch — Competência = mês do pagamento da fatura (caixa)
 """
-)
+    )
 
 # ----- Check API key configurada -----
 has_anthropic = bool(st.secrets.get("ANTHROPIC_API_KEY"))
@@ -89,14 +96,18 @@ transacoes = result.get("transacoes", [])
 st.divider()
 st.subheader("Fatura extraída")
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Banco", fatura_info.get("banco", "?"))
-col2.metric("Titular", fatura_info.get("cartao_titular", "?"))
-col3.metric("Vencimento", fatura_info.get("ciclo_vencimento", "?"))
+# Total em destaque (número-herói); resto vira uma linha discreta
 total = fatura_info.get("total", 0)
-col4.metric(
-    "Total",
-    "R$ " + f"{total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+_total_fmt = "R$ " + f"{total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+st.markdown(
+    f"""
+    <div class="heronum">
+      <div class="hn-l">total da fatura</div>
+      <div class="hn-v">{_total_fmt}</div>
+      <div class="hn-s">{fatura_info.get('banco', '?')} · {fatura_info.get('cartao_titular', '?')} · vencimento {fatura_info.get('ciclo_vencimento', '?')}</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 # ----- Dedupe -----
@@ -220,6 +231,7 @@ if st.button(
     f"Inserir {n_inserir} transações na planilha",
     type="primary",
     disabled=(n_inserir == 0),
+    use_container_width=True,
 ):
     rows_to_insert = []
     msg_orig = f"[fatura ANEXO {cartao_label} pago em {data_pgto_str}]"

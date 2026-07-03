@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from lib.components import COR, PLOTLY_CONFIG, fig_mobile
+from lib.components import COR, PLOTLY_CONFIG, fig_mobile, tema_verde_premium
 from lib.data import (
     auditar_contas_fixas,
     classificar_baldes,
@@ -30,105 +30,12 @@ from lib.data import (
     split_movimentos,
 )
 
-# ============== Tema Verde Premium ==============
+# ============== Tema Verde Premium (compartilhado) ==============
+tema_verde_premium()
 st.markdown(
-    """
-    <style>
-    .stApp { background: #F2F7F4; }
+    """<style>
     .block-container { max-width: 680px !important; padding-top: 2.2rem !important; }
-    header[data-testid="stHeader"] { background: transparent; }
-    h1,h2,h3 { letter-spacing: -0.01em; }
-    .stApp h2 { font-size: 1.25rem !important; font-weight: 700 !important; margin: 1.1rem 0 0.2rem !important; }
-
-    /* hero imersivo (sangra além da coluna) */
-    .hero5 {
-      background: linear-gradient(160deg, #0C5949 0%, #0A4A3A 55%, #07382C 100%);
-      color: #F2FBF6; border-radius: 22px; padding: 20px 22px 24px;
-      box-shadow: 0 14px 38px rgba(10,60,45,0.30); position: relative; overflow: hidden;
-      margin-bottom: 14px;
-    }
-    .h5-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-    .h5-ola { font-size: 12.5px; opacity: 0.75; }
-    .h5-nome { font-size: 17px; font-weight: 700; }
-    .h5-right { display: flex; align-items: center; gap: 8px; }
-    .h5-mes { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
-              background: rgba(255,255,255,0.14); }
-    .h5-av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
-             font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.18); }
-    .h5-rot { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; opacity: 0.75; }
-    .h5-num { font-size: 42px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05;
-              margin: 4px 0 10px; color: #fff; font-variant-numeric: tabular-nums; }
-    .h5-num .mais { color: #7CE0B8; }
-    .h5-num .menos { color: #FFAFA8; }
-    .h5-chips { display: flex; gap: 8px; flex-wrap: wrap; }
-    .h5-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600;
-               padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,0.13);
-               font-variant-numeric: tabular-nums; }
-    .h5-chip svg { width: 13px; height: 13px; }
-    .h5-spark { position: absolute; right: 20px; bottom: 22px; width: 116px; height: 42px; opacity: 0.9; }
-    @media (max-width: 640px) { .h5-spark { display: none; } .h5-num { font-size: 36px; } }
-
-    /* cards brancos com sombra */
-    .c5 { background: #fff; border-radius: 16px; padding: 14px 16px;
-          box-shadow: 0 3px 14px rgba(12,60,45,0.07); margin-bottom: 12px; }
-    .c5 h4 { margin: 0 0 10px; font-size: 13.5px; font-weight: 700; color: #1C2420; }
-
-    /* KPIs 2x2 */
-    .k5grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-    .k5 { background: #fff; border-radius: 16px; padding: 13px 14px;
-          box-shadow: 0 3px 14px rgba(12,60,45,0.07); }
-    .k5-l { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em;
-            color: #6C7A70; display: flex; align-items: center; gap: 6px; }
-    .k5-l svg { width: 13px; height: 13px; }
-    .k5-v { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin-top: 5px;
-            color: #1C2420; font-variant-numeric: tabular-nums; }
-    .k5-s { font-size: 10.5px; margin-top: 3px; color: #8B978F; }
-
-    /* baldes */
-    .segbar { display: flex; height: 10px; border-radius: 6px; overflow: hidden; margin-bottom: 12px; }
-    .brow { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-size: 13px; color: #1C2420; }
-    .brow .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
-    .brow .bl { flex: 1; font-weight: 500; }
-    .brow .bv { font-weight: 700; font-variant-numeric: tabular-nums; }
-    .brow .bp { font-size: 11px; color: #8B978F; width: 34px; text-align: right; }
-
-    /* metas em anéis */
-    .rings { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; text-align: center; }
-    .ring { display: flex; flex-direction: column; align-items: center; }
-    .ring svg { width: 62px; height: 62px; transform: rotate(-90deg); }
-    .ring .rv { font-size: 12.5px; font-weight: 700; color: #1C2420; margin-top: -41px; height: 36px;
-                display: grid; place-items: center; font-variant-numeric: tabular-nums; }
-    .ring .rl { font-size: 10.5px; font-weight: 600; color: #6C7A70; margin-top: 9px; line-height: 1.3; }
-
-    /* faturas */
-    .frow { display: flex; align-items: center; gap: 11px; padding: 9px 0; }
-    .frow + .frow { border-top: 1px solid #EDF2EE; }
-    .fstripe { width: 4px; height: 34px; border-radius: 2px; flex: none; }
-    .fmeio { flex: 1; min-width: 0; }
-    .fmeio .ft { font-size: 13.5px; font-weight: 600; color: #1C2420; }
-    .fmeio .fs { font-size: 11px; color: #8B978F; margin-top: 1px; }
-    .fval { font-size: 14px; font-weight: 700; color: #1C2420; font-variant-numeric: tabular-nums; }
-
-    /* casal */
-    .casal { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-    .pss { background: #fff; border-radius: 16px; padding: 13px 14px; box-shadow: 0 3px 14px rgba(12,60,45,0.07); }
-    .pss .ph { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .pss .pa { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
-               font-size: 10px; font-weight: 700; color: #fff; }
-    .pss .pn { font-size: 13px; font-weight: 700; color: #1C2420; }
-    .pss .pr { display: flex; justify-content: space-between; font-size: 12px; padding: 2.5px 0;
-               color: #4A564E; font-variant-numeric: tabular-nums; }
-    .pss .pr b { color: #1C2420; }
-    @media (max-width: 640px) { .casal { grid-template-columns: 1fr; } }
-
-    /* widgets streamlit no clima do tema */
-    div[data-testid="stExpander"] { background: #fff; border: 0 !important; border-radius: 16px !important;
-      box-shadow: 0 3px 14px rgba(12,60,45,0.07); margin-bottom: 12px; }
-    div[data-testid="stExpander"] summary { font-size: 13px !important; font-weight: 600; padding: 12px 14px !important; }
-    div[data-testid="stSelectbox"] > div > div { border-radius: 999px !important; }
-    hr { margin: 0.8rem 0 !important; }
-    </style>
-    """,
+    </style>""",
     unsafe_allow_html=True,
 )
 

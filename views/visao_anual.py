@@ -6,13 +6,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from lib.components import COR, PLOTLY_CONFIG, fig_mobile
+from lib.components import COR, PLOTLY_CONFIG, fig_mobile, tema_verde_premium
 from lib.data import is_investimento, is_pagamento_fatura, load_lancamentos
 
+tema_verde_premium()
 st.markdown(
     """<style>
-    .block-container { max-width: 1100px !important; padding-top: 3.5rem !important; }
-    .stApp h2 { font-size: 1.3rem !important; font-weight: 600 !important; margin-top: 1.1rem !important; }
+    .block-container { max-width: 1100px !important; padding-top: 2.2rem !important; }
     </style>""",
     unsafe_allow_html=True,
 )
@@ -66,15 +66,31 @@ splits = {
     "Investimentos": dfa[dfa.apply(is_investimento, axis=1)],
 }
 
-# KPIs anuais
+# KPIs anuais — grade 2×2 no estilo do mockup
 desp_ano = float(splits["Despesas"]["Valor"].sum())
 rec_ano = float(splits["Receitas"]["Valor"].sum())
 inv_ano = float(splits["Investimentos"]["Valor"].sum())
-k1, k2, k3, k4 = st.columns(4)
-k1.metric("receita no ano", "R$ " + fmt(rec_ano))
-k2.metric("despesa no ano", "R$ " + fmt(desp_ano))
-k3.metric("investido no ano", "R$ " + fmt(inv_ano))
-k4.metric("saldo no ano", "R$ " + fmt(rec_ano - desp_ano - inv_ano))
+saldo_ano = rec_ano - desp_ano - inv_ano
+
+def _r(v):
+    return "R$ " + (fmt(v) or "0")
+
+IC_UP = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 13V3M4 7l4-4 4 4"/></svg>'
+IC_DN = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M4 9l4 4 4-4"/></svg>'
+IC_CH = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13l4-5 3 3 5-7"/></svg>'
+IC_WA = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="12" height="8" rx="2"/><path d="M5 5V3.5A1.5 1.5 0 016.5 2h3A1.5 1.5 0 0111 3.5V5"/></svg>'
+cor_saldo_ano = COR["receita"] if saldo_ano >= 0 else COR["despesa"]
+st.markdown(
+    f"""
+    <div class="k5grid">
+      <div class="k5"><div class="k5-l">{IC_UP} receita no ano</div><div class="k5-v" style="color:{COR['receita']}">{_r(rec_ano)}</div></div>
+      <div class="k5"><div class="k5-l">{IC_DN} despesa no ano</div><div class="k5-v">{_r(desp_ano)}</div></div>
+      <div class="k5"><div class="k5-l">{IC_CH} investido no ano</div><div class="k5-v" style="color:{COR['investimento']}">{_r(inv_ano)}</div></div>
+      <div class="k5"><div class="k5-l">{IC_WA} saldo no ano</div><div class="k5-v" style="color:{cor_saldo_ano}">{_r(saldo_ano)}</div></div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # Gráfico: receita vs despesa vs investido por mês
 meses_lbl = [MNOME[m] for m in MESES]
