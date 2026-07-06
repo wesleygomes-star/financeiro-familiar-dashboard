@@ -70,10 +70,13 @@ with st.expander("Ver tabela completa"):
 
 # ROI — custo vs valor gerado
 st.subheader("Vale a pena?")
+# \$ evita o markdown tratar dois R$ na mesma frase como fórmula LaTeX
+# (escapado FORA da f-string — Py3.9 não aceita \ dentro de {})
+_custo_mes = fmt(total).replace("R$", "R\\$")
+_custo_ano = fmt(total * 12).replace("R$", "R\\$")
 st.markdown(
-    # \$ evita o markdown tratar dois R$ na mesma frase como fórmula LaTeX
     f"""
-O sistema custa **{fmt(total).replace("R$", "R\\$")}/mês** (≈ {fmt(total*12).replace("R$", "R\\$")}/ano) e em troca:
+O sistema custa **{_custo_mes}/mês** (≈ {_custo_ano}/ano) e em troca:
 - Lançamento sem fricção pelo WhatsApp (você + Sabrina)
 - Conciliação automática de faturas de cartão
 - Controle de contas fixas com alerta de vencimento
