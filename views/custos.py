@@ -71,8 +71,9 @@ with st.expander("Ver tabela completa"):
 # ROI — custo vs valor gerado
 st.subheader("Vale a pena?")
 st.markdown(
+    # \$ evita o markdown tratar dois R$ na mesma frase como fórmula LaTeX
     f"""
-O sistema custa **{fmt(total)}/mês** (≈ {fmt(total*12)}/ano) e em troca:
+O sistema custa **{fmt(total).replace("R$", "R\\$")}/mês** (≈ {fmt(total*12).replace("R$", "R\\$")}/ano) e em troca:
 - Lançamento sem fricção pelo WhatsApp (você + Sabrina)
 - Conciliação automática de faturas de cartão
 - Controle de contas fixas com alerta de vencimento

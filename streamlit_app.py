@@ -19,7 +19,8 @@ st.set_page_config(
     page_title="Financeiro Família Gomes",
     page_icon="💰",
     layout="wide",
-    initial_sidebar_state="expanded",
+    # navegação é a barra inferior (barra_navegacao) — sidebar fica oculta pelo tema
+    initial_sidebar_state="collapsed",
 )
 
 
@@ -58,6 +59,14 @@ def _tags_app_tela_inicial():
             for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
             head.appendChild(el);
           }}
+          // visual comercial: remove o "Manage app" e badges do Cloud, que vivem
+          // na página wrapper DE CIMA (CSS de dentro do iframe não alcança)
+          let n = 0;
+          const limpar = setInterval(() => {{
+            doc.querySelectorAll('[data-testid="manage-app-button"], [class*="viewerBadge"], [class*="_profileContainer"]')
+               .forEach((el) => {{ el.style.display = 'none'; }});
+            if (++n > 20) clearInterval(limpar);
+          }}, 3000);
         }})();
         </script>""",
         height=0,

@@ -48,6 +48,11 @@ def tema_verde_premium():
         """
         <style>
         header[data-testid="stHeader"] { background: transparent; }
+        /* visual comercial: sem chrome do Streamlit — a navegação é a barra inferior */
+        [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+        [data-testid="stToolbar"], [data-testid="stDecoration"],
+        [data-testid="manage-app-button"], [class*="viewerBadge"] { display: none !important; visibility: hidden !important; }
+        #MainMenu { visibility: hidden; }
         h1,h2,h3 { letter-spacing: -0.01em; }
         .stApp h1 { font-size: 1.6rem !important; font-weight: 800 !important; }
         .stApp h2 { font-size: 1.25rem !important; font-weight: 700 !important; margin: 1.1rem 0 0.2rem !important; }

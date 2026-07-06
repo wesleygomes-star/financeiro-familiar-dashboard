@@ -35,9 +35,17 @@ tema_verde_premium()
 barra_navegacao("inicio")
 st.markdown(
     """<style>
-    .block-container { max-width: 680px !important; padding-top: 0.9rem !important; position: relative; }
-    /* seletor de mês vira o pill do hero (sobreposto no canto direito, ao lado do avatar) */
-    .st-key-mespill { position: absolute !important; top: 44px; right: 64px; width: 126px; z-index: 20; }
+    .block-container { max-width: 680px !important; padding-top: 0.9rem !important; position: relative !important; }
+    /* seletor de mês vira o pill do hero (sobreposto no canto direito, ao lado do avatar).
+       largura TRAVADA com !important — o stVerticalBlock nativo força 100% e o pill
+       virava uma barra gigante no desktop */
+    .st-key-mespill {
+      position: absolute !important; top: 44px !important; right: 64px !important;
+      width: 126px !important; min-width: 126px !important; max-width: 126px !important;
+      left: auto !important; z-index: 20;
+    }
+    .st-key-mespill div[data-testid="stSelectbox"],
+    .st-key-mespill [data-baseweb="select"] { width: 126px !important; max-width: 126px !important; }
     .st-key-mespill div[data-testid="stSelectbox"] > div > div {
       background: rgba(7,56,44,0.55) !important; border: 1px solid rgba(255,255,255,0.28) !important;
       border-radius: 999px !important; min-height: 32px; height: 32px;
@@ -191,10 +199,11 @@ with st.popover("ver a conta do mês"):
         """,
         unsafe_allow_html=True,
     )
+    # \$ evita o markdown tratar dois R$ na mesma frase como fórmula LaTeX
     st.caption(
         f"Consumo (competência): {fmt(k['despesa_total'])} — o que o mês consumiu, mesmo pagando depois. "
         f"Saiu da conta (caixa): {fmt(caixa['despesa_total'])} — o que efetivamente debitou. "
-        f"Saldo do mês: {fmt(k['saldo_mes'])}."
+        f"Saldo do mês: {fmt(k['saldo_mes'])}.".replace("R$", "R\\$")
     )
 
 # ============== KPIs 2×2 ==============
