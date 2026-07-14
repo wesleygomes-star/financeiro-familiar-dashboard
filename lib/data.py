@@ -333,19 +333,29 @@ def is_pagamento_fatura(row) -> bool:
     return ("pagamento" in desc and "fatura" in desc)
 
 
+def is_rd(row) -> bool:
+    """RD = gasto corporativo reembolsável pela empresa (Subcategoria='RD') e o
+    respectivo reembolso. NEUTRO no consumo/tetos/livre — afeta só o caixa e a
+    auditoria gasto×reembolso (decisão Wesley 13/07)."""
+    return str(row.get("Subcategoria", "")).strip().upper() == "RD"
+
+
 def split_movimentos(df: pd.DataFrame) -> dict:
-    """Separa em receitas, despesas reais (sem investimento e sem pagamento de fatura) e aportes."""
+    """Separa em receitas, despesas reais (sem investimento, sem pagamento de fatura
+    e sem RD) e aportes. RD sai dos dois lados (gasto E reembolso) — neutro."""
     if df.empty:
-        return {"receitas": df, "despesas": df, "aportes": df, "pagamentos": df}
+        return {"receitas": df, "despesas": df, "aportes": df, "pagamentos": df, "rd": df}
     mask_inv = df.apply(is_investimento, axis=1)
     mask_pgto = df.apply(is_pagamento_fatura, axis=1)
-    mask_rec = df["Tipo"].astype(str).str.strip().str.lower() == "receita"
-    mask_desp = (df["Tipo"].astype(str).str.strip().str.lower() == "despesa") & (~mask_inv) & (~mask_pgto)
+    mask_rd = df.apply(is_rd, axis=1)
+    mask_rec = (df["Tipo"].astype(str).str.strip().str.lower() == "receita") & (~mask_rd)
+    mask_desp = (df["Tipo"].astype(str).str.strip().str.lower() == "despesa") & (~mask_inv) & (~mask_pgto) & (~mask_rd)
     return {
         "receitas": df[mask_rec].copy(),
         "despesas": df[mask_desp].copy(),
         "aportes": df[mask_inv].copy(),
         "pagamentos": df[mask_pgto].copy(),
+        "rd": df[mask_rd].copy(),
     }
 
 

@@ -13,6 +13,7 @@ import streamlit as st
 from lib.components import COR, PLOTLY_CONFIG, barra_navegacao, fig_mobile, tema_verde_premium
 from lib.data import (
     auditar_contas_fixas,
+    is_rd,
     classificar_baldes,
     compromissos_proximos_meses,
     fatura_estimada,
@@ -332,6 +333,33 @@ if not audit.empty:
             column_config={"Valor Esperado": st.column_config.NumberColumn(format="R$ %.0f")},
         )
         st.caption("o cadastro dispara os alertas (dia 10/15 no Zap) e alimenta a projeção abaixo")
+
+# ============== RD — despesas corporativas (reembolso) ==============
+df_rd = df_lanc[df_lanc.apply(is_rd, axis=1)] if not df_lanc.empty else df_lanc
+_rd_gasto = df_rd[df_rd["Tipo"] == "Despesa"]["Valor"].sum() if not df_rd.empty else 0.0
+_rd_reemb = df_rd[df_rd["Tipo"] == "Receita"]["Valor"].sum() if not df_rd.empty else 0.0
+_rd_saldo = _rd_gasto - _rd_reemb
+with st.expander(f"RD — despesas corporativas · a receber {fmt(_rd_saldo)}" if _rd_saldo > 0.005
+                 else "RD — despesas corporativas", expanded=False):
+    if df_rd.empty:
+        st.caption("Nenhum lançamento RD. Marque no Zap incluindo **RD** na mensagem — "
+                   "ex: `120 almoço cliente RD` · reembolso: `1500 reembolso RD`. Comando `rd` mostra o saldo.")
+    else:
+        _cor_rd = COR["alerta"] if _rd_saldo > 0.005 else (COR["despesa"] if _rd_saldo < -0.005 else COR["receita"])
+        st.markdown(
+            f"""
+            <div class="brow"><span class="bl">gastos corporativos</span><span class="bv">{fmt(_rd_gasto)}</span></div>
+            <div class="brow"><span class="bl">reembolsado pela empresa</span><span class="bv" style="color:{COR['receita']}">{fmt(_rd_reemb)}</span></div>
+            <div class="brow" style="border-top:1px solid #EDF2EE;margin-top:4px;padding-top:9px;">
+              <span class="bl" style="font-weight:700;">{'a receber' if _rd_saldo >= 0 else 'reembolso excedente'}</span>
+              <span class="bv" style="color:{_cor_rd};">{fmt(abs(_rd_saldo))}</span></div>
+            """,
+            unsafe_allow_html=True,
+        )
+        _rd_show = df_rd[["Data", "Tipo", "Descrição", "Valor"]].copy().sort_values("Data")
+        st.dataframe(_rd_show, use_container_width=True, hide_index=True,
+                     column_config={"Valor": st.column_config.NumberColumn(format="R$ %.2f")})
+        st.caption("RD é neutro no consumo e nos tetos — vive só aqui e no caixa. Comando `rd` no Zap mostra este saldo.")
 
 # ============== Investimentos (detalhe) ==============
 with st.expander("Investimentos & patrimônio", expanded=(estocado == 0 and aporte == 0)):
