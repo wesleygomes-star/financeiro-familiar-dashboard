@@ -328,9 +328,12 @@ if not audit.empty:
     with st.expander(f"Contas fixas — {n_pagas} pagas / {n_fixas} no mês · {fmt(audit['Valor Esperado'].sum())} comprometido"):
         audit_show = audit.sort_values("Dia Cobrança")
         st.dataframe(
-            audit_show[["Status", "Descrição", "Valor Esperado", "Dia Cobrança", "Pessoa Pagou"]],
+            audit_show[["Status", "Descrição", "Valor Pago", "Valor Esperado", "Dia Cobrança"]],
             use_container_width=True, hide_index=True,
-            column_config={"Valor Esperado": st.column_config.NumberColumn(format="R$ %.0f")},
+            column_config={
+                "Valor Pago": st.column_config.NumberColumn(format="R$ %.0f", help="o que realmente saiu este mês"),
+                "Valor Esperado": st.column_config.NumberColumn(format="R$ %.0f", help="referência do cadastro"),
+            },
         )
         st.caption("o cadastro dispara os alertas (dia 10/15 no Zap) e alimenta a projeção abaixo")
 

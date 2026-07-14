@@ -489,7 +489,9 @@ def _emparelhar_recorrentes(df_desp: pd.DataFrame, df_rec: pd.DataFrame) -> dict
     lanc = [(i, _toks_rec(r.get("Descrição", "")), _norm(r.get("Categoria", "")), _num_rec(r.get("Valor", 0)))
             for i, r in desp.iterrows()]
     recs = [(j, _num_rec(r.get("Valor", 0)), _norm(r.get("Categoria", "")),
-             _toks_rec(r.get(col_desc, "")) if col_desc else set()) for j, r in rec_ativas.iterrows()]
+             (_toks_rec(r.get(col_desc, "")) if col_desc else set())
+             | _toks_rec(r.get("Subcategoria", "")))  # subcat vira token (Cemig+Energia, Claro+Internet)
+            for j, r in rec_ativas.iterrows()]
     pares = []
     for ri, (_j, rval, rcat, rtoks) in enumerate(recs):
         if rval <= 0:
@@ -500,6 +502,10 @@ def _emparelhar_recorrentes(df_desp: pd.DataFrame, df_rec: pd.DataFrame) -> dict
                 continue
             shared = len(rtoks & ltoks)
             cat_ok = bool(rcat) and rcat == lcat
+            # par SÓ por categoria (sem token) exige valor quase exato (±8%) —
+            # evita casar item aleatório da mesma categoria (14/07)
+            if shared == 0 and cat_ok and diff > rval * 0.08:
+                continue
             if shared >= 1 or cat_ok:
                 pares.append((shared * 100 + (10 if cat_ok else 0) + (20 - 20 * diff / (rval * 0.20)), ri, li))
     pares.sort(key=lambda p: p[0], reverse=True)
@@ -527,9 +533,11 @@ def auditar_contas_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competenci
     if rec_ativas.empty:
         return pd.DataFrame()
 
-    # Filtra lançamentos da competência alvo (modo Caixa pra refletir quando $ saiu)
-    lanc_mes = df_lanc[df_lanc["Mês Caixa"] == competencia] if "Mês Caixa" in df_lanc.columns else df_lanc
-    lanc_mes = lanc_mes[lanc_mes["Tipo"].astype(str).str.lower() == "despesa"] if "Tipo" in lanc_mes.columns else lanc_mes
+    # Filtra por COMPETÊNCIA (14/07): "a conta do mês foi paga?" é pergunta de competência —
+    # fixa paga no cartão (caixa mês seguinte) conta como paga; e o pool NÃO herda as compras
+    # de junho da fatura (que geravam pares-lixo tipo Cemig←ELECTROLUX no modo Caixa).
+    lanc_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df_lanc.columns else df_lanc
+    lanc_mes = split_movimentos(lanc_mes)["despesas"]
 
     try:
         m, y = competencia.split("/")
