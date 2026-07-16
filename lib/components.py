@@ -78,6 +78,11 @@ def tema_verde_premium():
                    padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,0.13);
                    font-variant-numeric: tabular-nums; }
         .h5-chip svg { width: 13px; height: 13px; }
+        .h5-livre { display: flex; justify-content: space-between; align-items: center; gap: 10px;
+          background: rgba(255,255,255,0.10); border: 1px dashed rgba(255,255,255,0.25);
+          border-radius: 12px; padding: 9px 13px; font-size: 13px; margin-top: 12px; }
+        .h5-livre small { opacity: 0.65; font-size: 11px; }
+        .h5-livre b { font-size: 15px; color: #7CE0B8; white-space: nowrap; }
         .h5-spark { position: absolute; right: 20px; bottom: 22px; width: 116px; height: 42px; opacity: 0.9; }
         @media (max-width: 640px) { .h5-spark { display: none; } .h5-num { font-size: 36px; } }
 
@@ -188,6 +193,33 @@ def tema_verde_premium():
         .st-key-tabbar5 a:hover { background: #EDF3EE !important; }
         .st-key-tabbar5 a p { font-size: 10px !important; margin: 0 !important; color: inherit !important; }
         .st-key-tabbar5 a span[data-testid="stIconMaterial"] { font-size: 22px !important; }
+
+        /* ══ DESKTOP ≥1024px: barra inferior vira MENU LATERAL e o conteúdo respira ══ */
+        @media (min-width: 1024px) {
+          .st-key-tabbar5 {
+            top: 0; bottom: 0; left: 0; right: auto; width: 210px;
+            flex-direction: column !important; align-items: stretch; justify-content: flex-start;
+            gap: 4px !important; padding: 74px 12px 12px !important;
+            border-top: 0; border-right: 1px solid #E3EBE5;
+            box-shadow: none !important; background: #fff !important;
+          }
+          .st-key-tabbar5::before {
+            content: "$"; position: absolute; top: 16px; left: 14px; width: 36px; height: 36px;
+            border-radius: 10px; background: linear-gradient(160deg, #0C5949, #07382C);
+            color: #7CE0B8; display: grid; place-items: center; font-size: 19px; font-weight: 800;
+          }
+          .st-key-tabbar5::after {
+            content: "Financeiro"; position: absolute; top: 25px; left: 60px;
+            font-size: 15px; font-weight: 800; color: #1C2420;
+          }
+          .st-key-tabbar5 > div { flex: 0 0 auto !important; }
+          .st-key-tabbar5 a { flex-direction: row !important; justify-content: flex-start; gap: 10px;
+            padding: 9px 12px !important; border-radius: 10px; }
+          .st-key-tabbar5 a p { font-size: 13px !important; }
+          .st-key-tabbar5 a span[data-testid="stIconMaterial"] { font-size: 19px !important; }
+          .block-container { margin-left: 240px !important; margin-right: auto !important;
+            padding-bottom: 40px !important; }
+        }
         </style>
         """,
         unsafe_allow_html=True,

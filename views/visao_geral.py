@@ -37,11 +37,14 @@ barra_navegacao("inicio")
 st.markdown(
     """<style>
     .block-container { max-width: 680px !important; padding-top: 0.9rem !important; position: relative !important; }
+    @media (min-width: 1024px) { .block-container { max-width: 1180px !important; } }
+    /* a coluna que contém o pill vira o contexto de posicionamento (pill sempre sobre o hero) */
+    div[data-testid="column"]:has(.st-key-mespill), div[data-testid="stColumn"]:has(.st-key-mespill) { position: relative; }
     /* seletor de mês vira o pill do hero (sobreposto no canto direito, ao lado do avatar).
        largura TRAVADA com !important — o stVerticalBlock nativo força 100% e o pill
        virava uma barra gigante no desktop */
     .st-key-mespill {
-      position: absolute !important; top: 44px !important; right: 64px !important;
+      position: absolute !important; top: 44px !important; right: 20px !important;
       width: 126px !important; min-width: 126px !important; max-width: 126px !important;
       left: auto !important; z-index: 20;
     }
@@ -97,10 +100,14 @@ def _label(c):
         m, y = c.split("/"); return f"{_NOMES.get(m, m)}/{y}" + ("  ·  futuro" if _key(c) > _hoje else "")
     except Exception:
         return c
+# ============== Zona do topo: hero (esq) | KPIs (dir) — empilha no celular ==============
+col_hero, col_kpi = st.columns([1.35, 1], gap="medium")
+
 # o widget fica no fluxo do código AQUI, mas o CSS o posiciona DENTRO do hero
 # (canto superior direito, estilo pill do mockup)
-with st.container(key="mespill"):
-    competencia = st.selectbox("Mês", meses, index=0, format_func=_label, label_visibility="collapsed")
+with col_hero:
+    with st.container(key="mespill"):
+        competencia = st.selectbox("Mês", meses, index=0, format_func=_label, label_visibility="collapsed")
 
 # ============== Cálculos ==============
 lpg = livre_para_gastar(df_lanc, df_rec, df_faturas, df_saldo, competencia)
@@ -110,6 +117,12 @@ caixa = kpis_familia(df_lanc, df_saldo, competencia, "Caixa")
 estocado = k["saldo_estocado_total"]
 aporte = k["aporte_total"]
 
+
+# RD (pro KPI e pro expander)
+df_rd = df_lanc[df_lanc.apply(is_rd, axis=1)] if not df_lanc.empty else df_lanc
+_rd_gasto = df_rd[df_rd["Tipo"] == "Despesa"]["Valor"].sum() if not df_rd.empty else 0.0
+_rd_reemb = df_rd[df_rd["Tipo"] == "Receita"]["Valor"].sum() if not df_rd.empty else 0.0
+_rd_saldo = _rd_gasto - _rd_reemb
 
 # contas fixas + próxima fatura (pros KPIs)
 audit = auditar_contas_fixas(df_lanc, df_rec, competencia)
@@ -134,29 +147,32 @@ if not df_faturas.empty and "Vencimento_dt" in df_faturas.columns:
         _prox_fat_val = ("~" if float(r0.get("Total_num", 0) or 0) <= 0 else "") + fmt(_t0) if _t0 > 0 else "—"
         _prox_fat_txt = f"{_c0} · " + (f"vence em {_d0}d" if _d0 >= 0 else f"venceu há {abs(_d0)}d")
 
-# ============== Hero ==============
+# ============== Hero (v6: CAIXA — o que sobrou de verdade) ==============
 _h = datetime.now().hour
 saud = "bom dia" if _h < 12 else ("boa tarde" if _h < 18 else "boa noite")
-sinal = '<span class="mais">+</span>' if livre >= 0 else '<span class="menos">−</span>'
-st.markdown(
-    f"""
+sobrou = caixa["saldo_mes"]
+sinal = '<span class="mais">+</span>' if sobrou >= 0 else '<span class="menos">−</span>'
+with col_hero:
+    st.markdown(
+        f"""
     <div class="hero5">
       <div class="h5-bar">
         <div><div class="h5-ola">{saud},</div><div class="h5-nome">Família Gomes</div></div>
-        <div class="h5-right"><span class="h5-av">WG</span></div>
       </div>
-      <div class="h5-rot">livre pra gastar</div>
-      <div class="h5-num">{sinal}R$ {f"{abs(livre):,.0f}".replace(",", ".")}</div>
+      <div class="h5-rot">sobrou no mês · caixa</div>
+      <div class="h5-num">{sinal}R$ {f"{abs(sobrou):,.0f}".replace(",", ".")}</div>
       <div class="h5-chips">
-        <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#7CE0B8" stroke-width="2.2"><path d="M8 13V3M4 7l4-4 4 4"/></svg>entrou {fmt_mil(k['receita_total'])}</span>
-        <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#FFAFA8" stroke-width="2.2"><path d="M8 3v10M4 9l4 4 4-4"/></svg>gastou {fmt_mil(k['despesa_total'])}</span>
+        <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#7CE0B8" stroke-width="2.2"><path d="M8 13V3M4 7l4-4 4 4"/></svg>entrou {fmt_mil(caixa['receita_total'])}</span>
+        <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#FFAFA8" stroke-width="2.2"><path d="M8 3v10M4 9l4 4 4-4"/></svg>saiu {fmt_mil(caixa['despesa_total'])}</span>
       </div>
+      <div class="h5-livre"><span>livre pra gastar até o fim do mês <small>(planejamento)</small></span><b>{fmt(livre)}</b></div>
     </div>
     """,
-    unsafe_allow_html=True,
-)
+        unsafe_allow_html=True,
+    )
 
-with st.popover("ver a conta do mês"):
+_pop = col_hero.popover("ver a conta do mês")
+with _pop:
     _cor_livre_pop = COR["receita"] if livre >= 0 else COR["despesa"]
     st.markdown(
         f"""
@@ -184,12 +200,12 @@ IC_INV = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-widt
 IC_PAT = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="12" height="8" rx="2"/><path d="M5 5V3.5A1.5 1.5 0 016.5 2h3A1.5 1.5 0 0111 3.5V5"/></svg>'
 IC_FIX = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>'
 IC_FAT = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="4" width="12" height="9" rx="2"/><path d="M2 7h12"/></svg>'
-st.markdown(
+col_kpi.markdown(
     f"""
     <div class="k5grid">
-      <div class="k5"><div class="k5-l">{IC_INV} investiu</div>
-        <div class="k5-v">{fmt(aporte) if aporte > 0 else '—'}</div>
-        <div class="k5-s">{'este mês' if aporte > 0 else 'aporte 5000 CDB no Zap'}</div></div>
+      <div class="k5"><div class="k5-l">{IC_INV} rd · a receber</div>
+        <div class="k5-v">{fmt(_rd_saldo) if _rd_saldo > 0.005 else '—'}</div>
+        <div class="k5-s">{'gastos corporativos a reembolsar' if _rd_saldo > 0.005 else 'nada pendente da empresa'}</div></div>
       <div class="k5"><div class="k5-l">{IC_PAT} patrimônio</div>
         <div class="k5-v">{fmt(estocado) if estocado > 0 else '—'}</div>
         <div class="k5-s">{'saldo investido' if estocado > 0 else 'preencha Saldo Investido'}</div></div>
@@ -223,9 +239,23 @@ _rows = "".join(
     f'<span class="bp">{baldes[b]["total"] / tot_baldes * 100:.0f}%</span></div>'
     for b in ["Fixo", "Recorrente", "Flexível"]
 )
-st.markdown(f'<div class="c5"><h4>Para onde foi</h4><div class="segbar">{_seg}</div>{_rows}</div>',
-            unsafe_allow_html=True)
-with st.expander("Ver itens dos baldes"):
+# ============== Linha 2: baldes | contas fixas (empilha no celular) ==============
+col_b, col_f = st.columns(2, gap="medium")
+col_b.markdown(f'<div class="c5"><h4>Para onde foi</h4><div class="segbar">{_seg}</div>{_rows}</div>',
+               unsafe_allow_html=True)
+if not audit.empty:
+    with col_f.expander(f"Contas fixas — {n_pagas} pagas / {n_fixas}", expanded=False):
+        _ash = audit.sort_values("Dia Cobrança")
+        st.dataframe(
+            _ash[["Status", "Descrição", "Valor Pago", "Valor Esperado", "Dia Cobrança"]],
+            use_container_width=True, hide_index=True,
+            column_config={
+                "Valor Pago": st.column_config.NumberColumn(format="R$ %.0f", help="o que realmente saiu este mês"),
+                "Valor Esperado": st.column_config.NumberColumn(format="R$ %.0f", help="referência do cadastro"),
+            },
+        )
+        st.caption("o cadastro dispara os alertas (dia 10/15 no Zap) e alimenta a projeção")
+with col_b.expander("Ver itens dos baldes"):
     for b in ["Fixo", "Recorrente", "Flexível"]:
         st.markdown(f"**{BALDE_META[b][0]}** — {fmt(baldes[b]['total'])}")
         for it in baldes[b]["itens"]:
@@ -310,10 +340,6 @@ if not audit.empty:
         st.caption("o cadastro dispara os alertas (dia 10/15 no Zap) e alimenta a projeção abaixo")
 
 # ============== RD — despesas corporativas (reembolso) ==============
-df_rd = df_lanc[df_lanc.apply(is_rd, axis=1)] if not df_lanc.empty else df_lanc
-_rd_gasto = df_rd[df_rd["Tipo"] == "Despesa"]["Valor"].sum() if not df_rd.empty else 0.0
-_rd_reemb = df_rd[df_rd["Tipo"] == "Receita"]["Valor"].sum() if not df_rd.empty else 0.0
-_rd_saldo = _rd_gasto - _rd_reemb
 with st.expander(f"RD — despesas corporativas · a receber {fmt(_rd_saldo)}" if _rd_saldo > 0.005
                  else "RD — despesas corporativas", expanded=False):
     if df_rd.empty:
