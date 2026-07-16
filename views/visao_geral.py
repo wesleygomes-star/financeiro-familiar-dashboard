@@ -56,21 +56,45 @@ st.markdown(
     }
     .st-key-mespill div[data-testid="stSelectbox"] * { color: #EAF7F0 !important; font-size: 12px !important; }
     .st-key-mespill svg { fill: #EAF7F0 !important; }
+    /* olho de privacidade, colado no pill */
+    .st-key-olho { position: absolute !important; top: 44px !important; right: 152px !important;
+      width: 44px !important; z-index: 21; }
+    .st-key-olho button { background: rgba(7,56,44,0.55) !important; border: 1px solid rgba(255,255,255,0.28) !important;
+      border-radius: 999px !important; color: #EAF7F0 !important; height: 32px; min-height: 32px !important;
+      padding: 0 10px !important; font-size: 14px !important; width: 44px; }
+    .st-key-olho button:hover { background: rgba(7,56,44,0.8) !important; }
     </style>""",
     unsafe_allow_html=True,
 )
 
 
+_PRIV = bool(st.session_state.get("modo_privado", False))
+
+
+def _toggle_privado():
+    st.session_state["modo_privado"] = not st.session_state.get("modo_privado", False)
+
+
 def fmt(v: float) -> str:
+    if _PRIV:
+        return "R$ ••••"
     s = f"{abs(v):,.0f}".replace(",", ".")
     return ("-" if v < 0 else "") + f"R$ {s}"
 
 
 def fmt_mil(v: float) -> str:
     """R$ compacto pros chips: 63,9 mil."""
+    if _PRIV:
+        return "••••"
     if abs(v) >= 1000:
         return f"{v/1000:,.1f}".replace(".", ",") + " mil"
     return f"{v:,.0f}".replace(",", ".")
+
+
+if _PRIV:
+    # borra o que não passa pelo fmt (tabelas e gráficos)
+    st.markdown("<style>[data-testid='stDataFrame'], .stPlotlyChart { filter: blur(6px); }</style>",
+                unsafe_allow_html=True)
 
 
 # ============== Dados ==============
@@ -108,6 +132,9 @@ col_hero, col_kpi = st.columns([1.35, 1], gap="medium")
 with col_hero:
     with st.container(key="mespill"):
         competencia = st.selectbox("Mês", meses, index=0, format_func=_label, label_visibility="collapsed")
+    with st.container(key="olho"):
+        st.button("🙈" if _PRIV else "👁", on_click=_toggle_privado,
+                  help="esconder/mostrar os valores")
 
 # ============== Cálculos ==============
 lpg = livre_para_gastar(df_lanc, df_rec, df_faturas, df_saldo, competencia)
@@ -239,6 +266,25 @@ _rows = "".join(
     f'<span class="bp">{baldes[b]["total"] / tot_baldes * 100:.0f}%</span></div>'
     for b in ["Fixo", "Recorrente", "Flexível"]
 )
+# ============== Wesley × Sabrina ==============
+st.subheader("Quem movimenta")
+_cards = ""
+for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexivel"])]:
+    rec = k["receita_por_pessoa"].get(pessoa, 0)
+    desp = k["despesa_por_pessoa"].get(pessoa, 0)
+    apo = k["aporte_por_pessoa"].get(pessoa, 0)
+    saldo = rec - desp - apo
+    cor_saldo = COR["receita"] if saldo >= 0 else COR["despesa"]
+    _inv = f'<div class="pr"><span>investido</span><b>{fmt(apo)}</b></div>' if apo > 0 else ""
+    _cards += (
+        f'<div class="pss"><div class="ph"><span class="pa" style="background:{cor_av}">{pessoa[0]}</span>'
+        f'<span class="pn">{pessoa}</span></div>'
+        f'<div class="pr"><span>entrou</span><b>{fmt(rec) if rec > 0 else "—"}</b></div>'
+        f'<div class="pr"><span>gastou</span><b>{fmt(desp)}</b></div>{_inv}'
+        f'<div class="pr"><span>saldo</span><b style="color:{cor_saldo}">{"+" if saldo >= 0 else ""}{fmt(saldo)}</b></div></div>'
+    )
+st.markdown(f'<div class="casal">{_cards}</div>', unsafe_allow_html=True)
+
 # ============== Linha 2: baldes | contas fixas (empilha no celular) ==============
 col_b, col_f = st.columns(2, gap="medium")
 col_b.markdown(f'<div class="c5"><h4>Para onde foi</h4><div class="segbar">{_seg}</div>{_rows}</div>',
@@ -297,9 +343,9 @@ st.markdown(
 # ============== Faturas ==============
 st.subheader("Faturas")
 st.warning("Faltam as 2 faturas Bradesco da Sabrina — os gastos dela estão subestimados até carregar.")
-if not ab.empty:
-    _frows = ""
-    for _, r in ab.iterrows():
+def _fatura_rows(df_f):
+    rows = ""
+    for _, r in df_f.iterrows():
         cartao = str(r.get("Cartão", "?")); mes_ref = str(r.get("Mês Referência", "?"))
         carregada = str(r.get("Status", "")).lower() == "carregada"
         total = float(r.get("Total_num", 0) or 0)
@@ -315,29 +361,43 @@ if not ab.empty:
             cor_s, status = COR["alerta"], f"vence em {d}d · aguardando fatura"
         val_txt = fmt(total) if (carregada or total > 0) else "—"
         prefixo = "" if carregada else "~ "
-        _frows += (
+        rows += (
             f'<div class="frow"><span class="fstripe" style="background:{cor_s}"></span>'
             f'<span class="fmeio"><span class="ft">{cartao} · {mes_ref}</span>'
             f'<div class="fs">{status}</div></span>'
             f'<span class="fval">{prefixo if val_txt != "—" else ""}{val_txt}</span></div>'
         )
-    st.markdown(f'<div class="c5">{_frows}</div>', unsafe_allow_html=True)
+    return rows
+
+
+if not ab.empty:
+    # padrão enxuto: só o que precisa de ação (não carregadas), máx. 4
+    _pend = ab[ab["Status"].astype(str).str.lower() != "carregada"].head(4)
+    if not _pend.empty:
+        st.markdown(f'<div class="c5">{_fatura_rows(_pend)}</div>', unsafe_allow_html=True)
+    else:
+        st.success("Nenhuma fatura aguardando — tudo carregado e conciliado.")
+    with st.expander(f"Todas as faturas ({len(ab)}) · consultar com filtro"):
+        fc1, fc2 = st.columns(2)
+        _cartoes = ["todos os cartões"] + sorted(ab["Cartão"].astype(str).unique().tolist())
+        f_cart = fc1.selectbox("Cartão", _cartoes)
+        f_stat = fc2.selectbox("Status", ["todas", "aguardando fatura", "vencidas", "carregadas"])
+        filt = ab.copy()
+        if f_cart != "todos os cartões":
+            filt = filt[filt["Cartão"].astype(str) == f_cart]
+        _low = filt["Status"].astype(str).str.lower()
+        if f_stat == "aguardando fatura":
+            filt = filt[(_low != "carregada") & (filt["_dias"] >= 0)]
+        elif f_stat == "vencidas":
+            filt = filt[(_low != "carregada") & (filt["_dias"] < 0)]
+        elif f_stat == "carregadas":
+            filt = filt[_low == "carregada"]
+        if filt.empty:
+            st.caption("nada com esse filtro")
+        else:
+            st.markdown(f'<div class="c5">{_fatura_rows(filt)}</div>', unsafe_allow_html=True)
 else:
     st.info("Aba Faturas vazia.")
-
-# ============== Contas fixas (detalhe) ==============
-if not audit.empty:
-    with st.expander(f"Contas fixas — {n_pagas} pagas / {n_fixas} no mês · {fmt(audit['Valor Esperado'].sum())} comprometido"):
-        audit_show = audit.sort_values("Dia Cobrança")
-        st.dataframe(
-            audit_show[["Status", "Descrição", "Valor Pago", "Valor Esperado", "Dia Cobrança"]],
-            use_container_width=True, hide_index=True,
-            column_config={
-                "Valor Pago": st.column_config.NumberColumn(format="R$ %.0f", help="o que realmente saiu este mês"),
-                "Valor Esperado": st.column_config.NumberColumn(format="R$ %.0f", help="referência do cadastro"),
-            },
-        )
-        st.caption("o cadastro dispara os alertas (dia 10/15 no Zap) e alimenta a projeção abaixo")
 
 # ============== RD — despesas corporativas (reembolso) ==============
 with st.expander(f"RD — despesas corporativas · a receber {fmt(_rd_saldo)}" if _rd_saldo > 0.005
@@ -382,35 +442,26 @@ if not cron.empty:
     if not receitas.empty:
         por_mes = receitas.groupby("Competência")["Valor"].sum().tail(3)
         receita_proj = float(por_mes.mean()) if not por_mes.empty else 0
-    fig = go.Figure()
-    fig.add_bar(name="Parcelas", x=cron["Mês"], y=cron["Parcelas em curso"], marker_color=COR["neutro"])
-    fig.add_bar(name="Contas fixas", x=cron["Mês"], y=cron["Contas fixas"], marker_color=COR["neutro_claro"])
-    fig.add_bar(name="Faturas", x=cron["Mês"], y=cron["Faturas em aberto"], marker_color=COR["alerta"])
-    if receita_proj > 0:
-        fig.add_scatter(name="Receita projetada", x=cron["Mês"], y=[receita_proj] * len(cron),
-                        mode="lines", line=dict(color=COR["receita"], width=2, dash="dash"))
-    fig.update_layout(barmode="stack", height=280, margin=dict(l=10, r=10, t=10, b=10),
+    comp_cols = [c for c in ("Parcelas em curso", "Contas fixas", "Faturas em aberto") if c in cron.columns]
+    cron["Compromissos"] = cron[comp_cols].sum(axis=1)
+    cron["Sobra"] = receita_proj - cron["Compromissos"]
+    _cores = [COR["receita"] if s >= 0 else COR["despesa"] for s in cron["Sobra"]]
+    _txt = ["" if _PRIV else fmt(s) for s in cron["Sobra"]]
+    fig = go.Figure(go.Bar(x=cron["Mês"], y=cron["Sobra"], marker_color=_cores,
+                           text=_txt, textposition="outside", cliponaxis=False))
+    fig.update_layout(height=260, margin=dict(l=10, r=10, t=26, b=10),
                       template="plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                      font=dict(color="#2C2C2A", size=12),
-                      legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5))
+                      font=dict(color="#2C2C2A", size=12), showlegend=False,
+                      yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)", zeroline=True,
+                                 zerolinecolor="rgba(128,128,128,0.4)"))
     st.plotly_chart(fig_mobile(fig), use_container_width=True, config=PLOTLY_CONFIG)
-    st.caption("conforme as faturas grandes saem, sua folga cresce mês a mês")
-
-# ============== Wesley × Sabrina ==============
-st.subheader("Quem movimenta")
-_cards = ""
-for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexivel"])]:
-    rec = k["receita_por_pessoa"].get(pessoa, 0)
-    desp = k["despesa_por_pessoa"].get(pessoa, 0)
-    apo = k["aporte_por_pessoa"].get(pessoa, 0)
-    saldo = rec - desp - apo
-    cor_saldo = COR["receita"] if saldo >= 0 else COR["despesa"]
-    _inv = f'<div class="pr"><span>investido</span><b>{fmt(apo)}</b></div>' if apo > 0 else ""
-    _cards += (
-        f'<div class="pss"><div class="ph"><span class="pa" style="background:{cor_av}">{pessoa[0]}</span>'
-        f'<span class="pn">{pessoa}</span></div>'
-        f'<div class="pr"><span>entrou</span><b>{fmt(rec) if rec > 0 else "—"}</b></div>'
-        f'<div class="pr"><span>gastou</span><b>{fmt(desp)}</b></div>{_inv}'
-        f'<div class="pr"><span>saldo</span><b style="color:{cor_saldo}">{"+" if saldo >= 0 else ""}{fmt(saldo)}</b></div></div>'
+    st.caption(
+        f"quanto deve SOBRAR por mês = receita típica ({fmt(receita_proj)}, média dos últimos 3 meses) "
+        f"menos o que já está assumido (parcelas em curso + contas fixas + faturas em aberto). "
+        f"Verde = mês fecha com folga; vermelho = aperto."
     )
-st.markdown(f'<div class="casal">{_cards}</div>', unsafe_allow_html=True)
+    with st.expander("ver a composição dos compromissos"):
+        _dcron = cron[["Mês"] + comp_cols + ["Compromissos", "Sobra"]].copy()
+        st.dataframe(_dcron, use_container_width=True, hide_index=True,
+                     column_config={c: st.column_config.NumberColumn(format="R$ %.0f")
+                                    for c in _dcron.columns if c != "Mês"})
