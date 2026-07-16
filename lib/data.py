@@ -533,6 +533,29 @@ def _emparelhar_recorrentes(df_desp: pd.DataFrame, df_rec: pd.DataFrame, compete
         r_used.add(ri)
         l_used.add(li)
         mp[recs[ri][0]] = lanc[li][0]
+
+    # 2º passe (16/07): sobras com TOKEN em comum aceitam variação maior de valor
+    # (conta fixa de valor volátil — ex: Economia de Energia 301 esperado, 233 pago)
+    pares2 = []
+    for ri, (_j, rval, rcat, rtoks) in enumerate(recs):
+        if ri in r_used or rval <= 0:
+            continue
+        for li, (_i, ltoks, lcat, lval) in enumerate(lanc):
+            if li in l_used:
+                continue
+            diff = abs(lval - rval)
+            if diff > rval * 0.60:
+                continue
+            shared = len(rtoks & ltoks)
+            if shared >= 1:
+                pares2.append((shared * 100 + (10 if rcat == lcat else 0) - diff / max(rval, 1), ri, li))
+    pares2.sort(key=lambda p: p[0], reverse=True)
+    for _score, ri, li in pares2:
+        if ri in r_used or li in l_used:
+            continue
+        r_used.add(ri)
+        l_used.add(li)
+        mp[recs[ri][0]] = lanc[li][0]
     return mp
 
 

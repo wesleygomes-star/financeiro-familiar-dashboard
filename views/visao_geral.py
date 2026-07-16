@@ -43,7 +43,7 @@ st.markdown(
       div[data-testid="column"]:has(.k5grid), div[data-testid="stColumn"]:has(.k5grid) { display: flex; }
       div[data-testid="column"]:has(.k5grid) > div, div[data-testid="stColumn"]:has(.k5grid) > div { width: 100%; }
       .k5grid { height: 100%; grid-auto-rows: 1fr; margin-bottom: 0; }
-      .k5 { display: flex; flex-direction: column; justify-content: center; }
+      .k5 { display: flex; flex-direction: column; justify-content: center; min-height: 158px; }
     }
     /* a coluna que contém o pill vira o contexto de posicionamento (pill sempre sobre o hero) */
     div[data-testid="column"]:has(.st-key-mespill), div[data-testid="stColumn"]:has(.st-key-mespill) { position: relative; }
@@ -282,6 +282,7 @@ for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexive
     rec = caixa["receita_por_pessoa"].get(pessoa, 0)
     desp = caixa["despesa_por_pessoa"].get(pessoa, 0)
     apo = caixa["aporte_por_pessoa"].get(pessoa, 0)
+    consumo_p = k["despesa_por_pessoa"].get(pessoa, 0)
     saldo = rec - desp - apo
     cor_saldo = COR["receita"] if saldo >= 0 else COR["despesa"]
     _inv = f'<div class="pr"><span>investido</span><b>{fmt(apo)}</b></div>' if apo > 0 else ""
@@ -290,6 +291,7 @@ for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexive
         f'<span class="pn">{pessoa}</span></div>'
         f'<div class="pr"><span>entrou</span><b>{fmt(rec) if rec > 0 else "—"}</b></div>'
         f'<div class="pr"><span>gastou</span><b>{fmt(desp)}</b></div>{_inv}'
+        f'<div class="pr"><span style="color:#8B978F">consumo do mês</span><b style="color:#8B978F">{fmt(consumo_p)}</b></div>'
         f'<div class="pr"><span>saldo</span><b style="color:{cor_saldo}">{"+" if saldo >= 0 else ""}{fmt(saldo)}</b></div></div>'
     )
 st.markdown(f'<div class="casal">{_cards}</div>', unsafe_allow_html=True)
@@ -300,7 +302,7 @@ col_b.markdown(f'<div class="c5"><h4>Para onde foi · consumo do mês</h4><div c
                f'<div style="font-size:10.5px;color:#8B978F;margin-top:6px">competência: inclui compras no cartão feitas no mês (pagas depois) — por isso difere do "saiu" do caixa</div></div>',
                unsafe_allow_html=True)
 if not audit.empty:
-    with col_f.expander(f"Contas fixas — {n_pagas} pagas / {n_fixas}", expanded=False):
+    with col_f.expander(f"Contas fixas — {n_pagas} pagas / {n_fixas}", expanded=True):
         _ash = audit.sort_values("Dia Cobrança")
         st.dataframe(
             _ash[["Status", "Descrição", "Valor Pago", "Valor Esperado", "Dia Cobrança"]],
