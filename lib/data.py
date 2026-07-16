@@ -437,13 +437,30 @@ def _norm(s: str) -> str:
     return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
 
 
-def _recorrentes_despesa(df_rec: pd.DataFrame) -> pd.DataFrame:
-    """Filtra recorrentes ativas que sejam despesa (exclui categorias de receita)."""
+def _comp_key(c):
+    """MM/YYYY → chave ordenável (YYYYMM); None se inválido."""
+    try:
+        m, y = str(c).strip().split("/")
+        return int(y) * 100 + int(m)
+    except Exception:
+        return None
+
+
+def _recorrentes_despesa(df_rec: pd.DataFrame, competencia: str = None) -> pd.DataFrame:
+    """Filtra recorrentes ativas que sejam despesa (exclui categorias de receita).
+
+    Vigência (16/07): coluna `Fim` (MM/YYYY) marca a ÚLTIMA competência da conta —
+    ex: Doação Sergio Fim=07/2026 conta em julho e some de agosto em diante."""
     if df_rec.empty:
         return df_rec
     ativas = df_rec[df_rec.get("Ativo_bool", False)].copy() if "Ativo_bool" in df_rec.columns else df_rec.copy()
     if ativas.empty:
         return ativas
+    if competencia and "Fim" in ativas.columns:
+        alvo = _comp_key(competencia)
+        if alvo:
+            mask = ativas["Fim"].apply(lambda f: (_comp_key(f) is None) or (_comp_key(f) >= alvo))
+            ativas = ativas[mask]
     cat_lower = ativas["Categoria"].astype(str).str.strip().str.lower()
     return ativas[~cat_lower.isin(CATEGORIAS_RECEITA)].copy()
 
@@ -470,7 +487,7 @@ def _num_rec(v) -> float:
         return 0.0
 
 
-def _emparelhar_recorrentes(df_desp: pd.DataFrame, df_rec: pd.DataFrame) -> dict:
+def _emparelhar_recorrentes(df_desp: pd.DataFrame, df_rec: pd.DataFrame, competencia: str = None) -> dict:
     """Empareiha cada recorrente ATIVA (despesa) com no máx. 1 lançamento de despesa.
 
     Casamento ROBUSTO multi-sinal (não depende de descrição exata nem de data): exige
@@ -481,7 +498,7 @@ def _emparelhar_recorrentes(df_desp: pd.DataFrame, df_rec: pd.DataFrame) -> dict
 
     Retorna {índice_no_df_rec_ativas: índice_no_df_desp} — só recorrentes que casaram.
     """
-    rec_ativas = _recorrentes_despesa(df_rec)
+    rec_ativas = _recorrentes_despesa(df_rec, competencia)
     if df_desp is None or df_desp.empty or rec_ativas.empty:
         return {}
     col_desc = next((c for c in ("Descrição", "Descricao", "Item", "Nome") if c in rec_ativas.columns), None)
@@ -529,7 +546,7 @@ def auditar_contas_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competenci
     if df_rec.empty:
         return pd.DataFrame()
 
-    rec_ativas = _recorrentes_despesa(df_rec)
+    rec_ativas = _recorrentes_despesa(df_rec, competencia)
     if rec_ativas.empty:
         return pd.DataFrame()
 
@@ -549,7 +566,7 @@ def auditar_contas_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competenci
     eh_mes_corrente = (hoje.month == m and hoje.year == y)
     dia_hoje = hoje.day if eh_mes_corrente else 31  # se mês passado, considera "fim do mês"
 
-    emparelhamento = _emparelhar_recorrentes(lanc_mes, df_rec)
+    emparelhamento = _emparelhar_recorrentes(lanc_mes, df_rec, competencia)
     out_rows = []
     for ridx, rec in rec_ativas.iterrows():
         desc_rec = str(rec.get("Descrição") or rec.get("Descricao") or rec.get("Item") or rec.get("Nome") or "").strip()
@@ -657,15 +674,16 @@ def compromissos_proximos_meses(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, df_
     else:
         mes_atual, ano_atual = hoje.month, hoje.year
 
-    fixas_mes = 0.0
-    rec_desp = _recorrentes_despesa(df_rec)
-    if not rec_desp.empty and "Valor" in rec_desp.columns:
-        fixas_mes = float(rec_desp["Valor"].sum())
-
     out = []
     m, y = mes_atual, ano_atual
     for _ in range(n_meses):
         comp = f"{m:02d}/{y}"
+
+        # fixas respeitando vigência (coluna Fim) — muda mês a mês
+        fixas_mes = 0.0
+        rec_desp = _recorrentes_despesa(df_rec, comp)
+        if not rec_desp.empty and "Valor" in rec_desp.columns:
+            fixas_mes = float(rec_desp["Valor"].sum())
 
         parcelas = 0.0
         if not df_lanc.empty and "Mês Caixa" in df_lanc.columns:
@@ -832,7 +850,7 @@ def livre_para_gastar(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, df_faturas: p
     k = kpis_familia(df_lanc, df_saldo, competencia, modo="Competência")
     receita = k["receita_total"]
 
-    rec_desp = _recorrentes_despesa(df_rec)
+    rec_desp = _recorrentes_despesa(df_rec, competencia)
     fixas = float(rec_desp["Valor"].sum()) if not rec_desp.empty and "Valor" in rec_desp.columns else 0.0
 
     # faturas pendentes (a debitar) na janela do mês
