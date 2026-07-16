@@ -37,7 +37,14 @@ barra_navegacao("inicio")
 st.markdown(
     """<style>
     .block-container { max-width: 680px !important; padding-top: 0.9rem !important; position: relative !important; }
-    @media (min-width: 1024px) { .block-container { max-width: 1180px !important; } }
+    @media (min-width: 1024px) {
+      .block-container { max-width: 1180px !important; }
+      /* KPIs preenchem a altura do hero (sem buraco embaixo) */
+      div[data-testid="column"]:has(.k5grid), div[data-testid="stColumn"]:has(.k5grid) { display: flex; }
+      div[data-testid="column"]:has(.k5grid) > div, div[data-testid="stColumn"]:has(.k5grid) > div { width: 100%; }
+      .k5grid { height: 100%; grid-auto-rows: 1fr; margin-bottom: 0; }
+      .k5 { display: flex; flex-direction: column; justify-content: center; }
+    }
     /* a coluna que contém o pill vira o contexto de posicionamento (pill sempre sobre o hero) */
     div[data-testid="column"]:has(.st-key-mespill), div[data-testid="stColumn"]:has(.st-key-mespill) { position: relative; }
     /* seletor de mês vira o pill do hero (sobreposto no canto direito, ao lado do avatar).
@@ -268,11 +275,13 @@ _rows = "".join(
 )
 # ============== Wesley × Sabrina ==============
 st.subheader("Quem movimenta")
+st.caption("mesma régua do cartão verde: caixa — o que efetivamente entrou e saiu no mês")
 _cards = ""
 for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexivel"])]:
-    rec = k["receita_por_pessoa"].get(pessoa, 0)
-    desp = k["despesa_por_pessoa"].get(pessoa, 0)
-    apo = k["aporte_por_pessoa"].get(pessoa, 0)
+    # mesma régua do hero: CAIXA (o que entrou/saiu da conta no mês)
+    rec = caixa["receita_por_pessoa"].get(pessoa, 0)
+    desp = caixa["despesa_por_pessoa"].get(pessoa, 0)
+    apo = caixa["aporte_por_pessoa"].get(pessoa, 0)
     saldo = rec - desp - apo
     cor_saldo = COR["receita"] if saldo >= 0 else COR["despesa"]
     _inv = f'<div class="pr"><span>investido</span><b>{fmt(apo)}</b></div>' if apo > 0 else ""
@@ -287,7 +296,8 @@ st.markdown(f'<div class="casal">{_cards}</div>', unsafe_allow_html=True)
 
 # ============== Linha 2: baldes | contas fixas (empilha no celular) ==============
 col_b, col_f = st.columns(2, gap="medium")
-col_b.markdown(f'<div class="c5"><h4>Para onde foi</h4><div class="segbar">{_seg}</div>{_rows}</div>',
+col_b.markdown(f'<div class="c5"><h4>Para onde foi · consumo do mês</h4><div class="segbar">{_seg}</div>{_rows}'
+               f'<div style="font-size:10.5px;color:#8B978F;margin-top:6px">competência: inclui compras no cartão feitas no mês (pagas depois) — por isso difere do "saiu" do caixa</div></div>',
                unsafe_allow_html=True)
 if not audit.empty:
     with col_f.expander(f"Contas fixas — {n_pagas} pagas / {n_fixas}", expanded=False):
@@ -308,6 +318,9 @@ with col_b.expander("Ver itens dos baldes"):
             cc1, cc2 = st.columns([3, 1])
             cc1.caption(it["desc"])
             cc2.caption(fmt(it["valor"]))
+
+# ============== Linha 3 (desktop): metas | faturas ==============
+col_m, col_fat = st.columns(2, gap="medium")
 
 # ============== Metas (anéis) ==============
 mInvest = meta_valor(df_metas, "investir")
@@ -331,7 +344,7 @@ p_inv = (aporte / mInvest) if mInvest > 0 else 0
 p_poup = (poup_real / mPoup) if mPoup > 0 else 0
 p_flex = (flex_real / mFlex) if mFlex > 0 else 0
 cor_flex = COR["flexivel"] if p_flex <= 1 else COR["despesa"]
-st.markdown(
+col_m.markdown(
     '<div class="c5"><h4>Metas do mês</h4><div class="rings">'
     + _ring(p_inv, COR["investimento"], f"{p_inv*100:.0f}%", f"investir<br>{fmt_mil(aporte)} / {fmt_mil(mInvest)}")
     + _ring(p_poup, COR["receita"], f"{p_poup*100:.0f}%", f"poupança<br>{poup_real:.0f}% / {mPoup:.0f}%")
@@ -340,9 +353,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ============== Faturas ==============
-st.subheader("Faturas")
-st.warning("Faltam as 2 faturas Bradesco da Sabrina — os gastos dela estão subestimados até carregar.")
 def _fatura_rows(df_f):
     rows = ""
     for _, r in df_f.iterrows():
@@ -370,14 +380,24 @@ def _fatura_rows(df_f):
     return rows
 
 
-if not ab.empty:
-    # padrão enxuto: só o que precisa de ação (não carregadas), máx. 4
-    _pend = ab[ab["Status"].astype(str).str.lower() != "carregada"].head(4)
-    if not _pend.empty:
-        st.markdown(f'<div class="c5">{_fatura_rows(_pend)}</div>', unsafe_allow_html=True)
+# ============== Faturas (coluna direita da linha 3) ==============
+with col_fat:
+    st.markdown('<div class="c5" style="margin-bottom:0"><h4>Faturas</h4></div>', unsafe_allow_html=True)
+
+
+    if not ab.empty:
+        # padrão enxuto: só o que precisa de ação (não carregadas), máx. 4
+        _pend = ab[ab["Status"].astype(str).str.lower() != "carregada"].head(4)
+        if not _pend.empty:
+            st.markdown(f'<div class="c5">{_fatura_rows(_pend)}</div>', unsafe_allow_html=True)
+        else:
+            st.success("Nenhuma fatura aguardando — tudo em dia.")
+        _exp_fat = st.expander(f"Todas as faturas ({len(ab)}) · consultar com filtro")
     else:
-        st.success("Nenhuma fatura aguardando — tudo carregado e conciliado.")
-    with st.expander(f"Todas as faturas ({len(ab)}) · consultar com filtro"):
+        st.info("Aba Faturas vazia.")
+        _exp_fat = None
+if _exp_fat:
+    with _exp_fat:
         fc1, fc2 = st.columns(2)
         _cartoes = ["todos os cartões"] + sorted(ab["Cartão"].astype(str).unique().tolist())
         f_cart = fc1.selectbox("Cartão", _cartoes)
@@ -396,11 +416,12 @@ if not ab.empty:
             st.caption("nada com esse filtro")
         else:
             st.markdown(f'<div class="c5">{_fatura_rows(filt)}</div>', unsafe_allow_html=True)
-else:
-    st.info("Aba Faturas vazia.")
+
+# ============== Linha 4 (desktop): RD | investimentos ==============
+col_rd, col_inv = st.columns(2, gap="medium")
 
 # ============== RD — despesas corporativas (reembolso) ==============
-with st.expander(f"RD — despesas corporativas · a receber {fmt(_rd_saldo)}" if _rd_saldo > 0.005
+with col_rd.expander(f"RD — despesas corporativas · a receber {fmt(_rd_saldo)}" if _rd_saldo > 0.005
                  else "RD — despesas corporativas", expanded=False):
     if df_rd.empty:
         st.caption("Nenhum lançamento RD. Marque no Zap incluindo **RD** na mensagem — "
@@ -423,7 +444,7 @@ with st.expander(f"RD — despesas corporativas · a receber {fmt(_rd_saldo)}" i
         st.caption("RD é neutro no consumo e nos tetos — vive só aqui e no caixa. Comando `rd` no Zap mostra este saldo.")
 
 # ============== Investimentos (detalhe) ==============
-with st.expander("Investimentos & patrimônio", expanded=(estocado == 0 and aporte == 0)):
+with col_inv.expander("Investimentos & patrimônio", expanded=False):
     ic1, ic2, ic3 = st.columns(3)
     ic1.metric("aporte do mês", fmt(aporte) if aporte > 0 else "—")
     ic2.metric("saldo estocado", fmt(estocado) if estocado > 0 else "—")
