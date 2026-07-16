@@ -110,33 +110,6 @@ caixa = kpis_familia(df_lanc, df_saldo, competencia, "Caixa")
 estocado = k["saldo_estocado_total"]
 aporte = k["aporte_total"]
 
-# sparkline: saldo (receita−despesa) dos últimos 6 meses fechados + selecionado
-_spark_pts = ""
-try:
-    _meses_hist = [c for c in _passados if _key(c) <= _key(competencia)][:6][::-1]
-    _saldos = []
-    for c in _meses_hist:
-        mm = df_lanc[df_lanc["Competência"] == c]
-        r = mm[mm["Tipo"].astype(str).str.lower() == "receita"]["Valor"].sum()
-        d = mm[mm["Tipo"].astype(str).str.lower() == "despesa"]["Valor"].sum()
-        _saldos.append(float(r - d))
-    if len(_saldos) >= 3:
-        lo, hi = min(_saldos), max(_saldos)
-        rng = (hi - lo) or 1.0
-        n = len(_saldos)
-        pts = [
-            f"{2 + i * (112 / (n - 1)):.0f},{38 - (v - lo) / rng * 30:.0f}"
-            for i, v in enumerate(_saldos)
-        ]
-        _ult = pts[-1].split(",")
-        _spark_pts = (
-            f'<svg class="h5-spark" viewBox="0 0 118 44" aria-hidden="true">'
-            f'<polyline points="{" ".join(pts)}" fill="none" stroke="rgba(255,255,255,0.55)" '
-            f'stroke-width="2" stroke-linecap="round"/>'
-            f'<circle cx="{_ult[0]}" cy="{_ult[1]}" r="3.5" fill="#7CE0B8"/></svg>'
-        )
-except Exception:
-    _spark_pts = ""
 
 # contas fixas + próxima fatura (pros KPIs)
 audit = auditar_contas_fixas(df_lanc, df_rec, competencia)
@@ -178,7 +151,6 @@ st.markdown(
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#7CE0B8" stroke-width="2.2"><path d="M8 13V3M4 7l4-4 4 4"/></svg>entrou {fmt_mil(k['receita_total'])}</span>
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#FFAFA8" stroke-width="2.2"><path d="M8 3v10M4 9l4 4 4-4"/></svg>gastou {fmt_mil(k['despesa_total'])}</span>
       </div>
-      {_spark_pts}
     </div>
     """,
     unsafe_allow_html=True,
