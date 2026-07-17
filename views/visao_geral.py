@@ -53,7 +53,8 @@ st.markdown(
     [data-testid="stVerticalBlock"] > div:has(> .st-key-mespill),
     [data-testid="stVerticalBlock"] > div:has(> div > .st-key-mespill),
     [data-testid="stVerticalBlock"] > div:has(> .st-key-olho),
-    [data-testid="stVerticalBlock"] > div:has(> div > .st-key-olho) { display: contents; }
+    [data-testid="stVerticalBlock"] > div:has(> div > .st-key-olho),
+    div:has(> .st-key-mespill), div:has(> .st-key-olho) { display: contents; }
     /* os dois heróis com a mesma altura */
     .hero5 { min-height: 300px; display: flex; flex-direction: column; }
     .hero5 .h5-sub { margin-top: auto; padding-top: 10px; }
