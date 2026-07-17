@@ -48,9 +48,12 @@ st.markdown(
     }
     /* a coluna que contém o pill vira o contexto de posicionamento (pill sempre sobre o hero) */
     div[data-testid="column"]:has(.st-key-mespill), div[data-testid="stColumn"]:has(.st-key-mespill) { position: relative; }
-    /* invólucros do pill/olho não ocupam slot de gap (desalinhava os dois cartões) */
-    [data-testid="stVerticalBlock"] > div:has(.st-key-mespill),
-    [data-testid="stVerticalBlock"] > div:has(.st-key-olho) { display: contents; }
+    /* invólucros do pill/olho não ocupam slot de gap (desalinhava os dois cartões).
+       :has com filho DIRETO — a versão profunda pegava a linha de colunas inteira e empilhava os heróis */
+    [data-testid="stVerticalBlock"] > div:has(> .st-key-mespill),
+    [data-testid="stVerticalBlock"] > div:has(> div > .st-key-mespill),
+    [data-testid="stVerticalBlock"] > div:has(> .st-key-olho),
+    [data-testid="stVerticalBlock"] > div:has(> div > .st-key-olho) { display: contents; }
     /* os dois heróis com a mesma altura */
     .hero5 { min-height: 300px; display: flex; flex-direction: column; }
     .hero5 .h5-sub { margin-top: auto; padding-top: 10px; }
