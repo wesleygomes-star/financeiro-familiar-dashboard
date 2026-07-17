@@ -50,35 +50,48 @@ st.markdown(
     /* cabeçalho ACIMA dos cartões: Família Gomes à esquerda · olho + mês à direita.
        TUDO absoluto dentro do cabec (altura fixa) — flex com invólucros do Streamlit
        deixava o título sobrepor os controles em telas largas e matava o clique */
-    .st-key-cabec { position: relative !important; height: 40px; margin-bottom: 4px; }
+    .st-key-cabec { position: relative !important; height: 58px; margin-bottom: 14px;
+      border-radius: 18px;
+      background: linear-gradient(90deg, #0C5949 0%, #0A4A3A 38%, #0E3A62 66%, #082744 100%);
+      box-shadow: 0 8px 20px rgba(10,45,55,0.28); }
     /* invólucros internos NÃO podem ser contexto de posicionamento (o título ancorava neles) */
     .st-key-cabec > div, .st-key-cabec [data-testid="stElementContainer"],
     .st-key-cabec [data-testid="stMarkdown"] { position: static !important; }
-    .st-key-cabec .cab-nome { position: absolute; left: 2px; top: 50%; transform: translateY(-50%);
-      font-size: 17px; font-weight: 800; color: #21322A; max-width: calc(100% - 200px);
+    .st-key-cabec .cab-nome { position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
+      display: flex; align-items: center; gap: 12px;
+      font-size: 16.5px; font-weight: 700; color: #F2FBF6; max-width: calc(100% - 215px);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cab-av { width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,0.16);
+      color: #7CE0B8; font-weight: 800; font-size: 16px; display: inline-flex;
+      align-items: center; justify-content: center; flex: 0 0 34px; }
+    .cab-tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    @media (max-width: 640px) {
+      /* celular: sem o cifrão, o nome inteiro cabe ao lado do olho + mês */
+      .cab-av { display: none; }
+      .st-key-cabec .cab-nome { left: 16px; font-size: 15.5px; }
+    }
     /* pill do mês — largura TRAVADA (o stVerticalBlock nativo força 100%) */
     .st-key-mespill {
       position: absolute !important; top: 50% !important; transform: translateY(-50%);
-      right: 0 !important; left: auto !important; z-index: 6;
+      right: 16px !important; left: auto !important; z-index: 6;
       width: 126px !important; min-width: 126px !important; max-width: 126px !important;
     }
     .st-key-mespill div[data-testid="stSelectbox"],
     .st-key-mespill [data-baseweb="select"] { width: 126px !important; max-width: 126px !important; }
     .st-key-mespill div[data-testid="stSelectbox"] > div > div {
-      background: #0B4A3B !important; border: 1px solid rgba(11,74,59,0.35) !important;
+      background: rgba(255,255,255,0.14) !important; border: 1px solid rgba(255,255,255,0.30) !important;
       border-radius: 999px !important; min-height: 32px; height: 32px;
     }
     .st-key-mespill div[data-testid="stSelectbox"] * { color: #EAF7F0 !important; font-size: 12px !important; }
     .st-key-mespill svg { fill: #EAF7F0 !important; }
     /* olho de privacidade, colado no pill */
     .st-key-olho { position: absolute !important; top: 50% !important; transform: translateY(-50%);
-      right: 134px !important; left: auto !important; z-index: 6;
+      right: 150px !important; left: auto !important; z-index: 6;
       width: 44px !important; min-width: 44px !important; }
-    .st-key-olho button { background: #0B4A3B !important; border: 1px solid rgba(11,74,59,0.35) !important;
+    .st-key-olho button { background: rgba(255,255,255,0.14) !important; border: 1px solid rgba(255,255,255,0.30) !important;
       border-radius: 999px !important; color: #EAF7F0 !important; height: 32px; min-height: 32px !important;
       padding: 0 10px !important; font-size: 14px !important; width: 44px; }
-    .st-key-olho button:hover { background: #07382C !important; }
+    .st-key-olho button:hover { background: rgba(255,255,255,0.26) !important; }
     </style>""",
     unsafe_allow_html=True,
 )
@@ -142,7 +155,8 @@ def _label(c):
         return c
 # ============== Cabeçalho acima dos cartões: título esq · olho + mês dir ==============
 with st.container(key="cabec"):
-    st.markdown('<div class="cab-nome">Família Gomes</div>', unsafe_allow_html=True)
+    st.markdown('<div class="cab-nome"><span class="cab-av">$</span><span class="cab-tx">Família Gomes</span></div>',
+                unsafe_allow_html=True)
     with st.container(key="olho"):
         st.button("🙈" if _PRIV else "👁", on_click=_toggle_privado,
                   help="esconder/mostrar os valores")
