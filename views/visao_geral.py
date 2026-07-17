@@ -18,9 +18,7 @@ from lib.data import (
     classificar_baldes,
     compromissos_proximos_meses,
     fatura_estimada,
-    fatura_split_pessoa,
     kpis_familia,
-    livre_para_gastar,
     load_faturas,
     load_lancamentos,
     load_metas,
@@ -62,9 +60,9 @@ st.markdown(
        largura TRAVADA com !important — o stVerticalBlock nativo força 100% e o pill
        virava uma barra gigante no desktop */
     .st-key-mespill {
-      position: absolute !important; top: 44px !important; right: 20px !important;
+      position: absolute !important; top: 52px !important; right: auto !important;
       width: 126px !important; min-width: 126px !important; max-width: 126px !important;
-      left: auto !important; z-index: 20;
+      left: calc(50% - 37px) !important; z-index: 20;
     }
     .st-key-mespill div[data-testid="stSelectbox"],
     .st-key-mespill [data-baseweb="select"] { width: 126px !important; max-width: 126px !important; }
@@ -74,9 +72,11 @@ st.markdown(
     }
     .st-key-mespill div[data-testid="stSelectbox"] * { color: #EAF7F0 !important; font-size: 12px !important; }
     .st-key-mespill svg { fill: #EAF7F0 !important; }
-    /* olho de privacidade, colado no pill */
-    .st-key-olho { position: absolute !important; top: 44px !important; right: 152px !important;
-      width: 44px !important; z-index: 21; }
+    /* olho de privacidade, colado no pill (grupo olho+pill centralizado sob o título) */
+    .st-key-olho { position: absolute !important; top: 52px !important; right: auto !important;
+      left: calc(50% - 89px) !important; width: 44px !important; z-index: 21; }
+    /* topo do hero centralizado; margem reserva a faixa onde o pill/olho flutuam */
+    .h5-topo { justify-content: center !important; text-align: center; margin-bottom: 52px !important; }
     .st-key-olho button { background: rgba(7,56,44,0.55) !important; border: 1px solid rgba(255,255,255,0.28) !important;
       border-radius: 999px !important; color: #EAF7F0 !important; height: 32px; min-height: 32px !important;
       padding: 0 10px !important; font-size: 14px !important; width: 44px; }
@@ -155,8 +155,6 @@ with col_hero:
                   help="esconder/mostrar os valores")
 
 # ============== Cálculos ==============
-lpg = livre_para_gastar(df_lanc, df_rec, df_faturas, df_saldo, competencia)
-livre = lpg["livre"]
 k = kpis_familia(df_lanc, df_saldo, competencia, "Competência")
 caixa = kpis_familia(df_lanc, df_saldo, competencia, "Caixa")
 estocado = k["saldo_estocado_total"]
@@ -193,16 +191,14 @@ if not df_faturas.empty and "Vencimento_dt" in df_faturas.columns:
         _prox_fat_txt = f"{_c0} · " + (f"vence em {_d0}d" if _d0 >= 0 else f"venceu há {abs(_d0)}d")
 
 # ============== v7 · Linha 1: CAIXA (verde) | COMPETÊNCIA (azul) ==============
-_h = datetime.now().hour
-saud = "bom dia" if _h < 12 else ("boa tarde" if _h < 18 else "boa noite")
 sobrou = caixa["saldo_mes"]
 sinal = '<span class="mais">+</span>' if sobrou >= 0 else '<span class="menos">−</span>'
 with col_hero:
     st.markdown(
         f"""
     <div class="hero5">
-      <div class="h5-bar">
-        <div><div class="h5-ola">{saud},</div><div class="h5-nome">Família Gomes</div></div>
+      <div class="h5-bar h5-topo">
+        <div class="h5-nome">Família Gomes</div>
       </div>
       <div class="h5-rot">sobrou no mês · caixa</div>
       <div class="h5-num">{sinal}R$ {f"{abs(sobrou):,.0f}".replace(",", ".")}</div>
@@ -310,38 +306,10 @@ _seg = "".join(
     f'<div style="width:{baldes[b]["total"] / tot_baldes * 100:.1f}%;background:{BALDE_META[b][1]}"></div>'
     for b in ["Fixo", "Recorrente", "Flexível"]
 )
-_rows = "".join(
-    f'<div class="brow"><span class="dot" style="background:{BALDE_META[b][1]}"></span>'
-    f'<span class="bl">{BALDE_META[b][0]}</span><span class="bv">{fmt(baldes[b]["total"])}</span>'
-    f'<span class="bp">{baldes[b]["total"] / tot_baldes * 100:.0f}%</span></div>'
-    for b in ["Fixo", "Recorrente", "Flexível"]
-)
 
-# fixas ainda não pagas (esperado) + faturas a vencer = o que AINDA sai do caixa
-_fixas_pend = float(audit.loc[audit["Status"] != "Paga", "Valor Esperado"].sum()) if not audit.empty else 0.0
-_faturas_vencer = float(lpg.get("faturas_pagar", 0) or 0)
-_livre_cx = sobrou - _fixas_pend - _faturas_vencer
-with st.expander(f"🧾 A conta do mês — deve sobrar {fmt(_livre_cx)} · abrir", expanded=False):
-    _cor_livre = COR["receita"] if _livre_cx >= 0 else COR["despesa"]
-    st.markdown(
-        f"""
-        <div class="brow"><span class="bl">entrou (caixa)</span><span class="bv" style="color:{COR['receita']}">{fmt(caixa['receita_total'])}</span></div>
-        <div class="brow"><span class="bl">já saiu (caixa)</span><span class="bv">−{fmt(caixa['despesa_total'])}</span></div>
-        <div class="brow" style="border-top:1px solid #EDF2EE;">
-          <span class="bl" style="font-weight:700;">sobrou até agora <span style="color:#8B978F;font-weight:500">(cartão verde)</span></span>
-          <span class="bv">{fmt(sobrou)}</span></div>
-        <div class="brow" style="margin-top:6px;"><span class="bl" style="color:#8B978F">ainda sai este mês:</span><span></span></div>
-        <div class="brow"><span class="bl">contas fixas pendentes</span><span class="bv">−{fmt(_fixas_pend)}</span></div>
-        <div class="brow"><span class="bl">faturas a vencer</span><span class="bv">−{fmt(_faturas_vencer)}</span></div>
-        <div class="brow" style="border-top:1px solid #EDF2EE;margin-top:4px;padding-top:9px;">
-          <span class="bl" style="font-weight:800;">deve sobrar no fim do mês</span>
-          <span class="bv" style="color:{_cor_livre};font-size:15px;">{fmt(_livre_cx)}</span></div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.caption(f"na régua de consumo (cartão azul): o mês consumiu {fmt(k['despesa_total'])} de {fmt(k['receita_total'])} de receita — saldo {fmt(k['saldo_mes'])}. As faturas a vencer cobrem compras que já estão no consumo.".replace("R$", "R\\$"))
-    st.markdown(f'<h4 style="margin:14px 0 8px;font-size:13.5px">Para onde foi o consumo</h4>'
-                f'<div class="segbar">{_seg}</div>', unsafe_allow_html=True)
+_consumo_baldes = sum(baldes[b]["total"] for b in baldes)
+with st.expander(f"🧭 Para onde foi o consumo — {fmt(_consumo_baldes)} · abrir", expanded=False):
+    st.markdown(f'<div class="segbar">{_seg}</div>', unsafe_allow_html=True)
     _pb = st.columns(3)
     for _i, b in enumerate(["Fixo", "Recorrente", "Flexível"]):
         pct_b = baldes[b]["total"] / tot_baldes * 100
@@ -469,14 +437,20 @@ if not cron.empty:
     receita_proj = 0.0
     receitas = df_lanc[df_lanc["Tipo"].astype(str).str.lower() == "receita"]
     if not receitas.empty:
-        por_mes = receitas.groupby("Competência")["Valor"].sum().tail(3)
-        receita_proj = float(por_mes.mean()) if not por_mes.empty else 0
+        por_mes = receitas.groupby("Competência")["Valor"].sum()
+        # ordem CRONOLÓGICA e só meses até o atual — groupby ordena "MM/YYYY" alfabeticamente,
+        # e parcelas antigas de fatura criam competências de anos anteriores no fim da lista
+        _ult = sorted([c for c in por_mes.index if 0 < _key(c) <= _hoje], key=_key)[-3:]
+        receita_proj = float(por_mes.loc[_ult].mean()) if _ult else 0
     comp_cols = [c for c in ("Parcelas em curso", "Contas fixas", "Faturas em aberto") if c in cron.columns]
     cron["Compromissos"] = cron[comp_cols].sum(axis=1)
     cron["Livre"] = receita_proj - cron["Compromissos"]
     figj = go.Figure()
     figj.add_scatter(name="Receita prevista", x=cron["Mês"], y=[receita_proj] * len(cron),
-                     mode="lines", line=dict(color=COR["receita"], width=2, dash="dash"))
+                     mode="lines+markers+text", line=dict(color=COR["receita"], width=2, dash="dash"),
+                     marker=dict(size=5),
+                     text=["" if _PRIV else fmt_mil(receita_proj) for _ in range(len(cron))],
+                     textposition="top center", textfont=dict(size=10))
     if "Contas fixas" in cron.columns:
         figj.add_scatter(name="Contas fixas", x=cron["Mês"], y=cron["Contas fixas"],
                          mode="lines+markers+text", line=dict(color=COR["neutro"], width=2),
