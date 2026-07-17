@@ -47,7 +47,11 @@ def tema_verde_premium():
     st.markdown(
         """
         <style>
-        header[data-testid="stHeader"] { background: transparent; }
+        /* header fixo do Streamlit é invisível mas fica POR CIMA do topo da página e
+           engole cliques (matou o olho/seletor de mês do cabeçalho) — deixa atravessar,
+           mantendo os botões internos do próprio header clicáveis */
+        header[data-testid="stHeader"] { background: transparent; pointer-events: none; }
+        header[data-testid="stHeader"] button, header[data-testid="stHeader"] a { pointer-events: auto; }
         /* visual comercial: sem chrome do Streamlit — a navegação é a barra inferior */
         [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] { display: none !important; }
         [data-testid="stToolbar"], [data-testid="stDecoration"],

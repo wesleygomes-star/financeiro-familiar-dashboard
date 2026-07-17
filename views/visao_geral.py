@@ -48,14 +48,19 @@ st.markdown(
     .hero5 { min-height: 300px; display: flex; flex-direction: column; }
     .hero5 .h5-sub { margin-top: auto; padding-top: 10px; }
     /* cabeçalho ACIMA dos cartões: Família Gomes à esquerda · olho + mês à direita.
-       invólucros do olho/pill viram display:contents pra participarem do flex do cabec */
-    .st-key-cabec { display: flex !important; flex-direction: row !important;
-      align-items: center !important; gap: 8px; margin-bottom: 2px; }
-    .st-key-cabec > div:has(.st-key-olho), .st-key-cabec > div:has(.st-key-mespill) { display: contents; }
-    .st-key-cabec > div:has(.cab-nome) { flex: 1 1 auto; min-width: 0; }
-    .cab-nome { font-size: 17px; font-weight: 800; color: #21322A; }
+       TUDO absoluto dentro do cabec (altura fixa) — flex com invólucros do Streamlit
+       deixava o título sobrepor os controles em telas largas e matava o clique */
+    .st-key-cabec { position: relative !important; height: 40px; margin-bottom: 4px; }
+    /* invólucros internos NÃO podem ser contexto de posicionamento (o título ancorava neles) */
+    .st-key-cabec > div, .st-key-cabec [data-testid="stElementContainer"],
+    .st-key-cabec [data-testid="stMarkdown"] { position: static !important; }
+    .st-key-cabec .cab-nome { position: absolute; left: 2px; top: 50%; transform: translateY(-50%);
+      font-size: 17px; font-weight: 800; color: #21322A; max-width: calc(100% - 200px);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* pill do mês — largura TRAVADA (o stVerticalBlock nativo força 100%) */
     .st-key-mespill {
+      position: absolute !important; top: 50% !important; transform: translateY(-50%);
+      right: 0 !important; left: auto !important; z-index: 6;
       width: 126px !important; min-width: 126px !important; max-width: 126px !important;
     }
     .st-key-mespill div[data-testid="stSelectbox"],
@@ -67,7 +72,9 @@ st.markdown(
     .st-key-mespill div[data-testid="stSelectbox"] * { color: #EAF7F0 !important; font-size: 12px !important; }
     .st-key-mespill svg { fill: #EAF7F0 !important; }
     /* olho de privacidade, colado no pill */
-    .st-key-olho { width: 44px !important; min-width: 44px !important; }
+    .st-key-olho { position: absolute !important; top: 50% !important; transform: translateY(-50%);
+      right: 134px !important; left: auto !important; z-index: 6;
+      width: 44px !important; min-width: 44px !important; }
     .st-key-olho button { background: #0B4A3B !important; border: 1px solid rgba(11,74,59,0.35) !important;
       border-radius: 999px !important; color: #EAF7F0 !important; height: 32px; min-height: 32px !important;
       padding: 0 10px !important; font-size: 14px !important; width: 44px; }
@@ -380,9 +387,9 @@ def _fatura_rows(df_f):
         if carregada:
             cor_s, status = COR["receita"], "carregada · conciliada"
         elif d < 0:
-            cor_s, status = COR["despesa"], f"venceu há {abs(d)}d"
+            cor_s, status = COR["despesa"], f"venceu há {abs(d)}d" + (" · ~valor estimado" if total > 0 else "")
         else:
-            cor_s, status = COR["alerta"], f"vence em {d}d · aguardando fatura"
+            cor_s, status = COR["alerta"], f"vence em {d}d · aguardando fatura" + (" · ~valor estimado" if total > 0 else "")
         val_txt = fmt(total) if (carregada or total > 0) else "—"
         prefixo = "" if carregada else "~ "
         rows += (
