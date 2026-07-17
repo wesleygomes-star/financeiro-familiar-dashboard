@@ -275,7 +275,7 @@ col_cp.markdown(
 )
 
 # ============== Quem movimenta ==============
-st.subheader("Quem movimenta")
+st.markdown('<h2 style="text-align:center">Quem movimenta</h2>', unsafe_allow_html=True)
 _cards = ""
 for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexivel"])]:
     rec = caixa["receita_por_pessoa"].get(pessoa, 0)
