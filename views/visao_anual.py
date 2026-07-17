@@ -154,5 +154,5 @@ with st.expander("Detalhe: receita × despesa × investido por mês"):
         "Saldo": st.column_config.NumberColumn(format="R$ %.0f"),
     })
 
-st.caption("Jan-Abr vêm do seu Controle 2026 (só despesas). Maio+ do uso real via Zap. "
-           "Pagamento de fatura é excluído (transferência, não consumo).")
+st.caption("Jan–Jul: custos fixos (histórico Controle) + detalhe real dos cartões (faturas Itaú/XP) "
+           "+ lançamentos do Zap. Pagamento de fatura é excluído (transferência, não consumo).")
