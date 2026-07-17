@@ -48,6 +48,12 @@ st.markdown(
     }
     /* a coluna que contém o pill vira o contexto de posicionamento (pill sempre sobre o hero) */
     div[data-testid="column"]:has(.st-key-mespill), div[data-testid="stColumn"]:has(.st-key-mespill) { position: relative; }
+    /* invólucros do pill/olho não ocupam slot de gap (desalinhava os dois cartões) */
+    [data-testid="stVerticalBlock"] > div:has(.st-key-mespill),
+    [data-testid="stVerticalBlock"] > div:has(.st-key-olho) { display: contents; }
+    /* os dois heróis com a mesma altura */
+    .hero5 { min-height: 300px; display: flex; flex-direction: column; }
+    .hero5 .h5-sub { margin-top: auto; padding-top: 10px; }
     /* seletor de mês vira o pill do hero (sobreposto no canto direito, ao lado do avatar).
        largura TRAVADA com !important — o stVerticalBlock nativo força 100% e o pill
        virava uma barra gigante no desktop */
@@ -228,7 +234,6 @@ col_cp.markdown(
 
 # ============== Quem movimenta ==============
 st.subheader("Quem movimenta")
-st.caption("régua do caixa (cartão verde) · linha cinza = consumo (cartão azul)")
 _cards = ""
 for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexivel"])]:
     rec = caixa["receita_por_pessoa"].get(pessoa, 0)
@@ -260,7 +265,8 @@ with col_p.expander(f"🏦 Patrimônio — {fmt(estocado) if estocado > 0 else '
                 x=_ev["Data Snapshot_dt"], y=_ev["Saldo Total"], mode="lines+markers+text",
                 line=dict(color=COR["investimento"], width=3), marker=dict(size=9),
                 text=["" if _PRIV else fmt(vv) for vv in _ev["Saldo Total"]], textposition="top center"))
-            figp.update_layout(height=230, margin=dict(l=10, r=10, t=28, b=10), template="plotly_white",
+            figp.update_traces(cliponaxis=False)
+            figp.update_layout(height=240, margin=dict(l=10, r=16, t=48, b=10), template="plotly_white",
                                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                                font=dict(color="#2C2C2A", size=12), showlegend=False,
                                yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)"))
@@ -307,24 +313,36 @@ _rows = "".join(
     for b in ["Fixo", "Recorrente", "Flexível"]
 )
 
-with st.expander(f"🧾 A conta do mês — consumo {fmt(k['despesa_total'])} · abrir", expanded=False):
-    _cor_livre = COR["receita"] if livre >= 0 else COR["despesa"]
+# fixas ainda não pagas (esperado) + faturas a vencer = o que AINDA sai do caixa
+_fixas_pend = float(audit.loc[audit["Status"] != "Paga", "Valor Esperado"].sum()) if not audit.empty else 0.0
+_faturas_vencer = float(lpg.get("faturas_pagar", 0) or 0)
+_livre_cx = sobrou - _fixas_pend - _faturas_vencer
+with st.expander(f"🧾 A conta do mês — deve sobrar {fmt(_livre_cx)} · abrir", expanded=False):
+    _cor_livre = COR["receita"] if _livre_cx >= 0 else COR["despesa"]
     st.markdown(
         f"""
-        <div class="brow"><span class="bl">entrou</span><span class="bv" style="color:{COR['receita']}">{fmt(lpg['receita'])}</span></div>
-        <div class="brow"><span class="bl">contas fixas</span><span class="bv">−{fmt(lpg['fixas'])}</span></div>
-        <div class="brow"><span class="bl">faturas a pagar</span><span class="bv">−{fmt(lpg['faturas_pagar'])}</span></div>
-        <div class="brow"><span class="bl">já gastei (flexível)</span><span class="bv">−{fmt(lpg['flex_gasto'])}</span></div>
+        <div class="brow"><span class="bl">entrou (caixa)</span><span class="bv" style="color:{COR['receita']}">{fmt(caixa['receita_total'])}</span></div>
+        <div class="brow"><span class="bl">já saiu (caixa)</span><span class="bv">−{fmt(caixa['despesa_total'])}</span></div>
+        <div class="brow" style="border-top:1px solid #EDF2EE;">
+          <span class="bl" style="font-weight:700;">sobrou até agora <span style="color:#8B978F;font-weight:500">(cartão verde)</span></span>
+          <span class="bv">{fmt(sobrou)}</span></div>
+        <div class="brow" style="margin-top:6px;"><span class="bl" style="color:#8B978F">ainda sai este mês:</span><span></span></div>
+        <div class="brow"><span class="bl">contas fixas pendentes</span><span class="bv">−{fmt(_fixas_pend)}</span></div>
+        <div class="brow"><span class="bl">faturas a vencer</span><span class="bv">−{fmt(_faturas_vencer)}</span></div>
         <div class="brow" style="border-top:1px solid #EDF2EE;margin-top:4px;padding-top:9px;">
-          <span class="bl" style="font-weight:700;">livre pra gastar até o fim do mês</span>
-          <span class="bv" style="color:{_cor_livre};">{fmt(livre)}</span></div>
+          <span class="bl" style="font-weight:800;">deve sobrar no fim do mês</span>
+          <span class="bv" style="color:{_cor_livre};font-size:15px;">{fmt(_livre_cx)}</span></div>
         """,
         unsafe_allow_html=True,
     )
+    st.caption(f"na régua de consumo (cartão azul): o mês consumiu {fmt(k['despesa_total'])} de {fmt(k['receita_total'])} de receita — saldo {fmt(k['saldo_mes'])}. As faturas a vencer cobrem compras que já estão no consumo.".replace("R$", "R\\$"))
     st.markdown(f'<h4 style="margin:14px 0 8px;font-size:13.5px">Para onde foi o consumo</h4>'
-                f'<div class="segbar">{_seg}</div>{_rows}', unsafe_allow_html=True)
-    with st.popover("ver itens dos baldes"):
-        for b in ["Fixo", "Recorrente", "Flexível"]:
+                f'<div class="segbar">{_seg}</div>', unsafe_allow_html=True)
+    _pb = st.columns(3)
+    for _i, b in enumerate(["Fixo", "Recorrente", "Flexível"]):
+        pct_b = baldes[b]["total"] / tot_baldes * 100
+        with _pb[_i].popover(f"{BALDE_META[b][0].split(' ·')[0]} · {fmt_mil(baldes[b]['total'])} ({pct_b:.0f}%)",
+                             use_container_width=True):
             st.markdown(f"**{BALDE_META[b][0]}** — {fmt(baldes[b]['total'])}")
             for it in baldes[b]["itens"]:
                 cc1, cc2 = st.columns([3, 1])
@@ -365,6 +383,7 @@ with st.expander(f"🧾 A conta do mês — consumo {fmt(k['despesa_total'])} ·
         df_tetos = load_tetos()
     except Exception:
         df_tetos = pd.DataFrame()
+    _pop_tetos = st.popover("tetos por categoria · abrir", use_container_width=True)
     if not df_tetos.empty and "Categoria" in df_tetos.columns:
         _desp_cat = split_movimentos(no_mes)["despesas"].groupby("Categoria")["Valor"].sum()
         _tmap = dict(zip(df_tetos["Categoria"], pd.to_numeric(df_tetos.get("Teto Mensal", 0), errors="coerce").fillna(0)))
@@ -381,8 +400,8 @@ with st.expander(f"🧾 A conta do mês — consumo {fmt(k['despesa_total'])} ·
                 f'<div style="height:6px;border-radius:4px;background:#EDF2EE;margin-top:3px">'
                 f'<div style="width:{largura:.0f}%;height:6px;border-radius:4px;background:{cor_b}"></div></div></div>'
             )
-        st.markdown(f'<h4 style="margin:14px 0 4px;font-size:13.5px">Tetos por categoria</h4>{_linhas_teto}',
-                    unsafe_allow_html=True)
+        with _pop_tetos:
+            st.markdown(_linhas_teto, unsafe_allow_html=True)
 
 # ============== Faturas (fechado · filtro por mês) ==============
 def _fatura_rows(df_f):
@@ -456,15 +475,20 @@ if not cron.empty:
                      mode="lines", line=dict(color=COR["receita"], width=2, dash="dash"))
     if "Contas fixas" in cron.columns:
         figj.add_scatter(name="Contas fixas", x=cron["Mês"], y=cron["Contas fixas"],
-                         mode="lines+markers", line=dict(color=COR["neutro"], width=2))
+                         mode="lines+markers+text", line=dict(color=COR["neutro"], width=2),
+                         text=["" if _PRIV else fmt_mil(vv) for vv in cron["Contas fixas"]],
+                         textposition="bottom center", textfont=dict(size=10))
     if "Parcelas em curso" in cron.columns:
         figj.add_scatter(name="Parcelas", x=cron["Mês"], y=cron["Parcelas em curso"],
-                         mode="lines+markers", line=dict(color=COR["alerta"], width=2))
+                         mode="lines+markers+text", line=dict(color=COR["alerta"], width=2),
+                         text=["" if _PRIV else fmt_mil(vv) for vv in cron["Parcelas em curso"]],
+                         textposition="bottom center", textfont=dict(size=10))
     figj.add_scatter(name="LIVRE (sobra prevista)", x=cron["Mês"], y=cron["Livre"],
                      mode="lines+markers+text", line=dict(color=COR["investimento"], width=4),
                      marker=dict(size=9),
                      text=["" if _PRIV else fmt_mil(vv) for vv in cron["Livre"]], textposition="top center")
-    figj.update_layout(height=300, margin=dict(l=10, r=10, t=30, b=10), template="plotly_white",
+    figj.update_traces(cliponaxis=False)
+    figj.update_layout(height=320, margin=dict(l=10, r=16, t=44, b=10), template="plotly_white",
                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                        font=dict(color="#2C2C2A", size=12),
                        legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="center", x=0.5),

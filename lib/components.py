@@ -139,15 +139,16 @@ def tema_verde_premium():
         .fval { font-size: 14px; font-weight: 700; color: #1C2420; font-variant-numeric: tabular-nums; }
 
         /* cards de pessoa */
-        .casal { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-        .pss { background: #fff; border-radius: 16px; padding: 13px 14px; box-shadow: 0 3px 14px rgba(12,60,45,0.07); }
-        .pss .ph { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-        .pss .pa { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
-                   font-size: 10px; font-weight: 700; color: #fff; }
-        .pss .pn { font-size: 13px; font-weight: 700; color: #1C2420; }
-        .pss .pr { display: flex; justify-content: space-between; font-size: 12px; padding: 2.5px 0;
+        .casal { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px; }
+        .pss { background: #fff; border-radius: 16px; padding: 16px 18px; box-shadow: 0 3px 14px rgba(12,60,45,0.07); }
+        .pss .ph { display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+                   padding-bottom: 10px; border-bottom: 1px solid #EDF2EE; }
+        .pss .pa { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+                   font-size: 12px; font-weight: 700; color: #fff; }
+        .pss .pn { font-size: 14px; font-weight: 700; color: #1C2420; }
+        .pss .pr { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0;
                    color: #4A564E; font-variant-numeric: tabular-nums; }
-        .pss .pr b { color: #1C2420; }
+        .pss .pr b { color: #1C2420; font-size: 13.5px; }
         @media (max-width: 640px) { .casal { grid-template-columns: 1fr; } }
 
         /* widgets nativos na mesma linguagem */
