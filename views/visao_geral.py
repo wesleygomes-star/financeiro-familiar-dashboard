@@ -189,6 +189,11 @@ if not df_faturas.empty and "Vencimento_dt" in df_faturas.columns:
         _prox_fat_txt = f"{_c0} · " + (f"vence em {_d0}d" if _d0 >= 0 else f"venceu há {abs(_d0)}d")
 
 # ============== v7 · Linha 1: CAIXA (verde) | COMPETÊNCIA (azul) ==============
+def _num_hero(v: float) -> str:
+    """número grande dos cartões — respeita o modo privacidade"""
+    return "••••" if _PRIV else f"{abs(v):,.0f}".replace(",", ".")
+
+
 sobrou = caixa["saldo_mes"]
 sinal = '<span class="mais">+</span>' if sobrou >= 0 else '<span class="menos">−</span>'
 with col_hero:
@@ -199,7 +204,7 @@ with col_hero:
         <div><div class="h5-ola">visão de caixa,</div><div class="h5-nome">Caixa</div></div>
       </div>
       <div class="h5-rot">sobrou no mês</div>
-      <div class="h5-num">{sinal}R$ {f"{abs(sobrou):,.0f}".replace(",", ".")}</div>
+      <div class="h5-num">{sinal}R$ {_num_hero(sobrou)}</div>
       <div class="h5-chips">
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#7CE0B8" stroke-width="2.2"><path d="M8 13V3M4 7l4-4 4 4"/></svg>entrou {fmt_mil(caixa['receita_total'])}</span>
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#FFAFA8" stroke-width="2.2"><path d="M8 3v10M4 9l4 4 4-4"/></svg>saiu {fmt_mil(caixa['despesa_total'])}</span>
@@ -219,7 +224,7 @@ col_cp.markdown(
         <div><div class="h5-ola">visão de consumo,</div><div class="h5-nome">Competência</div></div>
       </div>
       <div class="h5-rot">consumo do mês</div>
-      <div class="h5-num">R$ {f"{k['despesa_total']:,.0f}".replace(",", ".")}</div>
+      <div class="h5-num">R$ {_num_hero(k['despesa_total'])}</div>
       <div class="h5-chips">
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#9CC8F0" stroke-width="2.2"><path d="M8 13V3M4 7l4-4 4 4"/></svg>receita {fmt_mil(k['receita_total'])}</span>
         <span class="h5-chip">saldo {_sinal_cp}{fmt_mil(abs(_saldo_cp))}</span>
