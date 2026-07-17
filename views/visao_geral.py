@@ -44,43 +44,34 @@ st.markdown(
       .k5grid { height: 100%; grid-auto-rows: 1fr; margin-bottom: 0; }
       .k5 { display: flex; flex-direction: column; justify-content: center; min-height: 158px; }
     }
-    /* a coluna que contém o pill vira o contexto de posicionamento (pill sempre sobre o hero) */
-    div[data-testid="column"]:has(.st-key-mespill), div[data-testid="stColumn"]:has(.st-key-mespill) { position: relative; }
-    /* invólucros do pill/olho não ocupam slot de gap (desalinhava os dois cartões).
-       :has com filho DIRETO — a versão profunda pegava a linha de colunas inteira e empilhava os heróis */
-    [data-testid="stVerticalBlock"] > div:has(> .st-key-mespill),
-    [data-testid="stVerticalBlock"] > div:has(> div > .st-key-mespill),
-    [data-testid="stVerticalBlock"] > div:has(> .st-key-olho),
-    [data-testid="stVerticalBlock"] > div:has(> div > .st-key-olho),
-    div:has(> .st-key-mespill), div:has(> .st-key-olho) { display: contents; }
     /* os dois heróis com a mesma altura */
     .hero5 { min-height: 300px; display: flex; flex-direction: column; }
     .hero5 .h5-sub { margin-top: auto; padding-top: 10px; }
-    /* seletor de mês vira o pill do hero (sobreposto no canto direito, ao lado do avatar).
-       largura TRAVADA com !important — o stVerticalBlock nativo força 100% e o pill
-       virava uma barra gigante no desktop */
+    /* cabeçalho ACIMA dos cartões: Família Gomes à esquerda · olho + mês à direita.
+       invólucros do olho/pill viram display:contents pra participarem do flex do cabec */
+    .st-key-cabec { display: flex !important; flex-direction: row !important;
+      align-items: center !important; gap: 8px; margin-bottom: 2px; }
+    .st-key-cabec > div:has(.st-key-olho), .st-key-cabec > div:has(.st-key-mespill) { display: contents; }
+    .st-key-cabec > div:has(.cab-nome) { flex: 1 1 auto; min-width: 0; }
+    .cab-nome { font-size: 17px; font-weight: 800; color: #21322A; }
+    /* pill do mês — largura TRAVADA (o stVerticalBlock nativo força 100%) */
     .st-key-mespill {
-      position: absolute !important; top: 52px !important; right: auto !important;
       width: 126px !important; min-width: 126px !important; max-width: 126px !important;
-      left: calc(50% - 37px) !important; z-index: 20;
     }
     .st-key-mespill div[data-testid="stSelectbox"],
     .st-key-mespill [data-baseweb="select"] { width: 126px !important; max-width: 126px !important; }
     .st-key-mespill div[data-testid="stSelectbox"] > div > div {
-      background: rgba(7,56,44,0.55) !important; border: 1px solid rgba(255,255,255,0.28) !important;
+      background: #0B4A3B !important; border: 1px solid rgba(11,74,59,0.35) !important;
       border-radius: 999px !important; min-height: 32px; height: 32px;
     }
     .st-key-mespill div[data-testid="stSelectbox"] * { color: #EAF7F0 !important; font-size: 12px !important; }
     .st-key-mespill svg { fill: #EAF7F0 !important; }
-    /* olho de privacidade, colado no pill (grupo olho+pill centralizado sob o título) */
-    .st-key-olho { position: absolute !important; top: 52px !important; right: auto !important;
-      left: calc(50% - 89px) !important; width: 44px !important; z-index: 21; }
-    /* topo do hero centralizado; margem reserva a faixa onde o pill/olho flutuam */
-    .h5-topo { justify-content: center !important; text-align: center; margin-bottom: 52px !important; }
-    .st-key-olho button { background: rgba(7,56,44,0.55) !important; border: 1px solid rgba(255,255,255,0.28) !important;
+    /* olho de privacidade, colado no pill */
+    .st-key-olho { width: 44px !important; min-width: 44px !important; }
+    .st-key-olho button { background: #0B4A3B !important; border: 1px solid rgba(11,74,59,0.35) !important;
       border-radius: 999px !important; color: #EAF7F0 !important; height: 32px; min-height: 32px !important;
       padding: 0 10px !important; font-size: 14px !important; width: 44px; }
-    .st-key-olho button:hover { background: rgba(7,56,44,0.8) !important; }
+    .st-key-olho button:hover { background: #07382C !important; }
     </style>""",
     unsafe_allow_html=True,
 )
@@ -142,17 +133,17 @@ def _label(c):
         m, y = c.split("/"); return f"{_NOMES.get(m, m)}/{y}" + ("  ·  futuro" if _key(c) > _hoje else "")
     except Exception:
         return c
-# ============== Zona do topo: hero (esq) | KPIs (dir) — empilha no celular ==============
-col_hero, col_cp = st.columns(2, gap="medium")
-
-# o widget fica no fluxo do código AQUI, mas o CSS o posiciona DENTRO do hero
-# (canto superior direito, estilo pill do mockup)
-with col_hero:
-    with st.container(key="mespill"):
-        competencia = st.selectbox("Mês", meses, index=0, format_func=_label, label_visibility="collapsed")
+# ============== Cabeçalho acima dos cartões: título esq · olho + mês dir ==============
+with st.container(key="cabec"):
+    st.markdown('<div class="cab-nome">Família Gomes</div>', unsafe_allow_html=True)
     with st.container(key="olho"):
         st.button("🙈" if _PRIV else "👁", on_click=_toggle_privado,
                   help="esconder/mostrar os valores")
+    with st.container(key="mespill"):
+        competencia = st.selectbox("Mês", meses, index=0, format_func=_label, label_visibility="collapsed")
+
+# ============== Zona do topo: hero caixa (esq) | hero competência (dir) ==============
+col_hero, col_cp = st.columns(2, gap="medium")
 
 # ============== Cálculos ==============
 k = kpis_familia(df_lanc, df_saldo, competencia, "Competência")
@@ -197,10 +188,10 @@ with col_hero:
     st.markdown(
         f"""
     <div class="hero5">
-      <div class="h5-bar h5-topo">
-        <div class="h5-nome">Família Gomes</div>
+      <div class="h5-bar">
+        <div><div class="h5-ola">visão de caixa,</div><div class="h5-nome">Caixa</div></div>
       </div>
-      <div class="h5-rot">sobrou no mês · caixa</div>
+      <div class="h5-rot">sobrou no mês</div>
       <div class="h5-num">{sinal}R$ {f"{abs(sobrou):,.0f}".replace(",", ".")}</div>
       <div class="h5-chips">
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#7CE0B8" stroke-width="2.2"><path d="M8 13V3M4 7l4-4 4 4"/></svg>entrou {fmt_mil(caixa['receita_total'])}</span>
@@ -308,7 +299,7 @@ _seg = "".join(
 )
 
 _consumo_baldes = sum(baldes[b]["total"] for b in baldes)
-with st.expander(f"🧭 Para onde foi o consumo — {fmt(_consumo_baldes)} · abrir", expanded=False):
+with st.expander(f"🧭 Para onde foi o consumo — {fmt(_consumo_baldes)}", expanded=False):
     st.markdown(f'<div class="segbar">{_seg}</div>', unsafe_allow_html=True)
     _pb = st.columns(3)
     for _i, b in enumerate(["Fixo", "Recorrente", "Flexível"]):
@@ -478,6 +469,7 @@ if not cron.empty:
     )
     with st.expander("ver composição mês a mês"):
         _dcron = cron[["Mês"] + comp_cols + ["Compromissos", "Livre"]].copy()
+        _dcron.insert(1, "Receita prevista", receita_proj)
         st.dataframe(_dcron, use_container_width=True, hide_index=True,
                      column_config={c: st.column_config.NumberColumn(format="R$ %.0f")
                                     for c in _dcron.columns if c != "Mês"})
