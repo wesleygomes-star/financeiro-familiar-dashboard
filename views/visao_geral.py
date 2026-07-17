@@ -92,6 +92,31 @@ st.markdown(
       border-radius: 999px !important; color: #EAF7F0 !important; height: 32px; min-height: 32px !important;
       padding: 0 10px !important; font-size: 14px !important; width: 44px; }
     .st-key-olho button:hover { background: rgba(255,255,255,0.26) !important; }
+
+    /* ===== L4: linhas expansíveis com bolha + valor à direita ===== */
+    /* nome (bold) à esquerda, valor (code) à direita — flex no parágrafo do label */
+    [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] p {
+      display: flex; align-items: baseline; justify-content: space-between;
+      width: 100%; gap: 12px; margin: 0; font-size: 14.5px; }
+    [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] strong {
+      font-weight: 700; color: #21322A; }
+    [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] code {
+      background: none !important; color: #21322A; font-family: inherit !important;
+      font-weight: 800; font-size: 14.5px; white-space: nowrap; padding: 0;
+      font-variant-numeric: tabular-nums; }
+    /* markdown ocupa a largura → o valor vai pra ponta direita */
+    [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] { flex: 1 1 auto; }
+    /* ícone (emoji do param icon=) vira bolha colorida por seção — é o 1º span DENTRO do span-flex */
+    [data-testid="stExpander"] summary > span > span:first-child {
+      border-radius: 9px; padding: 5px 6px; margin-right: 6px; line-height: 1;
+      display: inline-flex; align-items: center; }
+    .st-key-lin-patr    [data-testid="stExpander"] summary > span > span:first-child { background: #E7F5EF; }
+    .st-key-lin-fix     [data-testid="stExpander"] summary > span > span:first-child { background: #E6EEF7; }
+    .st-key-lin-consumo [data-testid="stExpander"] summary > span > span:first-child { background: #FBEFE0; }
+    .st-key-lin-fat     [data-testid="stExpander"] summary > span > span:first-child { background: #EFEDFB; }
+    /* remove o gap-fantasma dos containers keyed das linhas */
+    div:has(> .st-key-lin-patr), div:has(> .st-key-lin-fix),
+    div:has(> .st-key-lin-consumo), div:has(> .st-key-lin-fat) { display: contents; }
     </style>""",
     unsafe_allow_html=True,
 )
@@ -261,7 +286,7 @@ for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexive
     cor_saldo = COR["receita"] if saldo >= 0 else COR["despesa"]
     _inv = f'<div class="pr"><span>investido</span><b>{fmt(apo)}</b></div>' if apo > 0 else ""
     _cards += (
-        f'<div class="pss"><div class="ph"><span class="pa" style="background:{cor_av}">{pessoa[0]}</span>'
+        f'<div class="pss" style="border:2px solid {cor_av}"><div class="ph"><span class="pa" style="background:{cor_av}">{pessoa[0]}</span>'
         f'<span class="pn">{pessoa}</span>'
         f'<span class="psaldo" style="color:{cor_saldo}">{"+" if saldo >= 0 else "−"}{fmt(abs(saldo))}</span></div>'
         f'<div class="pr"><span>entrou</span><b>{fmt(rec) if rec > 0 else "—"}</b></div>'
@@ -274,7 +299,9 @@ st.markdown(f'<div class="casal">{_cards}</div>', unsafe_allow_html=True)
 # ============== Patrimônio | Contas fixas (clica pra abrir) ==============
 col_p, col_f = st.columns(2, gap="medium")
 
-with col_p.expander(f"🏦 Patrimônio — {fmt(estocado) if estocado > 0 else '—'} · ver evolução", expanded=False):
+_patr_val = fmt(estocado) if estocado > 0 else "—"
+_p_ctx = col_p.container(key="lin-patr")
+with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=False):
     if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
         _ev = df_saldo.dropna(subset=["Data Snapshot_dt"]).groupby("Data Snapshot_dt")["Saldo Total"].sum().reset_index()
         if len(_ev) >= 1:
@@ -297,7 +324,8 @@ with col_p.expander(f"🏦 Patrimônio — {fmt(estocado) if estocado > 0 else '
     else:
         st.info("Mande o print do app do banco no grupo do Zap — o patrimônio entra sozinho.")
 
-with col_f.expander(f"🕐 Contas fixas — {n_pagas} pagas / {n_fixas} · ver detalhe", expanded=False):
+_f_ctx = col_f.container(key="lin-fix")
+with _f_ctx.expander(f"**Contas fixas** `{n_pagas}/{n_fixas} pagas`", icon="🕐", expanded=False):
     if not audit.empty:
         _ash = audit.sort_values("Dia Cobrança")
         st.dataframe(
@@ -325,7 +353,8 @@ _seg = "".join(
 )
 
 _consumo_baldes = sum(baldes[b]["total"] for b in baldes)
-with st.expander(f"🧭 Para onde foi o consumo — {fmt(_consumo_baldes)}", expanded=False):
+_c_ctx = st.container(key="lin-consumo")
+with _c_ctx.expander(f"**Para onde foi o consumo** `{fmt(_consumo_baldes)}`", icon="🧭", expanded=False):
     st.markdown(f'<div class="segbar">{_seg}</div>', unsafe_allow_html=True)
     _pb = st.columns(3)
     for _i, b in enumerate(["Fixo", "Recorrente", "Flexível"]):
@@ -420,7 +449,9 @@ def _fatura_rows(df_f):
     return rows
 
 
-with st.expander(f"💳 Faturas — próxima: {_prox_fat_val or '—'} · {_prox_fat_txt} · abrir", expanded=False):
+_fat_ctx = st.container(key="lin-fat")
+with _fat_ctx.expander(f"**Faturas** `{_prox_fat_val or '—'}`", icon="💳", expanded=False):
+    st.caption(f"próxima: {_prox_fat_txt}")
     if not ab.empty:
         fc0, fc1, fc2 = st.columns(3)
         _meses_f = ["todos os meses"] + sorted(ab["Mês Referência"].astype(str).unique().tolist(), reverse=True)
