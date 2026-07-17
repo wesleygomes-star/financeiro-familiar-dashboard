@@ -83,6 +83,10 @@ def tema_verde_premium():
           border-radius: 12px; padding: 9px 13px; font-size: 13px; margin-top: 12px; }
         .h5-livre small { opacity: 0.65; font-size: 11px; }
         .h5-livre b { font-size: 15px; color: #7CE0B8; white-space: nowrap; }
+        .h5-sub { font-size: 11px; opacity: 0.6; margin-top: 10px; }
+        .hero5.h5-azul { background: linear-gradient(160deg, #134C7E 0%, #0E3A62 55%, #082744 100%);
+          box-shadow: 0 14px 38px rgba(8,40,68,0.30); }
+        .pss .psaldo { margin-left: auto; font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
         .h5-spark { position: absolute; right: 20px; bottom: 22px; width: 116px; height: 42px; opacity: 0.9; }
         @media (max-width: 640px) { .h5-spark { display: none; } .h5-num { font-size: 36px; } }
 

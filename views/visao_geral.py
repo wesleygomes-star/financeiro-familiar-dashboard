@@ -13,6 +13,7 @@ import streamlit as st
 from lib.components import COR, PLOTLY_CONFIG, barra_navegacao, fig_mobile, tema_verde_premium
 from lib.data import (
     auditar_contas_fixas,
+    load_tetos,
     is_rd,
     classificar_baldes,
     compromissos_proximos_meses,
@@ -132,7 +133,7 @@ def _label(c):
     except Exception:
         return c
 # ============== Zona do topo: hero (esq) | KPIs (dir) — empilha no celular ==============
-col_hero, col_kpi = st.columns([1.35, 1], gap="medium")
+col_hero, col_cp = st.columns(2, gap="medium")
 
 # o widget fica no fluxo do código AQUI, mas o CSS o posiciona DENTRO do hero
 # (canto superior direito, estilo pill do mockup)
@@ -181,7 +182,7 @@ if not df_faturas.empty and "Vencimento_dt" in df_faturas.columns:
         _prox_fat_val = ("~" if float(r0.get("Total_num", 0) or 0) <= 0 else "") + fmt(_t0) if _t0 > 0 else "—"
         _prox_fat_txt = f"{_c0} · " + (f"vence em {_d0}d" if _d0 >= 0 else f"venceu há {abs(_d0)}d")
 
-# ============== Hero (v6: CAIXA — o que sobrou de verdade) ==============
+# ============== v7 · Linha 1: CAIXA (verde) | COMPETÊNCIA (azul) ==============
 _h = datetime.now().hour
 saud = "bom dia" if _h < 12 else ("boa tarde" if _h < 18 else "boa noite")
 sobrou = caixa["saldo_mes"]
@@ -199,62 +200,94 @@ with col_hero:
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#7CE0B8" stroke-width="2.2"><path d="M8 13V3M4 7l4-4 4 4"/></svg>entrou {fmt_mil(caixa['receita_total'])}</span>
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#FFAFA8" stroke-width="2.2"><path d="M8 3v10M4 9l4 4 4-4"/></svg>saiu {fmt_mil(caixa['despesa_total'])}</span>
       </div>
-      <div class="h5-livre"><span>livre pra gastar até o fim do mês <small>(planejamento)</small></span><b>{fmt(livre)}</b></div>
+      <div class="h5-sub">dinheiro que efetivamente entrou e saiu da conta</div>
     </div>
     """,
         unsafe_allow_html=True,
     )
 
-_pop = col_hero.popover("ver a conta do mês")
-with _pop:
-    _cor_livre_pop = COR["receita"] if livre >= 0 else COR["despesa"]
-    st.markdown(
-        f"""
-        <div style="min-width:280px">
-          <div class="brow"><span class="bl">entrou</span><span class="bv" style="color:{COR['receita']}">{fmt(lpg['receita'])}</span></div>
-          <div class="brow"><span class="bl">contas fixas</span><span class="bv">−{fmt(lpg['fixas'])}</span></div>
-          <div class="brow"><span class="bl">faturas a pagar</span><span class="bv">−{fmt(lpg['faturas_pagar'])}</span></div>
-          <div class="brow"><span class="bl">já gastei (flexível)</span><span class="bv">−{fmt(lpg['flex_gasto'])}</span></div>
-          <div class="brow" style="border-top:1px solid #EDF2EE;margin-top:4px;padding-top:9px;">
-            <span class="bl" style="font-weight:700;">livre pra gastar</span>
-            <span class="bv" style="color:{_cor_livre_pop};">{fmt(livre)}</span></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    # \$ evita o markdown tratar dois R$ na mesma frase como fórmula LaTeX
-    st.caption(
-        f"Consumo (competência): {fmt(k['despesa_total'])} — o que o mês consumiu, mesmo pagando depois. "
-        f"Saiu da conta (caixa): {fmt(caixa['despesa_total'])} — o que efetivamente debitou. "
-        f"Saldo do mês: {fmt(k['saldo_mes'])}.".replace("R$", "R\\$")
-    )
-
-# ============== KPIs 2×2 ==============
-IC_INV = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13l4-5 3 3 5-7"/></svg>'
-IC_PAT = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="12" height="8" rx="2"/><path d="M5 5V3.5A1.5 1.5 0 016.5 2h3A1.5 1.5 0 0111 3.5V5"/></svg>'
-IC_FIX = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>'
-IC_FAT = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="4" width="12" height="9" rx="2"/><path d="M2 7h12"/></svg>'
-col_kpi.markdown(
+_saldo_cp = k["saldo_mes"]
+_sinal_cp = "+" if _saldo_cp >= 0 else "−"
+col_cp.markdown(
     f"""
-    <div class="k5grid">
-      <div class="k5"><div class="k5-l">{IC_INV} rd · a receber</div>
-        <div class="k5-v">{fmt(_rd_saldo) if _rd_saldo > 0.005 else '—'}</div>
-        <div class="k5-s">{'gastos corporativos a reembolsar' if _rd_saldo > 0.005 else 'nada pendente da empresa'}</div></div>
-      <div class="k5"><div class="k5-l">{IC_PAT} patrimônio</div>
-        <div class="k5-v">{fmt(estocado) if estocado > 0 else '—'}</div>
-        <div class="k5-s">{'saldo investido' if estocado > 0 else 'preencha Saldo Investido'}</div></div>
-      <div class="k5"><div class="k5-l">{IC_FIX} fixas pagas</div>
-        <div class="k5-v">{n_pagas} <span style="font-size:13px;font-weight:600;color:#8B978F">/ {n_fixas}</span></div>
-        <div class="k5-s">{'todas confirmadas' if n_pagas == n_fixas and n_fixas > 0 else 'a confirmar no mês'}</div></div>
-      <div class="k5"><div class="k5-l">{IC_FAT} faturas a pagar</div>
-        <div class="k5-v">{_prox_fat_val or '—'}</div>
-        <div class="k5-s">{_prox_fat_txt}</div></div>
+    <div class="hero5 h5-azul">
+      <div class="h5-bar">
+        <div><div class="h5-ola">visão de consumo,</div><div class="h5-nome">Competência</div></div>
+      </div>
+      <div class="h5-rot">consumo do mês</div>
+      <div class="h5-num">R$ {f"{k['despesa_total']:,.0f}".replace(",", ".")}</div>
+      <div class="h5-chips">
+        <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#9CC8F0" stroke-width="2.2"><path d="M8 13V3M4 7l4-4 4 4"/></svg>receita {fmt_mil(k['receita_total'])}</span>
+        <span class="h5-chip">saldo {_sinal_cp}{fmt_mil(abs(_saldo_cp))}</span>
+      </div>
+      <div class="h5-sub">compra no cartão conta na hora, mesmo pagando depois</div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-# ============== Para onde foi (baldes) ==============
+# ============== Quem movimenta ==============
+st.subheader("Quem movimenta")
+st.caption("régua do caixa (cartão verde) · linha cinza = consumo (cartão azul)")
+_cards = ""
+for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexivel"])]:
+    rec = caixa["receita_por_pessoa"].get(pessoa, 0)
+    desp = caixa["despesa_por_pessoa"].get(pessoa, 0)
+    apo = caixa["aporte_por_pessoa"].get(pessoa, 0)
+    consumo_p = k["despesa_por_pessoa"].get(pessoa, 0)
+    saldo = rec - desp - apo
+    cor_saldo = COR["receita"] if saldo >= 0 else COR["despesa"]
+    _inv = f'<div class="pr"><span>investido</span><b>{fmt(apo)}</b></div>' if apo > 0 else ""
+    _cards += (
+        f'<div class="pss"><div class="ph"><span class="pa" style="background:{cor_av}">{pessoa[0]}</span>'
+        f'<span class="pn">{pessoa}</span>'
+        f'<span class="psaldo" style="color:{cor_saldo}">{"+" if saldo >= 0 else "−"}{fmt(abs(saldo))}</span></div>'
+        f'<div class="pr"><span>entrou</span><b>{fmt(rec) if rec > 0 else "—"}</b></div>'
+        f'<div class="pr"><span>saiu</span><b>{fmt(desp)}</b></div>{_inv}'
+        f'<div class="pr"><span style="color:#8B978F">consumo do mês</span><b style="color:#8B978F">{fmt(consumo_p)}</b></div>'
+        f'</div>'
+    )
+st.markdown(f'<div class="casal">{_cards}</div>', unsafe_allow_html=True)
+
+# ============== Patrimônio | Contas fixas (clica pra abrir) ==============
+col_p, col_f = st.columns(2, gap="medium")
+
+with col_p.expander(f"🏦 Patrimônio — {fmt(estocado) if estocado > 0 else '—'} · ver evolução", expanded=False):
+    if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
+        _ev = df_saldo.dropna(subset=["Data Snapshot_dt"]).groupby("Data Snapshot_dt")["Saldo Total"].sum().reset_index()
+        if len(_ev) >= 1:
+            figp = go.Figure(go.Scatter(
+                x=_ev["Data Snapshot_dt"], y=_ev["Saldo Total"], mode="lines+markers+text",
+                line=dict(color=COR["investimento"], width=3), marker=dict(size=9),
+                text=["" if _PRIV else fmt(vv) for vv in _ev["Saldo Total"]], textposition="top center"))
+            figp.update_layout(height=230, margin=dict(l=10, r=10, t=28, b=10), template="plotly_white",
+                               paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                               font=dict(color="#2C2C2A", size=12), showlegend=False,
+                               yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)"))
+            st.plotly_chart(fig_mobile(figp), use_container_width=True, config=PLOTLY_CONFIG)
+        ic1, ic2, ic3 = st.columns(3)
+        ic1.metric("aporte do mês", fmt(aporte) if aporte > 0 else "—")
+        rend = rendimento_investido(df_saldo)
+        ic2.metric("rendimento", f"+{rend['pct']:.2f}%" if rend else "—")
+        ic3.metric("snapshots", str(df_saldo["Data Snapshot"].nunique()))
+        st.caption("cada print de investimento no Zap vira um ponto novo na curva")
+    else:
+        st.info("Mande o print do app do banco no grupo do Zap — o patrimônio entra sozinho.")
+
+with col_f.expander(f"🕐 Contas fixas — {n_pagas} pagas / {n_fixas} · ver detalhe", expanded=False):
+    if not audit.empty:
+        _ash = audit.sort_values("Dia Cobrança")
+        st.dataframe(
+            _ash[["Status", "Descrição", "Valor Pago", "Valor Esperado", "Dia Cobrança"]],
+            use_container_width=True, hide_index=True,
+            column_config={
+                "Valor Pago": st.column_config.NumberColumn(format="R$ %.0f", help="o que realmente saiu este mês"),
+                "Valor Esperado": st.column_config.NumberColumn(format="R$ %.0f", help="referência do cadastro"),
+            },
+        )
+        st.caption("cadastro alimenta os alertas do Zap e a projeção; coluna Fim encerra contas (vigência)")
+
+# ============== A conta do mês (conta + baldes + metas num card só) ==============
 no_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df_lanc.columns else df_lanc
 baldes = classificar_baldes(split_movimentos(no_mes)["despesas"], df_rec)
 BALDE_META = {
@@ -273,88 +306,85 @@ _rows = "".join(
     f'<span class="bp">{baldes[b]["total"] / tot_baldes * 100:.0f}%</span></div>'
     for b in ["Fixo", "Recorrente", "Flexível"]
 )
-# ============== Wesley × Sabrina ==============
-st.subheader("Quem movimenta")
-st.caption("mesma régua do cartão verde: caixa — o que efetivamente entrou e saiu no mês")
-_cards = ""
-for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexivel"])]:
-    # mesma régua do hero: CAIXA (o que entrou/saiu da conta no mês)
-    rec = caixa["receita_por_pessoa"].get(pessoa, 0)
-    desp = caixa["despesa_por_pessoa"].get(pessoa, 0)
-    apo = caixa["aporte_por_pessoa"].get(pessoa, 0)
-    consumo_p = k["despesa_por_pessoa"].get(pessoa, 0)
-    saldo = rec - desp - apo
-    cor_saldo = COR["receita"] if saldo >= 0 else COR["despesa"]
-    _inv = f'<div class="pr"><span>investido</span><b>{fmt(apo)}</b></div>' if apo > 0 else ""
-    _cards += (
-        f'<div class="pss"><div class="ph"><span class="pa" style="background:{cor_av}">{pessoa[0]}</span>'
-        f'<span class="pn">{pessoa}</span></div>'
-        f'<div class="pr"><span>entrou</span><b>{fmt(rec) if rec > 0 else "—"}</b></div>'
-        f'<div class="pr"><span>gastou</span><b>{fmt(desp)}</b></div>{_inv}'
-        f'<div class="pr"><span style="color:#8B978F">consumo do mês</span><b style="color:#8B978F">{fmt(consumo_p)}</b></div>'
-        f'<div class="pr"><span>saldo</span><b style="color:{cor_saldo}">{"+" if saldo >= 0 else ""}{fmt(saldo)}</b></div></div>'
-    )
-st.markdown(f'<div class="casal">{_cards}</div>', unsafe_allow_html=True)
 
-# ============== Linha 2: baldes | contas fixas (empilha no celular) ==============
-col_b, col_f = st.columns(2, gap="medium")
-col_b.markdown(f'<div class="c5"><h4>Para onde foi · consumo do mês</h4><div class="segbar">{_seg}</div>{_rows}'
-               f'<div style="font-size:10.5px;color:#8B978F;margin-top:6px">competência: inclui compras no cartão feitas no mês (pagas depois) — por isso difere do "saiu" do caixa</div></div>',
-               unsafe_allow_html=True)
-if not audit.empty:
-    with col_f.expander(f"Contas fixas — {n_pagas} pagas / {n_fixas}", expanded=True):
-        _ash = audit.sort_values("Dia Cobrança")
-        st.dataframe(
-            _ash[["Status", "Descrição", "Valor Pago", "Valor Esperado", "Dia Cobrança"]],
-            use_container_width=True, hide_index=True,
-            column_config={
-                "Valor Pago": st.column_config.NumberColumn(format="R$ %.0f", help="o que realmente saiu este mês"),
-                "Valor Esperado": st.column_config.NumberColumn(format="R$ %.0f", help="referência do cadastro"),
-            },
+with st.expander(f"🧾 A conta do mês — consumo {fmt(k['despesa_total'])} · abrir", expanded=False):
+    _cor_livre = COR["receita"] if livre >= 0 else COR["despesa"]
+    st.markdown(
+        f"""
+        <div class="brow"><span class="bl">entrou</span><span class="bv" style="color:{COR['receita']}">{fmt(lpg['receita'])}</span></div>
+        <div class="brow"><span class="bl">contas fixas</span><span class="bv">−{fmt(lpg['fixas'])}</span></div>
+        <div class="brow"><span class="bl">faturas a pagar</span><span class="bv">−{fmt(lpg['faturas_pagar'])}</span></div>
+        <div class="brow"><span class="bl">já gastei (flexível)</span><span class="bv">−{fmt(lpg['flex_gasto'])}</span></div>
+        <div class="brow" style="border-top:1px solid #EDF2EE;margin-top:4px;padding-top:9px;">
+          <span class="bl" style="font-weight:700;">livre pra gastar até o fim do mês</span>
+          <span class="bv" style="color:{_cor_livre};">{fmt(livre)}</span></div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(f'<h4 style="margin:14px 0 8px;font-size:13.5px">Para onde foi o consumo</h4>'
+                f'<div class="segbar">{_seg}</div>{_rows}', unsafe_allow_html=True)
+    with st.popover("ver itens dos baldes"):
+        for b in ["Fixo", "Recorrente", "Flexível"]:
+            st.markdown(f"**{BALDE_META[b][0]}** — {fmt(baldes[b]['total'])}")
+            for it in baldes[b]["itens"]:
+                cc1, cc2 = st.columns([3, 1])
+                cc1.caption(it["desc"])
+                cc2.caption(fmt(it["valor"]))
+
+    mInvest = meta_valor(df_metas, "investir")
+    mPoup = meta_valor(df_metas, "poupança")
+    mFlex = meta_valor(df_metas, "flexível")
+    flex_real = baldes["Flexível"]["total"]
+    poup_real = (k["saldo_mes"] / k["receita_total"] * 100) if k["receita_total"] > 0 else 0
+
+    def _ring(pct, cor, valor_txt, label):
+        C = 163.4
+        off = C * (1 - min(max(pct, 0), 1))
+        return (
+            f'<div class="ring"><svg viewBox="0 0 62 62">'
+            f'<circle cx="31" cy="31" r="26" fill="none" stroke="#EDF2EE" stroke-width="7"/>'
+            f'<circle cx="31" cy="31" r="26" fill="none" stroke="{cor}" stroke-width="7" '
+            f'stroke-linecap="round" stroke-dasharray="{C}" stroke-dashoffset="{off:.0f}"/></svg>'
+            f'<div class="rv">{valor_txt}</div><div class="rl">{label}</div></div>'
         )
-        st.caption("o cadastro dispara os alertas (dia 10/15 no Zap) e alimenta a projeção")
-with col_b.expander("Ver itens dos baldes"):
-    for b in ["Fixo", "Recorrente", "Flexível"]:
-        st.markdown(f"**{BALDE_META[b][0]}** — {fmt(baldes[b]['total'])}")
-        for it in baldes[b]["itens"]:
-            cc1, cc2 = st.columns([3, 1])
-            cc1.caption(it["desc"])
-            cc2.caption(fmt(it["valor"]))
 
-# ============== Linha 3 (desktop): metas | faturas ==============
-col_m, col_fat = st.columns(2, gap="medium")
-
-# ============== Metas (anéis) ==============
-mInvest = meta_valor(df_metas, "investir")
-mPoup = meta_valor(df_metas, "poupança")
-mFlex = meta_valor(df_metas, "flexível")
-flex_real = baldes["Flexível"]["total"]
-poup_real = (k["saldo_mes"] / k["receita_total"] * 100) if k["receita_total"] > 0 else 0
-
-def _ring(pct, cor, valor_txt, label):
-    C = 163.4
-    off = C * (1 - min(max(pct, 0), 1))
-    return (
-        f'<div class="ring"><svg viewBox="0 0 62 62">'
-        f'<circle cx="31" cy="31" r="26" fill="none" stroke="#EDF2EE" stroke-width="7"/>'
-        f'<circle cx="31" cy="31" r="26" fill="none" stroke="{cor}" stroke-width="7" '
-        f'stroke-linecap="round" stroke-dasharray="{C}" stroke-dashoffset="{off:.0f}"/></svg>'
-        f'<div class="rv">{valor_txt}</div><div class="rl">{label}</div></div>'
+    p_inv = (aporte / mInvest) if mInvest > 0 else 0
+    p_poup = (poup_real / mPoup) if mPoup > 0 else 0
+    p_flex = (flex_real / mFlex) if mFlex > 0 else 0
+    cor_flex = COR["flexivel"] if p_flex <= 1 else COR["despesa"]
+    st.markdown(
+        '<h4 style="margin:14px 0 8px;font-size:13.5px">Metas do mês</h4><div class="rings">'
+        + _ring(p_inv, COR["investimento"], f"{p_inv*100:.0f}%", f"investir<br>{fmt_mil(aporte)} / {fmt_mil(mInvest)}")
+        + _ring(p_poup, COR["receita"], f"{p_poup*100:.0f}%", f"poupança<br>{poup_real:.0f}% / {mPoup:.0f}%")
+        + _ring(p_flex, cor_flex, f"{p_flex*100:.0f}%", f"teto flexível<br>{fmt_mil(flex_real)} / {fmt_mil(mFlex)}")
+        + "</div>",
+        unsafe_allow_html=True,
     )
 
-p_inv = (aporte / mInvest) if mInvest > 0 else 0
-p_poup = (poup_real / mPoup) if mPoup > 0 else 0
-p_flex = (flex_real / mFlex) if mFlex > 0 else 0
-cor_flex = COR["flexivel"] if p_flex <= 1 else COR["despesa"]
-col_m.markdown(
-    '<div class="c5"><h4>Metas do mês</h4><div class="rings">'
-    + _ring(p_inv, COR["investimento"], f"{p_inv*100:.0f}%", f"investir<br>{fmt_mil(aporte)} / {fmt_mil(mInvest)}")
-    + _ring(p_poup, COR["receita"], f"{p_poup*100:.0f}%", f"poupança<br>{poup_real:.0f}% / {mPoup:.0f}%")
-    + _ring(p_flex, cor_flex, f"{p_flex*100:.0f}%", f"teto flexível<br>{fmt_mil(flex_real)} / {fmt_mil(mFlex)}")
-    + "</div></div>",
-    unsafe_allow_html=True,
-)
+    try:
+        df_tetos = load_tetos()
+    except Exception:
+        df_tetos = pd.DataFrame()
+    if not df_tetos.empty and "Categoria" in df_tetos.columns:
+        _desp_cat = split_movimentos(no_mes)["despesas"].groupby("Categoria")["Valor"].sum()
+        _tmap = dict(zip(df_tetos["Categoria"], pd.to_numeric(df_tetos.get("Teto Mensal", 0), errors="coerce").fillna(0)))
+        _linhas_teto = ""
+        for cat, gasto in _desp_cat.sort_values(ascending=False).head(6).items():
+            teto = float(_tmap.get(cat, 0) or 0)
+            pct = gasto / teto if teto > 0 else 0
+            cor_b = COR["receita"] if pct < 0.8 else (COR["alerta"] if pct <= 1 else COR["despesa"])
+            largura = min(pct, 1.15) / 1.15 * 100 if teto > 0 else 0
+            rot = f"{pct*100:.0f}% do teto" if teto > 0 else "sem teto"
+            _linhas_teto += (
+                f'<div style="margin:7px 0"><div style="display:flex;justify-content:space-between;font-size:12.5px">'
+                f'<span>{cat}</span><b>{fmt(gasto)} <span style="color:#8B978F;font-weight:500">· {rot}</span></b></div>'
+                f'<div style="height:6px;border-radius:4px;background:#EDF2EE;margin-top:3px">'
+                f'<div style="width:{largura:.0f}%;height:6px;border-radius:4px;background:{cor_b}"></div></div></div>'
+            )
+        st.markdown(f'<h4 style="margin:14px 0 4px;font-size:13.5px">Tetos por categoria</h4>{_linhas_teto}',
+                    unsafe_allow_html=True)
 
+# ============== Faturas (fechado · filtro por mês) ==============
 def _fatura_rows(df_f):
     rows = ""
     for _, r in df_f.iterrows():
@@ -382,29 +412,17 @@ def _fatura_rows(df_f):
     return rows
 
 
-# ============== Faturas (coluna direita da linha 3) ==============
-with col_fat:
-    st.markdown('<div class="c5" style="margin-bottom:0"><h4>Faturas</h4></div>', unsafe_allow_html=True)
-
-
+with st.expander(f"💳 Faturas — próxima: {_prox_fat_val or '—'} · {_prox_fat_txt} · abrir", expanded=False):
     if not ab.empty:
-        # padrão enxuto: só o que precisa de ação (não carregadas), máx. 4
-        _pend = ab[ab["Status"].astype(str).str.lower() != "carregada"].head(4)
-        if not _pend.empty:
-            st.markdown(f'<div class="c5">{_fatura_rows(_pend)}</div>', unsafe_allow_html=True)
-        else:
-            st.success("Nenhuma fatura aguardando — tudo em dia.")
-        _exp_fat = st.expander(f"Todas as faturas ({len(ab)}) · consultar com filtro")
-    else:
-        st.info("Aba Faturas vazia.")
-        _exp_fat = None
-if _exp_fat:
-    with _exp_fat:
-        fc1, fc2 = st.columns(2)
+        fc0, fc1, fc2 = st.columns(3)
+        _meses_f = ["todos os meses"] + sorted(ab["Mês Referência"].astype(str).unique().tolist(), reverse=True)
+        f_mes = fc0.selectbox("Mês", _meses_f)
         _cartoes = ["todos os cartões"] + sorted(ab["Cartão"].astype(str).unique().tolist())
         f_cart = fc1.selectbox("Cartão", _cartoes)
         f_stat = fc2.selectbox("Status", ["todas", "aguardando fatura", "vencidas", "carregadas"])
         filt = ab.copy()
+        if f_mes != "todos os meses":
+            filt = filt[filt["Mês Referência"].astype(str) == f_mes]
         if f_cart != "todos os cartões":
             filt = filt[filt["Cartão"].astype(str) == f_cart]
         _low = filt["Status"].astype(str).str.lower()
@@ -418,13 +436,53 @@ if _exp_fat:
             st.caption("nada com esse filtro")
         else:
             st.markdown(f'<div class="c5">{_fatura_rows(filt)}</div>', unsafe_allow_html=True)
+    else:
+        st.info("Aba Faturas vazia.")
 
-# ============== Linha 4 (desktop): RD | investimentos ==============
-col_rd, col_inv = st.columns(2, gap="medium")
+# ============== Projeção (linhas: receita, fixas, parcelas e o LIVRE) ==============
+st.subheader("Projeção")
+cron = compromissos_proximos_meses(df_lanc, df_rec, df_faturas, 6, partir_de=competencia)
+if not cron.empty:
+    receita_proj = 0.0
+    receitas = df_lanc[df_lanc["Tipo"].astype(str).str.lower() == "receita"]
+    if not receitas.empty:
+        por_mes = receitas.groupby("Competência")["Valor"].sum().tail(3)
+        receita_proj = float(por_mes.mean()) if not por_mes.empty else 0
+    comp_cols = [c for c in ("Parcelas em curso", "Contas fixas", "Faturas em aberto") if c in cron.columns]
+    cron["Compromissos"] = cron[comp_cols].sum(axis=1)
+    cron["Livre"] = receita_proj - cron["Compromissos"]
+    figj = go.Figure()
+    figj.add_scatter(name="Receita prevista", x=cron["Mês"], y=[receita_proj] * len(cron),
+                     mode="lines", line=dict(color=COR["receita"], width=2, dash="dash"))
+    if "Contas fixas" in cron.columns:
+        figj.add_scatter(name="Contas fixas", x=cron["Mês"], y=cron["Contas fixas"],
+                         mode="lines+markers", line=dict(color=COR["neutro"], width=2))
+    if "Parcelas em curso" in cron.columns:
+        figj.add_scatter(name="Parcelas", x=cron["Mês"], y=cron["Parcelas em curso"],
+                         mode="lines+markers", line=dict(color=COR["alerta"], width=2))
+    figj.add_scatter(name="LIVRE (sobra prevista)", x=cron["Mês"], y=cron["Livre"],
+                     mode="lines+markers+text", line=dict(color=COR["investimento"], width=4),
+                     marker=dict(size=9),
+                     text=["" if _PRIV else fmt_mil(vv) for vv in cron["Livre"]], textposition="top center")
+    figj.update_layout(height=300, margin=dict(l=10, r=10, t=30, b=10), template="plotly_white",
+                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                       font=dict(color="#2C2C2A", size=12),
+                       legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="center", x=0.5),
+                       yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)"))
+    st.plotly_chart(fig_mobile(figj), use_container_width=True, config=PLOTLY_CONFIG)
+    st.caption(
+        f"receita prevista = média dos últimos 3 meses ({fmt(receita_proj)}). "
+        f"LIVRE = receita − fixas − parcelas − faturas em aberto (faturas entram no cálculo)."
+    )
+    with st.expander("ver composição mês a mês"):
+        _dcron = cron[["Mês"] + comp_cols + ["Compromissos", "Livre"]].copy()
+        st.dataframe(_dcron, use_container_width=True, hide_index=True,
+                     column_config={c: st.column_config.NumberColumn(format="R$ %.0f")
+                                    for c in _dcron.columns if c != "Mês"})
 
-# ============== RD — despesas corporativas (reembolso) ==============
-with col_rd.expander(f"RD — despesas corporativas · a receber {fmt(_rd_saldo)}" if _rd_saldo > 0.005
-                 else "RD — despesas corporativas", expanded=False):
+# ============== RD — despesas corporativas ==============
+with st.expander(f"🏢 RD — despesas corporativas · a receber {fmt(_rd_saldo)}" if _rd_saldo > 0.005
+                 else "🏢 RD — despesas corporativas", expanded=False):
     if df_rd.empty:
         st.caption("Nenhum lançamento RD. Marque no Zap incluindo **RD** na mensagem — "
                    "ex: `120 almoço cliente RD` · reembolso: `1500 reembolso RD`. Comando `rd` mostra o saldo.")
@@ -443,48 +501,4 @@ with col_rd.expander(f"RD — despesas corporativas · a receber {fmt(_rd_saldo)
         _rd_show = df_rd[["Data", "Tipo", "Descrição", "Valor"]].copy().sort_values("Data")
         st.dataframe(_rd_show, use_container_width=True, hide_index=True,
                      column_config={"Valor": st.column_config.NumberColumn(format="R$ %.2f")})
-        st.caption("RD é neutro no consumo e nos tetos — vive só aqui e no caixa. Comando `rd` no Zap mostra este saldo.")
-
-# ============== Investimentos (detalhe) ==============
-with col_inv.expander("Investimentos & patrimônio", expanded=False):
-    ic1, ic2, ic3 = st.columns(3)
-    ic1.metric("aporte do mês", fmt(aporte) if aporte > 0 else "—")
-    ic2.metric("saldo estocado", fmt(estocado) if estocado > 0 else "—")
-    rend = rendimento_investido(df_saldo)
-    ic3.metric("rendimento", f"+{rend['pct']:.1f}%" if rend else "—",
-               help="precisa de ≥2 registros na aba Saldo Investido")
-    if estocado == 0 and aporte == 0:
-        st.info("No Zap: `aporte 5000 CDB XP` registra investimento. Preencha a aba `Saldo Investido` pro patrimônio aparecer.")
-
-# ============== Projeção ==============
-st.subheader("Projeção")
-cron = compromissos_proximos_meses(df_lanc, df_rec, df_faturas, 6, partir_de=competencia)
-if not cron.empty:
-    receita_proj = 0.0
-    receitas = df_lanc[df_lanc["Tipo"].astype(str).str.lower() == "receita"]
-    if not receitas.empty:
-        por_mes = receitas.groupby("Competência")["Valor"].sum().tail(3)
-        receita_proj = float(por_mes.mean()) if not por_mes.empty else 0
-    comp_cols = [c for c in ("Parcelas em curso", "Contas fixas", "Faturas em aberto") if c in cron.columns]
-    cron["Compromissos"] = cron[comp_cols].sum(axis=1)
-    cron["Sobra"] = receita_proj - cron["Compromissos"]
-    _cores = [COR["receita"] if s >= 0 else COR["despesa"] for s in cron["Sobra"]]
-    _txt = ["" if _PRIV else fmt(s) for s in cron["Sobra"]]
-    fig = go.Figure(go.Bar(x=cron["Mês"], y=cron["Sobra"], marker_color=_cores,
-                           text=_txt, textposition="outside", cliponaxis=False))
-    fig.update_layout(height=260, margin=dict(l=10, r=10, t=26, b=10),
-                      template="plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                      font=dict(color="#2C2C2A", size=12), showlegend=False,
-                      yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)", zeroline=True,
-                                 zerolinecolor="rgba(128,128,128,0.4)"))
-    st.plotly_chart(fig_mobile(fig), use_container_width=True, config=PLOTLY_CONFIG)
-    st.caption(
-        f"quanto deve SOBRAR por mês = receita típica ({fmt(receita_proj)}, média dos últimos 3 meses) "
-        f"menos o que já está assumido (parcelas em curso + contas fixas + faturas em aberto). "
-        f"Verde = mês fecha com folga; vermelho = aperto."
-    )
-    with st.expander("ver a composição dos compromissos"):
-        _dcron = cron[["Mês"] + comp_cols + ["Compromissos", "Sobra"]].copy()
-        st.dataframe(_dcron, use_container_width=True, hide_index=True,
-                     column_config={c: st.column_config.NumberColumn(format="R$ %.0f")
-                                    for c in _dcron.columns if c != "Mês"})
+        st.caption("RD é neutro no consumo e nos tetos. Comando `rd` no Zap mostra este saldo.")
