@@ -209,7 +209,7 @@ def _num_hero(v: float) -> str:
 
 
 sobrou = caixa["saldo_mes"]
-sinal = '<span class="mais">+</span>' if sobrou >= 0 else '<span class="menos">−</span>'
+sinal = '' if sobrou >= 0 else '<span class="menos">−</span>'
 with col_hero:
     st.markdown(
         f"""
@@ -230,18 +230,18 @@ with col_hero:
     )
 
 _saldo_cp = k["saldo_mes"]
-_sinal_cp = "+" if _saldo_cp >= 0 else "−"
+_sinal_cp = '' if _saldo_cp >= 0 else '<span class="menos">−</span>'
 col_cp.markdown(
     f"""
     <div class="hero5 h5-azul">
       <div class="h5-bar">
         <div><div class="h5-ola">visão de consumo,</div><div class="h5-nome">Competência</div></div>
       </div>
-      <div class="h5-rot">consumo do mês</div>
-      <div class="h5-num">R$ {_num_hero(k['despesa_total'])}</div>
+      <div class="h5-rot">saldo do mês</div>
+      <div class="h5-num">{_sinal_cp}R$ {_num_hero(_saldo_cp)}</div>
       <div class="h5-chips">
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#9CC8F0" stroke-width="2.2"><path d="M8 13V3M4 7l4-4 4 4"/></svg>receita {fmt_mil(k['receita_total'])}</span>
-        <span class="h5-chip">saldo {_sinal_cp}{fmt_mil(abs(_saldo_cp))}</span>
+        <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#FFAFA8" stroke-width="2.2"><path d="M8 3v10M4 9l4 4 4-4"/></svg>consumo {fmt_mil(k['despesa_total'])}</span>
       </div>
       <div class="h5-sub">compra no cartão conta na hora, mesmo pagando depois</div>
     </div>
