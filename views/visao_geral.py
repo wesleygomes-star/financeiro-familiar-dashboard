@@ -19,7 +19,9 @@ from lib.data import (
     compromissos_proximos_meses,
     fatura_estimada,
     kpis_familia,
+    load_bens,
     load_faturas,
+    patrimonio_imobilizado,
     load_lancamentos,
     load_metas,
     load_recorrentes,
@@ -27,6 +29,7 @@ from lib.data import (
     meta_valor,
     meses_disponiveis,
     rendimento_investido,
+    serie_estocado,
     split_movimentos,
 )
 
@@ -196,6 +199,11 @@ k = kpis_familia(df_lanc, df_saldo, competencia, "Competência")
 caixa = kpis_familia(df_lanc, df_saldo, competencia, "Caixa")
 estocado = k["saldo_estocado_total"]
 aporte = k["aporte_total"]
+# aporte FINANCEIRO (meta investir / aba Patrimônio) = aportes sem compra de bens
+# (carro/AP saem do caixa como investimento, mas não são aplicação financeira)
+_mes_cx = df_lanc[df_lanc["Mês Caixa"] == competencia] if "Mês Caixa" in df_lanc.columns else df_lanc
+_aq_bens = float(_mes_cx[_mes_cx["Categoria"].astype(str).str.strip() == "Aquisição de Bem"]["Valor"].sum()) if not _mes_cx.empty else 0.0
+aporte_fin = max(aporte - _aq_bens, 0.0)
 
 
 # RD (pro KPI e pro expander)
@@ -299,11 +307,35 @@ st.markdown(f'<div class="casal">{_cards}</div>', unsafe_allow_html=True)
 # ============== Patrimônio | Contas fixas (clica pra abrir) ==============
 col_p, col_f = st.columns(2, gap="medium")
 
-_patr_val = fmt(estocado) if estocado > 0 else "—"
+df_bens = load_bens()
+_imob = patrimonio_imobilizado(df_bens)
+_patr_total = estocado + _imob["total"]
+_patr_val = fmt(_patr_total) if _patr_total > 0 else "—"
 _p_ctx = col_p.container(key="lin-patr")
 with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=False):
+    pm1, pm2, pm3 = st.columns(3)
+    pm1.metric("investível", fmt(estocado) if estocado > 0 else "—",
+               help="dinheiro que vira caixa fácil: Itaú + XP (snapshots)")
+    pm2.metric("imobilizado", fmt(_imob["total"]) if _imob["total"] > 0 else "—",
+               help="bens a valor de mercado − saldo devedor (aba Bens)")
+    pm3.metric("total", fmt(_patr_total) if _patr_total > 0 else "—")
+    if _imob["total"] > 0:
+        st.caption(f"imobilizado: {fmt(_imob['investimento'])} em bens de investimento + "
+                   f"{fmt(_imob['uso'])} em bens de uso".replace("R$", "R\\$"))
+    if not df_bens.empty and _imob["n_pendentes"] > 0:
+        _pend = df_bens[df_bens["Valor de Mercado"].fillna(0) <= 0]["Nome"].tolist()
+        st.caption(f"⏳ sem avaliação (fora do total): {', '.join(str(p) for p in _pend[:4])}")
+    if not df_bens.empty and _imob["n_avaliados"] > 0:
+        _bt = df_bens[df_bens["Valor de Mercado"].fillna(0) > 0][
+            ["Nome", "Finalidade", "Valor de Mercado", "Saldo Devedor"]].copy()
+        _bt["Equity"] = _bt["Valor de Mercado"] - _bt["Saldo Devedor"].fillna(0)
+        st.dataframe(_bt, use_container_width=True, hide_index=True,
+                     column_config={c: st.column_config.NumberColumn(format="R$ %.0f")
+                                    for c in ("Valor de Mercado", "Saldo Devedor", "Equity")})
+    st.markdown('<div style="font-size:13px;font-weight:700;margin:6px 0 0">Investível — evolução</div>',
+                unsafe_allow_html=True)
     if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
-        _ev = df_saldo.dropna(subset=["Data Snapshot_dt"]).groupby("Data Snapshot_dt")["Saldo Total"].sum().reset_index()
+        _ev = serie_estocado(df_saldo)
         if len(_ev) >= 1:
             figp = go.Figure(go.Scatter(
                 x=_ev["Data Snapshot_dt"], y=_ev["Saldo Total"], mode="lines+markers+text",
@@ -316,7 +348,8 @@ with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=Fal
                                yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)"))
             st.plotly_chart(fig_mobile(figp), use_container_width=True, config=PLOTLY_CONFIG)
         ic1, ic2, ic3 = st.columns(3)
-        ic1.metric("aporte do mês", fmt(aporte) if aporte > 0 else "—")
+        ic1.metric("aporte do mês", fmt(aporte_fin) if aporte_fin > 0 else "—",
+                   help="aporte financeiro (compra de bens não conta aqui)")
         rend = rendimento_investido(df_saldo)
         ic2.metric("rendimento", f"+{rend['pct']:.2f}%" if rend else "—")
         ic3.metric("snapshots", str(df_saldo["Data Snapshot"].nunique()))
@@ -384,13 +417,13 @@ with _c_ctx.expander(f"**Para onde foi o consumo** `{fmt(_consumo_baldes)}`", ic
             f'<div class="rv">{valor_txt}</div><div class="rl">{label}</div></div>'
         )
 
-    p_inv = (aporte / mInvest) if mInvest > 0 else 0
+    p_inv = (aporte_fin / mInvest) if mInvest > 0 else 0
     p_poup = (poup_real / mPoup) if mPoup > 0 else 0
     p_flex = (flex_real / mFlex) if mFlex > 0 else 0
     cor_flex = COR["flexivel"] if p_flex <= 1 else COR["despesa"]
     st.markdown(
         '<h4 style="margin:14px 0 8px;font-size:13.5px">Metas do mês</h4><div class="rings">'
-        + _ring(p_inv, COR["investimento"], f"{p_inv*100:.0f}%", f"investir<br>{fmt_mil(aporte)} / {fmt_mil(mInvest)}")
+        + _ring(p_inv, COR["investimento"], f"{p_inv*100:.0f}%", f"investir<br>{fmt_mil(aporte_fin)} / {fmt_mil(mInvest)}")
         + _ring(p_poup, COR["receita"], f"{p_poup*100:.0f}%", f"poupança<br>{poup_real:.0f}% / {mPoup:.0f}%")
         + _ring(p_flex, cor_flex, f"{p_flex*100:.0f}%", f"teto flexível<br>{fmt_mil(flex_real)} / {fmt_mil(mFlex)}")
         + "</div>",

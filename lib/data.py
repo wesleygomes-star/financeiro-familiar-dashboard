@@ -262,6 +262,60 @@ def load_faturas() -> pd.DataFrame:
 
 
 @st.cache_data(ttl=60)
+def load_bens() -> pd.DataFrame:
+    """Aba Bens — patrimônio real (imóveis, veículos). Linhas Status=Ativo com Valor de Mercado."""
+    try:
+        rows = _records_formatted("Bens")
+    except Exception:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    for c in ("Custo Aquisição", "Valor de Mercado", "Saldo Devedor", "Renda Mensal", "Custo Mensal"):
+        if c in df.columns:
+            df[c] = df[c].apply(_parse_valor)
+    if "Status" in df.columns:
+        df = df[df["Status"].astype(str).str.strip().str.lower() == "ativo"].copy()
+    return df
+
+
+def patrimonio_imobilizado(df_bens: pd.DataFrame) -> dict:
+    """Equity dos bens (mercado − saldo devedor), total e split Uso × Investimento.
+    Bens sem Valor de Mercado preenchido não contam (evita nº fictício)."""
+    out = {"total": 0.0, "uso": 0.0, "investimento": 0.0, "n_avaliados": 0, "n_pendentes": 0}
+    if df_bens is None or df_bens.empty or "Valor de Mercado" not in df_bens.columns:
+        return out
+    for _, r in df_bens.iterrows():
+        vm = float(r.get("Valor de Mercado", 0) or 0)
+        if vm <= 0:
+            out["n_pendentes"] += 1
+            continue
+        eq = vm - float(r.get("Saldo Devedor", 0) or 0)
+        out["total"] += eq
+        chave = "investimento" if str(r.get("Finalidade", "")).strip().lower().startswith("invest") else "uso"
+        out[chave] += eq
+        out["n_avaliados"] += 1
+    return out
+
+
+@st.cache_data(ttl=60)
+def load_bens_snapshots() -> pd.DataFrame:
+    try:
+        rows = _records_formatted("Bens Snapshots")
+    except Exception:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    for c in ("Valor de Mercado", "Saldo Devedor"):
+        if c in df.columns:
+            df[c] = df[c].apply(_parse_valor)
+    if "Data" in df.columns:
+        df["Data_dt"] = df["Data"].apply(_parse_data)
+    return df
+
+
+@st.cache_data(ttl=60)
 def load_saldo_investido() -> pd.DataFrame:
     try:
         rows = _records_formatted("Saldo Investido")
@@ -282,24 +336,23 @@ def load_saldo_investido() -> pd.DataFrame:
 
 
 def saldo_estocado_atual(df_saldo: pd.DataFrame) -> dict:
-    """Retorna {pessoa: saldo_total} usando o último snapshot por pessoa."""
+    """Retorna {pessoa: saldo_total} somando o ÚLTIMO snapshot de cada modalidade.
+    Snapshots de bancos diferentes chegam em datas diferentes (print por print) —
+    pegar só 'a data mais recente' descartava os bancos que não vieram naquele dia."""
     if df_saldo.empty or "Pessoa" not in df_saldo.columns:
         return {}
     out = {}
+    tem_data = "Data Snapshot_dt" in df_saldo.columns
+    tem_mod = "Modalidade" in df_saldo.columns
     for pessoa, grupo in df_saldo.groupby("Pessoa"):
-        if "Data Snapshot_dt" in grupo.columns:
-            g = grupo.sort_values("Data Snapshot_dt", ascending=False)
-        else:
-            g = grupo
-        # soma por modalidade na data mais recente
-        if g.empty:
+        if grupo.empty or "Saldo Total" not in grupo.columns:
             continue
-        ultima_data = g.iloc[0].get("Data Snapshot_dt")
-        if pd.notna(ultima_data):
-            no_dia = g[g["Data Snapshot_dt"] == ultima_data]
+        g = grupo.sort_values("Data Snapshot_dt", ascending=False) if tem_data else grupo
+        if tem_mod:
+            ultimo_por_mod = g.drop_duplicates(subset=["Modalidade"], keep="first")
         else:
-            no_dia = g.head(5)
-        out[pessoa] = float(no_dia["Saldo Total"].sum()) if "Saldo Total" in no_dia.columns else 0.0
+            ultimo_por_mod = g.head(1)
+        out[pessoa] = float(ultimo_por_mod["Saldo Total"].sum())
     return out
 
 
@@ -906,22 +959,42 @@ def livre_para_gastar(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, df_faturas: p
 
 
 def rendimento_investido(df_saldo: pd.DataFrame) -> dict:
-    """Rendimento entre o snapshot mais antigo e o mais recente, descontando aportes.
-    Precisa de >= 2 snapshots. Retorna {pct, valor} ou {} se insuficiente."""
-    if df_saldo.empty or "Data Snapshot_dt" not in df_saldo.columns:
+    """Rendimento por MODALIDADE (último − primeiro snapshot de cada uma), descontando aportes.
+    Modalidade com 1 snapshot só ainda não rende (fica de fora da conta) — evita que um
+    banco novo em data diferente distorça o total. Retorna {pct, valor} ou {}."""
+    if df_saldo.empty or "Data Snapshot_dt" not in df_saldo.columns or "Saldo Total" not in df_saldo.columns:
         return {}
-    datas = df_saldo["Data Snapshot_dt"].dropna().sort_values().unique()
-    if len(datas) < 2:
+    if "Modalidade" not in df_saldo.columns:
         return {}
-    primeiro = df_saldo[df_saldo["Data Snapshot_dt"] == datas[0]]
-    ultimo = df_saldo[df_saldo["Data Snapshot_dt"] == datas[-1]]
-    saldo_ini = float(primeiro["Saldo Total"].sum()) if "Saldo Total" in primeiro.columns else 0.0
-    saldo_fim = float(ultimo["Saldo Total"].sum()) if "Saldo Total" in ultimo.columns else 0.0
-    aportes = float(df_saldo["Aportado no Mês"].sum()) if "Aportado no Mês" in df_saldo.columns else 0.0
-    if saldo_ini <= 0:
+    base = ganho = 0.0
+    for _, g in df_saldo.dropna(subset=["Data Snapshot_dt"]).groupby("Modalidade"):
+        g = g.sort_values("Data Snapshot_dt")
+        if len(g) < 2:
+            continue
+        ini = float(g.iloc[0]["Saldo Total"]); fim = float(g.iloc[-1]["Saldo Total"])
+        apo = float(g["Aportado no Mês"].sum()) if "Aportado no Mês" in g.columns else 0.0
+        base += ini
+        ganho += fim - ini - apo
+    if base <= 0:
         return {}
-    ganho = saldo_fim - saldo_ini - aportes
-    return {"pct": ganho / saldo_ini * 100, "valor": ganho}
+    return {"pct": ganho / base * 100, "valor": ganho}
+
+
+def serie_estocado(df_saldo: pd.DataFrame) -> pd.DataFrame:
+    """Série temporal do total investido: em cada data com snapshot, soma o último valor
+    CONHECIDO de cada modalidade (forward-fill) — bancos chegam em datas diferentes."""
+    if df_saldo.empty or "Data Snapshot_dt" not in df_saldo.columns or "Saldo Total" not in df_saldo.columns:
+        return pd.DataFrame()
+    d = df_saldo.dropna(subset=["Data Snapshot_dt"]).copy()
+    if d.empty:
+        return pd.DataFrame()
+    if "Modalidade" not in d.columns:
+        d["Modalidade"] = "—"
+    piv = d.pivot_table(index="Data Snapshot_dt", columns="Modalidade",
+                        values="Saldo Total", aggfunc="last").sort_index().ffill()
+    out = piv.sum(axis=1).reset_index()
+    out.columns = ["Data Snapshot_dt", "Saldo Total"]
+    return out
 
 
 @st.cache_data(ttl=60)
