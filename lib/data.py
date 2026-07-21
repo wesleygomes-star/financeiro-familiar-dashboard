@@ -503,16 +503,21 @@ def _recorrentes_despesa(df_rec: pd.DataFrame, competencia: str = None) -> pd.Da
     """Filtra recorrentes ativas que sejam despesa (exclui categorias de receita).
 
     Vigência (16/07): coluna `Fim` (MM/YYYY) marca a ÚLTIMA competência da conta —
-    ex: Doação Sergio Fim=07/2026 conta em julho e some de agosto em diante."""
+    ex: Doação Sergio Fim=07/2026 conta em julho e some de agosto em diante.
+    Vigência (21/07): coluna `Início` (MM/YYYY) marca a PRIMEIRA competência —
+    ex: Parcela BYD Início=08/2026 só passa a contar em agosto."""
     if df_rec.empty:
         return df_rec
     ativas = df_rec[df_rec.get("Ativo_bool", False)].copy() if "Ativo_bool" in df_rec.columns else df_rec.copy()
     if ativas.empty:
         return ativas
-    if competencia and "Fim" in ativas.columns:
+    if competencia:
         alvo = _comp_key(competencia)
-        if alvo:
+        if alvo and "Fim" in ativas.columns:
             mask = ativas["Fim"].apply(lambda f: (_comp_key(f) is None) or (_comp_key(f) >= alvo))
+            ativas = ativas[mask]
+        if alvo and "Início" in ativas.columns:
+            mask = ativas["Início"].apply(lambda i: (_comp_key(i) is None) or (_comp_key(i) <= alvo))
             ativas = ativas[mask]
     cat_lower = ativas["Categoria"].astype(str).str.strip().str.lower()
     return ativas[~cat_lower.isin(CATEGORIAS_RECEITA)].copy()
