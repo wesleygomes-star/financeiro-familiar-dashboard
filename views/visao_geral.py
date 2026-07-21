@@ -357,9 +357,16 @@ with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=Fal
         _bt = df_bens[df_bens["Valor de Mercado"].fillna(0) > 0][
             ["Nome", "Finalidade", "Valor de Mercado", "Saldo Devedor"]].copy()
         _bt["Equity"] = _bt["Valor de Mercado"] - _bt["Saldo Devedor"].fillna(0)
-        st.dataframe(_bt, use_container_width=True, hide_index=True,
-                     column_config={c: st.column_config.NumberColumn(format="R$ %.0f")
-                                    for c in ("Valor de Mercado", "Saldo Devedor", "Equity")})
+
+        def _brl(v):
+            if _PRIV:
+                return "R$ ••••"
+            if pd.isna(v):
+                return "—"
+            return "R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+        _sty = _bt.style.format({c: _brl for c in ("Valor de Mercado", "Saldo Devedor", "Equity")})
+        st.dataframe(_sty, use_container_width=True, hide_index=True)
     st.markdown('<div style="font-size:13px;font-weight:700;margin:6px 0 0">Investível — evolução</div>',
                 unsafe_allow_html=True)
     if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
