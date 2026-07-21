@@ -262,7 +262,9 @@ with col_hero:
         unsafe_allow_html=True,
     )
 
-_saldo_cp = k["saldo_mes"]
+# régua de CONSUMO pura: receita − consumo (movimentos patrimoniais — aporte,
+# resgate, compra de bem — não entram; eles vivem no caixa e no Patrimônio)
+_saldo_cp = k["receita_total"] - k["despesa_total"]
 _sinal_cp = '' if _saldo_cp >= 0 else '<span class="menos">−</span>'
 col_cp.markdown(
     f"""
