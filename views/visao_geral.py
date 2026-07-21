@@ -120,6 +120,10 @@ st.markdown(
     /* remove o gap-fantasma dos containers keyed das linhas */
     div:has(> .st-key-lin-patr), div:has(> .st-key-lin-fix),
     div:has(> .st-key-lin-consumo), div:has(> .st-key-lin-fat) { display: contents; }
+    /* rótulos de grupo dentro dos cards de pessoa (caixa × competência) */
+    .pss .pgrp { font-size: 9.5px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .09em; color: #9BAaa1; margin: 8px 0 2px; }
+    .pss .pgrp { color: #97A69D; }
     </style>""",
     unsafe_allow_html=True,
 )
@@ -300,9 +304,11 @@ for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexive
     _cards += (
         f'<div class="pss" style="border:2px solid {cor_av}"><div class="ph"><span class="pa" style="background:{cor_av}">{pessoa[0]}</span>'
         f'<span class="pn">{pessoa}</span>'
-        f'<span class="psaldo" style="color:{cor_saldo}">{"+" if saldo >= 0 else "−"}{fmt(abs(saldo))}</span></div>'
+        f'<span class="psaldo" style="color:{cor_saldo}" title="entrou − saiu (caixa)">{"+" if saldo >= 0 else "−"}{fmt(abs(saldo))}</span></div>'
+        f'<div class="pgrp">caixa · conta no mês</div>'
         f'<div class="pr"><span>entrou</span><b>{fmt(rec) if rec > 0 else "—"}</b></div>'
         f'<div class="pr"><span>saiu</span><b>{fmt(desp)}</b></div>{_inv}'
+        f'<div class="pgrp">competência · consumo</div>'
         f'<div class="pr"><span style="color:#8B978F">consumo do mês</span><b style="color:#8B978F">{fmt(consumo_p)}</b></div>'
         f'</div>'
     )
