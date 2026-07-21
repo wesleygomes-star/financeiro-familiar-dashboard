@@ -261,8 +261,9 @@ with col_hero:
       <div class="h5-chips">
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#7CE0B8" stroke-width="2.2"><path d="M8 13V3M4 7l4-4 4 4"/></svg>entrou {fmt_mil(caixa['receita_total'])}</span>
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#FFAFA8" stroke-width="2.2"><path d="M8 3v10M4 9l4 4 4-4"/></svg>saiu {fmt_mil(caixa['despesa_total'])}</span>
+        {f'<span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#9CD8F0" stroke-width="2.2"><path d="M2 13l4-5 3 3 5-7"/></svg>investido {fmt_mil(caixa["aporte_total"])}</span>' if abs(caixa['aporte_total']) > 0.5 else ''}
       </div>
-      <div class="h5-sub">dinheiro que efetivamente entrou e saiu da conta</div>
+      <div class="h5-sub">dinheiro que efetivamente entrou e saiu da conta · investido soma no Patrimônio</div>
     </div>
     """,
         unsafe_allow_html=True,
@@ -283,6 +284,7 @@ col_cp.markdown(
       <div class="h5-chips">
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#9CC8F0" stroke-width="2.2"><path d="M8 13V3M4 7l4-4 4 4"/></svg>receita {fmt_mil(k['receita_total'])}</span>
         <span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#FFAFA8" stroke-width="2.2"><path d="M8 3v10M4 9l4 4 4-4"/></svg>consumo {fmt_mil(k['despesa_total'])}</span>
+        {f'<span class="h5-chip"><svg viewBox="0 0 16 16" fill="none" stroke="#9CD8F0" stroke-width="2.2"><path d="M2 13l4-5 3 3 5-7"/></svg>investido {fmt_mil(k["aporte_total"])}</span>' if abs(k['aporte_total']) > 0.5 else ''}
       </div>
       <div class="h5-sub">compra no cartão conta na hora, mesmo pagando depois</div>
     </div>
@@ -339,6 +341,8 @@ with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=Fal
         '<div style="background:#F2F7F3;border-radius:12px;padding:10px 14px;margin-bottom:6px">'
         + _linha_patr("investível", estocado, "dinheiro que vira caixa fácil: bancos/corretoras (snapshots)")
         + _linha_patr("imobilizado", _imob["total"], "bens a valor de mercado − saldo devedor (aba Bens)")
+        + _linha_patr("investido no mês", caixa["aporte_total"],
+                      "quanto saiu do caixa pra patrimônio neste mês (aportes + compra de bens − resgates)")
         + _linha_patr("total", _patr_total, "investível + imobilizado", forte=True)
         + "</div>",
         unsafe_allow_html=True,
