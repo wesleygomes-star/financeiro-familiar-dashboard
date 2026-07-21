@@ -313,20 +313,23 @@ _patr_total = estocado + _imob["total"]
 _patr_val = fmt(_patr_total) if _patr_total > 0 else "—"
 _p_ctx = col_p.container(key="lin-patr")
 with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=False):
-    def _kpi_patr(rotulo, valor, dica):
+    def _linha_patr(rotulo, valor, dica, forte=False):
         v = fmt(valor) if valor > 0 else "—"
-        return (f'<div style="flex:1;min-width:0;background:#F2F7F3;border-radius:12px;'
-                f'padding:9px 12px" title="{dica}">'
-                f'<div style="font-size:10.5px;color:#5C6B62;font-weight:700;'
-                f'text-transform:uppercase;letter-spacing:.04em">{rotulo}</div>'
-                f'<div style="font-size:15.5px;font-weight:800;font-variant-numeric:tabular-nums;'
-                f'white-space:nowrap">{v}</div></div>')
+        peso = "800" if forte else "600"
+        tam = "15.5px" if forte else "13.5px"
+        borda = "border-top:1px solid #E1EAE4;margin-top:4px;padding-top:8px;" if forte else ""
+        return (f'<div style="display:flex;justify-content:space-between;align-items:baseline;'
+                f'padding:4px 0;{borda}" title="{dica}">'
+                f'<span style="font-size:12.5px;color:#5C6B62;font-weight:700;'
+                f'text-transform:uppercase;letter-spacing:.04em">{rotulo}</span>'
+                f'<span style="font-size:{tam};font-weight:{peso};'
+                f'font-variant-numeric:tabular-nums">{v}</span></div>')
 
     st.markdown(
-        '<div style="display:flex;gap:8px;margin-bottom:6px">'
-        + _kpi_patr("investível", estocado, "dinheiro que vira caixa fácil: bancos/corretoras (snapshots)")
-        + _kpi_patr("imobilizado", _imob["total"], "bens a valor de mercado − saldo devedor (aba Bens)")
-        + _kpi_patr("total", _patr_total, "investível + imobilizado")
+        '<div style="background:#F2F7F3;border-radius:12px;padding:10px 14px;margin-bottom:6px">'
+        + _linha_patr("investível", estocado, "dinheiro que vira caixa fácil: bancos/corretoras (snapshots)")
+        + _linha_patr("imobilizado", _imob["total"], "bens a valor de mercado − saldo devedor (aba Bens)")
+        + _linha_patr("total", _patr_total, "investível + imobilizado", forte=True)
         + "</div>",
         unsafe_allow_html=True,
     )
