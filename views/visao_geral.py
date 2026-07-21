@@ -245,9 +245,10 @@ def _num_hero(v: float) -> str:
     return "••••" if _PRIV else f"{abs(v):,.0f}".replace(",", ".")
 
 
-# régua OPERACIONAL: entrou − saiu (bate com os chips). Aportes, resgates e
-# compras de bem são movimento patrimonial — vivem na linha Patrimônio.
-sobrou = caixa["receita_total"] - caixa["despesa_total"]
+# sobrou = entrou − saiu − investido (fecha com os 3 chips). O "investido" é o
+# líquido que saiu DA CONTA pra patrimônio (pagamentos direto do investimento
+# têm par de resgate e zeram — só conta o que realmente passou pela conta).
+sobrou = caixa["saldo_mes"]
 sinal = '' if sobrou >= 0 else '<span class="menos">−</span>'
 with col_hero:
     st.markdown(
@@ -269,9 +270,8 @@ with col_hero:
         unsafe_allow_html=True,
     )
 
-# régua de CONSUMO pura: receita − consumo (movimentos patrimoniais — aporte,
-# resgate, compra de bem — não entram; eles vivem no caixa e no Patrimônio)
-_saldo_cp = k["receita_total"] - k["despesa_total"]
+# saldo = receita − consumo − investido (fecha com os 3 chips, em competência)
+_saldo_cp = k["saldo_mes"]
 _sinal_cp = '' if _saldo_cp >= 0 else '<span class="menos">−</span>'
 col_cp.markdown(
     f"""
@@ -300,7 +300,7 @@ for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexive
     desp = caixa["despesa_por_pessoa"].get(pessoa, 0)
     apo = caixa["aporte_por_pessoa"].get(pessoa, 0)
     consumo_p = k["despesa_por_pessoa"].get(pessoa, 0)
-    saldo = rec - desp  # operacional: entrou − saiu (patrimonial fica no Patrimônio)
+    saldo = rec - desp - apo  # fecha com as linhas do card: entrou − saiu − investido
     cor_saldo = COR["receita"] if saldo >= 0 else COR["despesa"]
     _inv = f'<div class="pr"><span>investido</span><b>{fmt(apo)}</b></div>' if apo > 0 else ""
     _cards += (
