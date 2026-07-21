@@ -313,12 +313,23 @@ _patr_total = estocado + _imob["total"]
 _patr_val = fmt(_patr_total) if _patr_total > 0 else "—"
 _p_ctx = col_p.container(key="lin-patr")
 with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=False):
-    pm1, pm2, pm3 = st.columns(3)
-    pm1.metric("investível", fmt(estocado) if estocado > 0 else "—",
-               help="dinheiro que vira caixa fácil: Itaú + XP (snapshots)")
-    pm2.metric("imobilizado", fmt(_imob["total"]) if _imob["total"] > 0 else "—",
-               help="bens a valor de mercado − saldo devedor (aba Bens)")
-    pm3.metric("total", fmt(_patr_total) if _patr_total > 0 else "—")
+    def _kpi_patr(rotulo, valor, dica):
+        v = fmt(valor) if valor > 0 else "—"
+        return (f'<div style="flex:1;min-width:0;background:#F2F7F3;border-radius:12px;'
+                f'padding:9px 12px" title="{dica}">'
+                f'<div style="font-size:10.5px;color:#5C6B62;font-weight:700;'
+                f'text-transform:uppercase;letter-spacing:.04em">{rotulo}</div>'
+                f'<div style="font-size:15.5px;font-weight:800;font-variant-numeric:tabular-nums;'
+                f'white-space:nowrap">{v}</div></div>')
+
+    st.markdown(
+        '<div style="display:flex;gap:8px;margin-bottom:6px">'
+        + _kpi_patr("investível", estocado, "dinheiro que vira caixa fácil: bancos/corretoras (snapshots)")
+        + _kpi_patr("imobilizado", _imob["total"], "bens a valor de mercado − saldo devedor (aba Bens)")
+        + _kpi_patr("total", _patr_total, "investível + imobilizado")
+        + "</div>",
+        unsafe_allow_html=True,
+    )
     if _imob["total"] > 0:
         st.caption(f"imobilizado: {fmt(_imob['investimento'])} em bens de investimento + "
                    f"{fmt(_imob['uso'])} em bens de uso".replace("R$", "R\\$"))
