@@ -241,7 +241,9 @@ def _num_hero(v: float) -> str:
     return "••••" if _PRIV else f"{abs(v):,.0f}".replace(",", ".")
 
 
-sobrou = caixa["saldo_mes"]
+# régua OPERACIONAL: entrou − saiu (bate com os chips). Aportes, resgates e
+# compras de bem são movimento patrimonial — vivem na linha Patrimônio.
+sobrou = caixa["receita_total"] - caixa["despesa_total"]
 sinal = '' if sobrou >= 0 else '<span class="menos">−</span>'
 with col_hero:
     st.markdown(
@@ -292,7 +294,7 @@ for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexive
     desp = caixa["despesa_por_pessoa"].get(pessoa, 0)
     apo = caixa["aporte_por_pessoa"].get(pessoa, 0)
     consumo_p = k["despesa_por_pessoa"].get(pessoa, 0)
-    saldo = rec - desp - apo
+    saldo = rec - desp  # operacional: entrou − saiu (patrimonial fica no Patrimônio)
     cor_saldo = COR["receita"] if saldo >= 0 else COR["despesa"]
     _inv = f'<div class="pr"><span>investido</span><b>{fmt(apo)}</b></div>' if apo > 0 else ""
     _cards += (
