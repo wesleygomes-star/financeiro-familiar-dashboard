@@ -12,6 +12,20 @@ def fmt_brl(v) -> str:
         return "R$ 0,00"
 
 
+def faixa_titulo(titulo: str):
+    """Faixa gradiente verde→azul no topo da página (mesma identidade da Visão Geral)."""
+    st.markdown(
+        f'<div style="background:linear-gradient(90deg,#0C5949 0%,#0A4A3A 38%,#0E3A62 66%,#082744 100%);'
+        f'border-radius:18px;padding:12px 18px;margin-bottom:14px;'
+        f'box-shadow:0 8px 20px rgba(10,45,55,0.28);display:flex;align-items:center;gap:12px">'
+        f'<span style="width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,0.16);'
+        f'color:#7CE0B8;font-weight:800;font-size:16px;display:inline-flex;align-items:center;'
+        f'justify-content:center;flex:0 0 34px">$</span>'
+        f'<span style="color:#F2FBF6;font-size:16.5px;font-weight:700">{titulo}</span></div>',
+        unsafe_allow_html=True,
+    )
+
+
 # ---- Tokens semânticos de cor: cada cor tem UM significado no painel inteiro ----
 COR = {
     "receita": "#1D9E75",         # verde — dinheiro que entra / positivo

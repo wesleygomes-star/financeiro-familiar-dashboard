@@ -11,7 +11,7 @@ Estrutura:
 import streamlit as st
 from datetime import datetime
 from lib.data import load_lancamentos, load_recorrentes, load_tetos, meses_disponiveis, filtrar, mes_anterior, progresso_mes, classificar_fixa_variavel
-from lib.components import barra_navegacao, kpi_card, donut_categorias, barras_categoria_vs_teto, projecao_6_meses, tabela_top_despesas, detalhar_categoria, comparativo_mensal, fmt_brl, breakdown_fixa_variavel, detalhar_fixa_variavel, tema_verde_premium
+from lib.components import barra_navegacao, faixa_titulo, kpi_card, donut_categorias, barras_categoria_vs_teto, projecao_6_meses, tabela_top_despesas, detalhar_categoria, comparativo_mensal, fmt_brl, breakdown_fixa_variavel, detalhar_fixa_variavel, tema_verde_premium
 
 
 # set_page_config + auth ficam no router (streamlit_app.py)
@@ -91,7 +91,7 @@ df_lanc = classificar_fixa_variavel(df_lanc, df_rec)
 
 
 # ============== HEADER ==============
-st.title("Financeiro Família Gomes")
+faixa_titulo("Detalhes")
 
 # ============== FILTROS (card único agrupado) ==============
 with st.container(border=True):

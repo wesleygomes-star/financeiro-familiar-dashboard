@@ -12,7 +12,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-from lib.components import barra_navegacao, tema_verde_premium
+from lib.components import faixa_titulo, barra_navegacao, tema_verde_premium
 from lib.data import load_lancamentos
 from lib.ocr_fatura import dedupe_against_existing, extract_transactions
 from lib.sheets_writer import append_lancamentos
@@ -28,7 +28,7 @@ st.markdown(
 )
 
 # ----- Header -----
-st.title("Importar Fatura")
+faixa_titulo("Importar Fatura")
 with st.expander("Como funciona"):
     st.markdown(
         """
@@ -45,15 +45,15 @@ has_anthropic = bool(st.secrets.get("ANTHROPIC_API_KEY"))
 has_openai = bool(st.secrets.get("OPENAI_API_KEY"))
 
 if not has_anthropic and not has_openai:
-    st.error(
-        "⚠️ **Nenhuma API key de IA configurada.**\n\n"
-        "Edite `.streamlit/secrets.toml` e adicione UMA das duas:\n\n"
-        "```toml\n"
-        'ANTHROPIC_API_KEY = "sk-ant-..."\n'
-        "# OU\n"
-        'OPENAI_API_KEY = "sk-..."\n'
-        "```\n\n"
-        "**Custo estimado:** R$ 3-5/mês com 6 faturas/mês."
+    st.success(
+        "📲 **O jeito oficial de importar fatura é pelo Zap:** mande o PDF (ou CSV) "
+        "no grupo da família e o robô extrai, valida a soma ao centavo, marca duplicatas "
+        "e atualiza a aba Faturas sozinho."
+    )
+    st.caption(
+        "Esta página é o caminho alternativo por upload e está desativada — o OCR daqui "
+        "usa uma chave de IA própria que não foi migrada pro novo servidor. "
+        "Se quiser reativar, é só pedir ao Claude pra configurar a chave no Railway."
     )
     st.stop()
 

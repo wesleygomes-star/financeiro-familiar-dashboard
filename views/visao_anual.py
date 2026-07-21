@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from lib.components import barra_navegacao, COR, PLOTLY_CONFIG, fig_mobile, tema_verde_premium
+from lib.components import barra_navegacao, COR, PLOTLY_CONFIG, faixa_titulo, fig_mobile, tema_verde_premium
 from lib.data import is_investimento, is_pagamento_fatura, load_lancamentos
 
 tema_verde_premium()
@@ -31,8 +31,8 @@ def fmt(v):
 
 df = load_lancamentos(False)
 
-c1, c2, c3 = st.columns([2, 1, 1])
-c1.markdown("### Visão anual")
+faixa_titulo("Visão anual")
+_esp, c2, c3 = st.columns([2, 1, 1])
 anos = sorted({str(c).split("/")[1] for c in df["Competência"] if "/" in str(c)}, reverse=True) if not df.empty else ["2026"]
 ano = c2.selectbox("Ano", anos, index=anos.index("2026") if "2026" in anos else 0, label_visibility="collapsed")
 modo = c3.radio("Modo", ["Competência", "Caixa"], horizontal=True, label_visibility="collapsed")
@@ -110,17 +110,27 @@ fig.update_layout(barmode="group", height=280, margin=dict(l=10, r=10, t=10, b=1
                   legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5))
 st.plotly_chart(fig_mobile(fig), use_container_width=True, config=PLOTLY_CONFIG)
 
-# Tabelas matriz
-NUMCOLS = {c: st.column_config.NumberColumn(format="%.0f", width="small") for c in meses_lbl}
-NUMCOLS["Total"] = st.column_config.NumberColumn(format="R$ %.0f")
-NUMCOLS["Média"] = st.column_config.NumberColumn(format="R$ %.0f")
+# Tabelas matriz — formato pt-BR (milhar com ponto), células vazias sem "None"
+def _mil(v):
+    if pd.isna(v):
+        return "—"
+    return f"{v:,.0f}".replace(",", ".")
+
+
+def _brl0(v):
+    if pd.isna(v):
+        return "—"
+    return "R$ " + f"{v:,.0f}".replace(",", ".")
+
 
 for nome, cor in [("Despesas", "#E24B4A"), ("Receitas", "#1D9E75"), ("Investimentos", "#185FA5")]:
     disp, totais, total = matriz(splits[nome], nome, cor)
     if disp is None or disp.empty:
         continue
     st.subheader(f"{nome} · R$ {fmt(total)} no ano")
-    st.dataframe(disp.round(0), use_container_width=True, column_config=NUMCOLS,
+    _fmt_cols = {"Total": _brl0, "Média": _brl0}
+    _fmt_cols.update({m: _mil for m in meses_lbl})
+    st.dataframe(disp.round(0).style.format(_fmt_cols), use_container_width=True,
                  height=min(40 + len(disp) * 35, 560))
 
 # Resultado mensal (receita − despesa − investido) — Saldo colorido salta da grade
@@ -147,12 +157,8 @@ styled = saldo_view.style.apply(_cor_saldo, subset=["Saldo"]).format({"Saldo": _
 st.dataframe(styled, use_container_width=True, hide_index=True)
 
 with st.expander("Detalhe: receita × despesa × investido por mês"):
-    st.dataframe(res, use_container_width=True, hide_index=True, column_config={
-        "Receita": st.column_config.NumberColumn(format="R$ %.0f"),
-        "Despesa": st.column_config.NumberColumn(format="R$ %.0f"),
-        "Investido": st.column_config.NumberColumn(format="R$ %.0f"),
-        "Saldo": st.column_config.NumberColumn(format="R$ %.0f"),
-    })
+    st.dataframe(res.style.format({c: _brl0 for c in ("Receita", "Despesa", "Investido", "Saldo")}),
+                 use_container_width=True, hide_index=True)
 
 st.caption("Jan–Jul: custos fixos (histórico Controle) + detalhe real dos cartões (faturas Itaú/XP) "
            "+ lançamentos do Zap. Pagamento de fatura é excluído (transferência, não consumo).")
