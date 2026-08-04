@@ -579,7 +579,7 @@ def _emparelhar_recorrentes(df_desp: pd.DataFrame, df_rec: pd.DataFrame, compete
             cat_ok = bool(rcat) and rcat == lcat
             # par SÓ por categoria (sem token) exige valor quase exato (±8%) —
             # evita casar item aleatório da mesma categoria (14/07)
-            if shared == 0 and cat_ok and diff > rval * 0.08:
+            if shared == 0 and cat_ok and diff > rval * 0.03:
                 continue
             if shared >= 1 or cat_ok:
                 pares.append((shared * 100 + (10 if cat_ok else 0) + (20 - 20 * diff / (rval * 0.20)), ri, li))
