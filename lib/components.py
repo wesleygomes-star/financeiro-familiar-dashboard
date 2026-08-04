@@ -257,6 +257,7 @@ def barra_navegacao(ativa: str = "inicio"):
     """
     ABAS = [
         ("inicio", "views/visao_geral.py", "Início", ":material/home:"),
+        ("patrimonio", "views/patrimonio.py", "Patrimônio", ":material/account_balance:"),
         ("anual", "views/visao_anual.py", "Anual", ":material/calendar_month:"),
         ("importar", "views/importar_fatura.py", "Importar", ":material/upload_file:"),
         ("detalhes", "views/dashboard_detalhado.py", "Detalhes", ":material/monitoring:"),

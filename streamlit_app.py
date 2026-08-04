@@ -160,6 +160,7 @@ else:
 # ============== Navegação nomeada ==============
 pages = [
     st.Page("views/visao_geral.py", title="Visão Geral", icon="💰", default=True),
+    st.Page("views/patrimonio.py", title="Patrimônio", icon="🏦"),
     st.Page("views/visao_anual.py", title="Visão Anual", icon="📅"),
     st.Page("views/importar_fatura.py", title="Importar Fatura", icon="📥"),
     st.Page("views/dashboard_detalhado.py", title="Dashboard Detalhado", icon="📊"),
