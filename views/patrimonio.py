@@ -137,8 +137,8 @@ if not df_bens.empty and "Valor de Mercado" in df_bens.columns:
     if not _dividas.empty:
         total_divida = _dividas["Saldo Devedor"].sum()
         st.caption(
-            f"dívida total em aberto: {fmt(total_divida)} — carro amortiza sozinho todo dia 1º "
-            f"(tabela Price); AP Cláudio segue o cronograma contratual."
+            (f"dívida total em aberto: {fmt(total_divida)} — carro amortiza sozinho todo dia 1º "
+             f"(tabela Price); AP Cláudio segue o cronograma contratual.").replace("R$", "R\\$")
         )
 
     if _imob["n_pendentes"] > 0:
@@ -195,9 +195,10 @@ if not _ap.empty:
         unsafe_allow_html=True,
     )
     st.caption(
-        "IR de ganho de capital pessoa física é sobre o valor NOMINAL (venda − custo histórico), "
-        "sem correção monetária — não confundir com o breakeven do custo de capital (visão gerencial, "
-        "no dossiê do AP). Alíquotas progressivas: 15% até R$5mi de ganho, 17,5% até R$10mi, 20% até R$30mi, 22,5% acima."
+        ("IR de ganho de capital pessoa física é sobre o valor NOMINAL (venda − custo histórico), "
+         "sem correção monetária — não confundir com o breakeven do custo de capital (visão gerencial, "
+         "no dossiê do AP). Alíquotas progressivas: 15% até R$5mi de ganho, 17,5% até R$10mi, 20% até R$30mi, 22,5% acima."
+         ).replace("R$", "R\\$")
     )
 else:
     st.info("AP Cláudio não encontrado na aba Bens.")
