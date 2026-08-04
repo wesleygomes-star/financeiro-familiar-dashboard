@@ -151,21 +151,20 @@ else:
 st.markdown('<h3 style="margin-top:20px">Grandes projetos</h3>', unsafe_allow_html=True)
 
 
-def _faixas_ir(ganho: float) -> float:
-    """Ganho de capital PF, alienação de imóvel (Lei 13.259/2016) — alíquotas progressivas
-    por faixa de ganho, sem correção monetária do custo (lei não permite)."""
+def _tributos_pj(ganho: float) -> dict:
+    """Ganho de capital PJ na alienação de bem do ativo não circulante — tributado pelo
+    valor TOTAL do ganho (sem presunção, vale pra Lucro Real e Presumido) via IRPJ (15% +
+    adicional 10% acima de R$240k/ano) + CSLL (9% flat). Regime da ARTH não confirmado,
+    mas a regra do ganho de capital converge nos dois regimes — estimativa, não apuração."""
     if ganho <= 0:
-        return 0.0
-    faixas = [(5_000_000, 0.15), (5_000_000, 0.175), (20_000_000, 0.20), (float("inf"), 0.225)]
-    imposto = 0.0
-    restante = ganho
-    for tamanho, aliquota in faixas:
-        parcela = min(restante, tamanho)
-        imposto += parcela * aliquota
-        restante -= parcela
-        if restante <= 0:
-            break
-    return imposto
+        return {"irpj_base": 0.0, "irpj_adicional": 0.0, "csll": 0.0, "total": 0.0}
+    LIMITE_ADICIONAL = 240_000.0
+    excedente = max(ganho - LIMITE_ADICIONAL, 0.0)
+    irpj_base = ganho * 0.15
+    irpj_adicional = excedente * 0.10
+    csll = ganho * 0.09
+    return {"irpj_base": irpj_base, "irpj_adicional": irpj_adicional, "csll": csll,
+            "total": irpj_base + irpj_adicional + csll}
 
 
 _ap = df_bens[df_bens["Nome"].astype(str).str.contains("501", na=False)] if not df_bens.empty else pd.DataFrame()
@@ -175,18 +174,20 @@ if not _ap.empty:
     custo = float(r.get("Custo Aquisição", 0) or 0)
     saldo_dev = float(r.get("Saldo Devedor", 0) or 0)
     ganho = max(vm - custo, 0.0)
-    ir = _faixas_ir(ganho)
-    liquido = vm - saldo_dev - ir
+    trib = _tributos_pj(ganho)
+    liquido = vm - saldo_dev - trib["total"]
     st.markdown(
         f"""
         <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(12,60,45,0.06)">
-          <div style="font-weight:800;font-size:14.5px;margin-bottom:8px">🏠 {r.get('Nome', 'AP 501')}</div>
+          <div style="font-weight:800;font-size:14.5px;margin-bottom:8px">🏠 {r.get('Nome', 'AP 501')} · ARTH Participações (PJ)</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px">
             <div style="color:#5C6B62">Valor de mercado</div><div style="text-align:right;font-weight:700">{fmt(vm)}</div>
             <div style="color:#5C6B62">Custo de aquisição</div><div style="text-align:right;font-weight:700">{fmt(custo)}</div>
             <div style="color:#5C6B62">Saldo devedor</div><div style="text-align:right;font-weight:700">{fmt(saldo_dev)}</div>
             <div style="color:#5C6B62">Ganho de capital estimado</div><div style="text-align:right;font-weight:700">{fmt(ganho)}</div>
-            <div style="color:#5C6B62">IR estimado na venda (PF, s/ correção)</div><div style="text-align:right;font-weight:700;color:{COR['despesa']}">{fmt(ir)}</div>
+            <div style="color:#5C6B62">IRPJ (15% + adicional 10%)</div><div style="text-align:right;font-weight:700;color:{COR['despesa']}">{fmt(trib['irpj_base'] + trib['irpj_adicional'])}</div>
+            <div style="color:#5C6B62">CSLL (9%)</div><div style="text-align:right;font-weight:700;color:{COR['despesa']}">{fmt(trib['csll'])}</div>
+            <div style="color:#5C6B62;font-weight:700">Total tributos estimado</div><div style="text-align:right;font-weight:800;color:{COR['despesa']}">{fmt(trib['total'])}</div>
             <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;color:#1C2420;font-weight:800">Líquido estimado na venda</div>
             <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;text-align:right;font-weight:800;color:{COR['receita']}">{fmt(liquido)}</div>
           </div>
@@ -195,9 +196,13 @@ if not _ap.empty:
         unsafe_allow_html=True,
     )
     st.caption(
-        ("IR de ganho de capital pessoa física é sobre o valor NOMINAL (venda − custo histórico), "
-         "sem correção monetária — não confundir com o breakeven do custo de capital (visão gerencial, "
-         "no dossiê do AP). Alíquotas progressivas: 15% até R$5mi de ganho, 17,5% até R$10mi, 20% até R$30mi, 22,5% acima."
+        ("Investimento em nome da ARTH Participações (PJ) — tributos calculados na empresa, não pessoa física. "
+         "Ganho de capital na venda de ativo não circulante é tributado pelo valor TOTAL (sem presunção), "
+         "vale tanto pra Lucro Real quanto Presumido: IRPJ 15% + adicional 10% sobre o que exceder R$240mil/ano "
+         "de ganho + CSLL 9% flat — bem mais pesado que o IR pessoa física. Estimativa de planejamento; a apuração "
+         "real da ARTH pode variar com regime, período de apuração e outros resultados da empresa no exercício — "
+         "confirmar com o contador antes de decidir o preço de venda. Não confundir com o breakeven do custo de "
+         "capital (visão gerencial, no dossiê do AP)."
          ).replace("R$", "R\\$")
     )
 else:
