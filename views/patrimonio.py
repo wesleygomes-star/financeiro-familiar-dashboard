@@ -1,12 +1,16 @@
 """Patrimônio — visão completa: investível, imobilizado, dívidas e grandes projetos.
 set_page_config + auth no router."""
+from datetime import datetime
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 from lib.components import COR, PLOTLY_CONFIG, barra_navegacao, faixa_titulo, fig_mobile, tema_verde_premium
 from lib.data import (
+    custo_capital_corrigido,
     kpis_familia,
+    load_ap_claudio_aportes,
     load_bens,
     load_lancamentos,
     load_saldo_investido,
@@ -176,6 +180,7 @@ if not _ap.empty:
     ganho = max(vm - custo, 0.0)
     trib = _tributos_pj(ganho)
     liquido = vm - saldo_dev - trib["total"]
+
     st.markdown(
         f"""
         <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(12,60,45,0.06)">
@@ -188,7 +193,7 @@ if not _ap.empty:
             <div style="color:#5C6B62">IRPJ (15% + adicional 10%)</div><div style="text-align:right;font-weight:700;color:{COR['despesa']}">{fmt(trib['irpj_base'] + trib['irpj_adicional'])}</div>
             <div style="color:#5C6B62">CSLL (9%)</div><div style="text-align:right;font-weight:700;color:{COR['despesa']}">{fmt(trib['csll'])}</div>
             <div style="color:#5C6B62;font-weight:700">Total tributos estimado</div><div style="text-align:right;font-weight:800;color:{COR['despesa']}">{fmt(trib['total'])}</div>
-            <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;color:#1C2420;font-weight:800">Líquido estimado na venda</div>
+            <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;color:#1C2420;font-weight:800">Líquido nominal na venda</div>
             <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;text-align:right;font-weight:800;color:{COR['receita']}">{fmt(liquido)}</div>
           </div>
         </div>
@@ -201,9 +206,157 @@ if not _ap.empty:
          "vale tanto pra Lucro Real quanto Presumido: IRPJ 15% + adicional 10% sobre o que exceder R$240mil/ano "
          "de ganho + CSLL 9% flat — bem mais pesado que o IR pessoa física. Estimativa de planejamento; a apuração "
          "real da ARTH pode variar com regime, período de apuração e outros resultados da empresa no exercício — "
-         "confirmar com o contador antes de decidir o preço de venda. Não confundir com o breakeven do custo de "
-         "capital (visão gerencial, no dossiê do AP)."
+         "confirmar com o contador antes de decidir o preço de venda. Não inclui os custos de regularização "
+         "(ITBI, escritura, registro) — ver simulação completa abaixo."
          ).replace("R$", "R\\$")
     )
+
+    # ---------- Custos de regularização (2 cenários do ITBI) ----------
+    ESCRITURA = 4_373.0
+    REGISTRO = 4_373.0
+    DESPACHANTE = 1_200.0
+    ITBI_EMITIDO = 28_557.72
+    ITBI_REVISAO = 5_657.93
+    regularizacao_emitido = ITBI_EMITIDO + ESCRITURA + REGISTRO + DESPACHANTE
+    regularizacao_revisao = ITBI_REVISAO + ESCRITURA + REGISTRO + DESPACHANTE
+
+    st.markdown('<h3 style="margin-top:20px">Custos de regularização</h3>', unsafe_allow_html=True)
+    _reg = pd.DataFrame(
+        [
+            {"Item": "ITBI", "Guia emitida (PBH)": ITBI_EMITIDO, "Se a revisão for aceita": ITBI_REVISAO},
+            {"Item": "Escritura pública (≈)", "Guia emitida (PBH)": ESCRITURA, "Se a revisão for aceita": ESCRITURA},
+            {"Item": "Registro 4º RI (≈)", "Guia emitida (PBH)": REGISTRO, "Se a revisão for aceita": REGISTRO},
+            {"Item": "Despachante (Oiti)", "Guia emitida (PBH)": DESPACHANTE, "Se a revisão for aceita": DESPACHANTE},
+            {"Item": "Total", "Guia emitida (PBH)": regularizacao_emitido, "Se a revisão for aceita": regularizacao_revisao},
+        ]
+    )
+    st.dataframe(
+        _reg.style.format({c: (lambda v: fmt(v)) for c in ("Guia emitida (PBH)", "Se a revisão for aceita")}),
+        use_container_width=True, hide_index=True,
+    )
+    st.caption(
+        ("PBH lançou o ITBI como se o imóvel estivesse pronto (base R$951.924, valor venal cadastral) — "
+         "despachante já protocolou revisão pra base correta (fração declarada R$188.597,67). Enquanto não sai "
+         "a decisão, os dois valores ficam em aberto — ver pendências abaixo. Escritura e registro são estimativas "
+         "de tabela (TJMG). Pra PJ, esses custos são CAPITALIZADOS no custo de aquisição do imóvel (reduzem o ganho "
+         "de capital tributável), não são despesa dedutível corrente — refletido na simulação abaixo."
+         ).replace("R$", "R\\$")
+    )
+
+    # ---------- O que foi investido + custo do dinheiro ----------
+    df_aportes = load_ap_claudio_aportes()
+    TAXA_CAPITAL = 0.12
+    hoje = datetime.now()
+    total_aportado = float(df_aportes["Valor Pago"].sum()) if not df_aportes.empty else 0.0
+    n_aportes = int((df_aportes["Valor Pago"] > 0).sum()) if not df_aportes.empty else 0
+    primeiro_aporte = df_aportes["Data_dt"].min() if not df_aportes.empty else pd.NaT
+    custo_corrigido = custo_capital_corrigido(df_aportes, TAXA_CAPITAL, hoje) if not df_aportes.empty else 0.0
+    breakeven = custo_corrigido + saldo_dev
+
+    st.markdown('<h3 style="margin-top:20px">O que foi investido</h3>', unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(12,60,45,0.06)">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px">
+            <div style="color:#5C6B62">Total já aportado ({n_aportes} pagamentos)</div><div style="text-align:right;font-weight:700">{fmt(total_aportado)}</div>
+            <div style="color:#5C6B62">Primeiro aporte</div><div style="text-align:right;font-weight:700">{primeiro_aporte.strftime('%d/%m/%Y') if pd.notna(primeiro_aporte) else '—'}</div>
+            <div style="color:#5C6B62">Saldo a pagar (quitação final)</div><div style="text-align:right;font-weight:700">{fmt(saldo_dev)}</div>
+            <div style="color:#5C6B62;font-weight:700">Total contratado (nominal)</div><div style="text-align:right;font-weight:800">{fmt(custo)}</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<h3 style="margin-top:20px">Custo do dinheiro</h3>', unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(12,60,45,0.06)">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px">
+            <div style="color:#5C6B62">Taxa de custo de capital usada</div><div style="text-align:right;font-weight:700">{TAXA_CAPITAL*100:.0f}% a.a.</div>
+            <div style="color:#5C6B62">Aportes corrigidos até hoje</div><div style="text-align:right;font-weight:700">{fmt(custo_corrigido)}</div>
+            <div style="color:#5C6B62">(+) saldo a pagar</div><div style="text-align:right;font-weight:700">{fmt(saldo_dev)}</div>
+            <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;color:#1C2420;font-weight:800">Breakeven mínimo de venda</div>
+            <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;text-align:right;font-weight:800;color:{COR['alerta']}">{fmt(breakeven)}</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        ("cada aporte corrigido da data do pagamento até hoje, capitalização diária composta — "
+         "é quanto esse dinheiro valeria se tivesse rendido a taxa acima em vez de ter ido pro imóvel. "
+         "abaixo do breakeven, a venda perde dinheiro em termos reais mesmo dando lucro no papel."
+         ).replace("R$", "R\\$")
+    )
+
+    # ---------- Simulação de resultado: nominal × custo de capital, cada um nos 2 cenários de ITBI ----------
+    st.markdown('<h3 style="margin-top:20px">Simulação de resultado</h3>', unsafe_allow_html=True)
+
+    def _cenario(nome: str, regularizacao: float, custo_base_cash: float) -> dict:
+        """custo_base_cash = saldo_dev (nominal) ou breakeven (custo de capital) — o que sai
+        do caixa na venda, sem contar regularização. Ganho de capital (fiscal) sempre usa o
+        custo TOTAL contratado + regularização capitalizada — regra PJ, igual nos 2 lentes."""
+        custo_fiscal = custo + regularizacao
+        ganho_c = max(vm - custo_fiscal, 0.0)
+        trib_c = _tributos_pj(ganho_c)
+        liquido_c = vm - custo_base_cash - regularizacao - trib_c["total"]
+        return {
+            "Cenário": nome,
+            "Ganho de capital (PJ)": ganho_c,
+            "Tributos (PJ)": trib_c["total"],
+            "Custos de regularização": regularizacao,
+            "Líquido estimado": liquido_c,
+        }
+
+    _sim = pd.DataFrame(
+        [
+            _cenario("Nominal · guia ITBI emitida", regularizacao_emitido, saldo_dev),
+            _cenario("Nominal · revisão do ITBI aceita", regularizacao_revisao, saldo_dev),
+            _cenario("Custo de capital · guia ITBI emitida", regularizacao_emitido, breakeven),
+            _cenario("Custo de capital · revisão do ITBI aceita", regularizacao_revisao, breakeven),
+        ]
+    )
+    _cols_money = ("Ganho de capital (PJ)", "Tributos (PJ)", "Custos de regularização", "Líquido estimado")
+    st.dataframe(
+        _sim.style.format({c: (lambda v: fmt(v)) for c in _cols_money}),
+        use_container_width=True, hide_index=True,
+    )
+    _liq_nom_emit = _sim.loc[0, "Líquido estimado"]
+    _liq_nom_rev = _sim.loc[1, "Líquido estimado"]
+    _liq_real_emit = _sim.loc[2, "Líquido estimado"]
+    _liq_real_rev = _sim.loc[3, "Líquido estimado"]
+    margem_real = (_liq_real_rev / breakeven * 100) if breakeven > 0 else 0.0
+    st.caption(
+        (f"vendendo hoje por {fmt(vm)}: no nominal, o líquido vai de {fmt(_liq_nom_emit)} (se o ITBI ficar como a PBH "
+         f"lançou) a {fmt(_liq_nom_rev)} (se a revisão for aceita) — diferença de {fmt(_liq_nom_rev - _liq_nom_emit)}. "
+         f"Descontando o custo de capital, o líquido REAL vai de {fmt(_liq_real_emit)} a {fmt(_liq_real_rev)} "
+         f"({margem_real:.1f}% de margem real sobre o breakeven, no cenário da revisão). "
+         "cada cenário de ITBI recalcula o ganho de capital porque, sendo PJ, ITBI/escritura/registro/despachante "
+         "entram no custo de aquisição do imóvel — reduzem o ganho tributável, não são despesa separada."
+         ).replace("R$", "R\\$")
+    )
+
+    # ---------- Pendências ----------
+    st.markdown('<h3 style="margin-top:20px">Pendências</h3>', unsafe_allow_html=True)
+    _pendencias = [
+        (True, "Contratos (PCV + Construção) assinados por Wesley e pela DMA — validado 05/08"),
+        (True, "1ª parcela do despachante (R$ 600) paga — 30/07"),
+        (False, "ITBI em disputa: guia da PBH de R$ 28.557,72 (avaliou como imóvel pronto) vs. R$ 5.657,93 esperado — aguardando revisão (protocolo 70/044293-26-80)"),
+        (False, "Enviar ao despachante: CNH, certidão de casamento atualizada e qualificação"),
+        (False, f"Quitar saldo final ({fmt(saldo_dev)} + INCC) e negociar outorga da escritura — evitar cessão (3% DMA)"),
+    ]
+    _linhas_pend = "".join(
+        f"""<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #F0F3F1;font-size:13px">
+              <div>{'✅' if done else '⬜'}</div>
+              <div style="color:{'#8B978F' if done else '#1C2420'}">{texto}</div>
+            </div>"""
+        for done, texto in _pendencias
+    )
+    st.markdown(
+        f'<div style="background:#fff;border-radius:14px;padding:16px 16px 8px;box-shadow:0 2px 8px rgba(12,60,45,0.06)">{_linhas_pend}</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption("snapshot manual — fonte de verdade é o DOSSIE - AP 501 Ed Claudio de Paula.md na pasta do investimento")
 else:
     st.info("AP Cláudio não encontrado na aba Bens.")

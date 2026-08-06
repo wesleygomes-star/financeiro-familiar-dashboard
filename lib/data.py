@@ -299,6 +299,41 @@ def patrimonio_imobilizado(df_bens: pd.DataFrame) -> dict:
 
 
 @st.cache_data(ttl=60)
+def load_ap_claudio_aportes() -> pd.DataFrame:
+    """Aba 'AP Claudio Aportes' — fluxo de caixa real do investimento (agrupado por data
+    de pagamento), fonte pro cálculo de custo de capital no dossiê do AP 501."""
+    try:
+        rows = _records_formatted("AP Claudio Aportes")
+    except Exception:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    df["Valor Pago"] = df["Valor Pago"].apply(_parse_valor)
+    df["Data_dt"] = df["Data"].apply(_parse_data)
+    return df
+
+
+def custo_capital_corrigido(df_aportes: pd.DataFrame, taxa_aa: float, data_ref: datetime) -> float:
+    """Corrige cada aporte da data de pagamento até data_ref, capitalização diária composta
+    (mesma fórmula do controle manual: fator = (1+taxa)^(dias/365)). Representa quanto esse
+    dinheiro valeria hoje se tivesse rendido a taxa_aa em vez de ter sido investido no imóvel —
+    é o preço mínimo de venda pra não perder dinheiro em termos reais (visão gerencial, não fiscal)."""
+    if df_aportes is None or df_aportes.empty:
+        return 0.0
+    total = 0.0
+    for _, r in df_aportes.iterrows():
+        d = r.get("Data_dt")
+        v = float(r.get("Valor Pago", 0) or 0)
+        if pd.isna(d) or v == 0:
+            continue
+        dias = (data_ref - d).days
+        fator = (1 + taxa_aa) ** (dias / 365)
+        total += v * fator
+    return total
+
+
+@st.cache_data(ttl=60)
 def load_bens_snapshots() -> pd.DataFrame:
     try:
         rows = _records_formatted("Bens Snapshots")
