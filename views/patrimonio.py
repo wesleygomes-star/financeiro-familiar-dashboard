@@ -290,6 +290,35 @@ if not _ap.empty:
          ).replace("R$", "R\\$")
     )
 
+    # ---------- Comparativo com outras aplicações (mesmo fluxo de caixa, taxas alternativas) ----------
+    TAXA_CDB = 0.11  # CDB ~100% CDI — ajustar conforme CDI vigente
+    TAXA_ACOES_DIV = 0.15  # média histórica aprox. de longo prazo de carteiras de dividendos (IDIV/B3) — MUITO mais volátil, sem garantia
+    equity_imovel = vm - saldo_dev
+    cdb_corrigido = custo_capital_corrigido(df_aportes, TAXA_CDB, hoje) if not df_aportes.empty else 0.0
+    acoes_corrigido = custo_capital_corrigido(df_aportes, TAXA_ACOES_DIV, hoje) if not df_aportes.empty else 0.0
+
+    st.markdown('<h3 style="margin-top:20px">Comparativo com outras aplicações</h3>', unsafe_allow_html=True)
+    _comp = pd.DataFrame(
+        [
+            {"Aplicação": "AP 501 (equity atual, bruto)", "Taxa considerada": "ganho real do imóvel", "Valor hoje": equity_imovel, "vs. imóvel": 0.0},
+            {"Aplicação": "CDB (100% CDI)", "Taxa considerada": f"{TAXA_CDB*100:.0f}% a.a.", "Valor hoje": cdb_corrigido, "vs. imóvel": cdb_corrigido - equity_imovel},
+            {"Aplicação": "Ações dividendos (12 principais)", "Taxa considerada": f"{TAXA_ACOES_DIV*100:.0f}% a.a. (histórico)", "Valor hoje": acoes_corrigido, "vs. imóvel": acoes_corrigido - equity_imovel},
+        ]
+    )
+    st.dataframe(
+        _comp.style.format({c: (lambda v: fmt(v)) for c in ("Valor hoje", "vs. imóvel")}),
+        use_container_width=True, hide_index=True,
+    )
+    st.caption(
+        (f"mesmo fluxo de aportes ({fmt(total_aportado)}, nas mesmas datas) corrigido pela taxa de cada aplicação até hoje, "
+         f"comparado com o equity bruto do imóvel hoje ({fmt(equity_imovel)} = valor de mercado − saldo devedor, sem tributos "
+         "de venda). CDB é baixo risco e o rendimento é praticamente garantido pelo emissor; ações de dividendos têm risco de "
+         "preço real — a taxa aqui é uma média histórica de longo prazo, não uma promessa, o ano-a-ano oscila bem mais que isso. "
+         "nenhum dos três desconta o imposto de saída de cada aplicação (IR regressivo no CDB, ganho de capital nas ações) — "
+         "só a venda do imóvel tem essa conta feita, na simulação abaixo."
+         ).replace("R$", "R\\$")
+    )
+
     # ---------- Simulação de resultado: nominal × custo de capital, cada um nos 2 cenários de ITBI ----------
     st.markdown('<h3 style="margin-top:20px">Simulação de resultado</h3>', unsafe_allow_html=True)
 
