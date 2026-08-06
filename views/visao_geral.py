@@ -220,6 +220,8 @@ _rd_saldo = _rd_gasto - _rd_reemb
 audit = auditar_contas_fixas(df_lanc, df_rec, competencia)
 n_pagas = int((audit["Status"] == "Paga").sum()) if not audit.empty else 0
 n_fixas = len(audit)
+_fixas_provisao = float(audit["Valor Esperado"].sum()) if not audit.empty else 0.0
+_fixas_pago = float(audit["Valor Pago"].sum()) if not audit.empty else 0.0
 
 _prox_fat_txt, _prox_fat_val = "—", ""
 ab = pd.DataFrame()
@@ -393,7 +395,7 @@ with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=Fal
         st.info("Mande o print do app do banco no grupo do Zap — o patrimônio entra sozinho.")
 
 _f_ctx = col_f.container(key="lin-fix")
-with _f_ctx.expander(f"**Contas fixas** `{n_pagas}/{n_fixas} pagas`", icon="🕐", expanded=False):
+with _f_ctx.expander(f"**Contas fixas** `{n_pagas}/{n_fixas} pagas · {fmt(_fixas_pago)} de {fmt(_fixas_provisao)}`", icon="🕐", expanded=False):
     if not audit.empty:
         _ash = audit.sort_values("Dia Cobrança")
         st.dataframe(
