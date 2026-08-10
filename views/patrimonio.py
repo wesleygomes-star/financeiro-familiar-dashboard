@@ -361,7 +361,11 @@ if not _ap.empty:
     ]
     TAXA_ACOES_DIV = sum(dy for _, _, dy in TOP10_DIVIDENDOS_2025) / len(TOP10_DIVIDENDOS_2025) / 100
 
-    st.markdown('<h3 style="margin-top:20px">Top 10 dividendos B3 (2025)</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="margin-top:20px">Top 10 dividendos B3 2025 · cenário de stress</h3>', unsafe_allow_html=True)
+    st.caption(
+        "isto NÃO é uma expectativa de retorno — é um teste de estresse pegando o melhor cenário real observado "
+        "em 2025, pra ver se mesmo o topo do topo supera o imóvel. simulação, não recomendação de investimento."
+    )
     _df_top10 = pd.DataFrame(
         [{"Empresa": nome, "Ticker": tk, "Dividend Yield 2025": f"{dy:.2f}%"} for nome, tk, dy in TOP10_DIVIDENDOS_2025]
     )
@@ -369,7 +373,7 @@ if not _ap.empty:
     st.caption(
         (f"yield REALIZADO em 2025 (não é promessa nem média de longo prazo) — média simples dos 10: {TAXA_ACOES_DIV*100:.2f}% a.a. "
          "vários desses yields vieram de distribuição extraordinária (ex: venda de ativo), não é o que se repete todo ano — "
-         "trate como cenário otimista/melhor-caso observado, não como expectativa. fonte: B3 (Bora Investir)."
+         "esse número só entra no comparativo abaixo como cenário de stress. fonte: B3 (Bora Investir)."
          )
     )
 
@@ -384,7 +388,7 @@ if not _ap.empty:
         [
             {"Aplicação": "AP 501 (equity atual, bruto)", "Taxa considerada": "ganho real do imóvel", "Valor hoje": equity_imovel, "vs. imóvel": 0.0},
             {"Aplicação": "CDB (100% CDI)", "Taxa considerada": f"{TAXA_CDB*100:.0f}% a.a.", "Valor hoje": cdb_corrigido, "vs. imóvel": cdb_corrigido - equity_imovel},
-            {"Aplicação": "Top 10 dividendos B3 2025 (real)", "Taxa considerada": f"{TAXA_ACOES_DIV*100:.2f}% a.a. (melhor caso 2025)", "Valor hoje": acoes_corrigido, "vs. imóvel": acoes_corrigido - equity_imovel},
+            {"Aplicação": "Top 10 dividendos B3 2025 (stress)", "Taxa considerada": f"{TAXA_ACOES_DIV*100:.2f}% a.a. (melhor caso real, não expectativa)", "Valor hoje": acoes_corrigido, "vs. imóvel": acoes_corrigido - equity_imovel},
         ]
     )
     st.dataframe(
@@ -394,7 +398,7 @@ if not _ap.empty:
     st.caption(
         (f"mesmo fluxo de aportes ({fmt(total_aportado)}, nas mesmas datas) corrigido pela taxa de cada aplicação até hoje, "
          f"comparado com o equity bruto do imóvel hoje ({fmt(equity_imovel)} = valor de mercado − saldo devedor, sem tributos "
-         "de venda). CDB é baixo risco e o rendimento é praticamente garantido pelo emissor; mesmo no cenário otimista dos "
+         "de venda). CDB é baixo risco e o rendimento é praticamente garantido pelo emissor; mesmo no stress dos "
          "10 melhores pagadores de dividendos de 2025 (tabela acima), o imóvel ainda ganha. nenhum dos três desconta o "
          "imposto de saída de cada aplicação (IR regressivo no CDB, ganho de capital nas ações) — só a venda do imóvel "
          "tem essa conta feita, na simulação abaixo."
