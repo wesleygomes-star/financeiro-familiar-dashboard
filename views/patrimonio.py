@@ -36,8 +36,15 @@ df_lanc = load_lancamentos(False)
 df_saldo = load_saldo_investido()
 df_bens = load_bens()
 
+# Mútuo de sócio à Empresta — corrigido pelo CDI a partir do início (posição, não snapshot de banco)
+MUTUO_EMPRESTA_PRINCIPAL = 235_612.0
+MUTUO_EMPRESTA_INICIO = datetime(2026, 8, 1)
+TAXA_CDI = 0.11  # ajustar conforme CDI vigente
+_df_mutuo = pd.DataFrame([{"Valor Pago": MUTUO_EMPRESTA_PRINCIPAL, "Data_dt": MUTUO_EMPRESTA_INICIO}])
+mutuo_empresta_hoje = custo_capital_corrigido(_df_mutuo, TAXA_CDI, datetime.now())
+
 _est = saldo_estocado_atual(df_saldo)
-estocado = sum(_est.values()) if _est else 0.0
+estocado = (sum(_est.values()) if _est else 0.0) + mutuo_empresta_hoje
 _imob = patrimonio_imobilizado(df_bens)
 patr_total = estocado + _imob["total"]
 
@@ -117,6 +124,36 @@ if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
     st.caption("cada print de investimento no Zap vira um ponto novo na curva")
 else:
     st.info("Mande o print do app do banco no grupo do Zap — o patrimônio entra sozinho.")
+
+# ============== Onde está — por instituição ==============
+st.markdown('<h4 style="margin-top:14px">Onde está</h4>', unsafe_allow_html=True)
+_linhas_banco = []
+if not df_saldo.empty and "Modalidade" in df_saldo.columns:
+    _tem_data = "Data Snapshot_dt" in df_saldo.columns
+    for mod, g in df_saldo.groupby("Modalidade"):
+        g2 = g.sort_values("Data Snapshot_dt", ascending=False) if _tem_data else g
+        ultimo = g2.iloc[0]
+        _linhas_banco.append({
+            "Instituição": mod,
+            "Saldo": float(ultimo.get("Saldo Total", 0) or 0),
+            "Atualizado em": ultimo.get("Data Snapshot", "—"),
+        })
+_linhas_banco.append({
+    "Instituição": "Mútuo Empresta (sócio)",
+    "Saldo": mutuo_empresta_hoje,
+    "Atualizado em": f"corrigido pelo CDI desde {MUTUO_EMPRESTA_INICIO.strftime('%m/%Y')}",
+})
+_df_banco = pd.DataFrame(_linhas_banco).sort_values("Saldo", ascending=False)
+st.dataframe(
+    _df_banco.style.format({"Saldo": lambda v: fmt(v)}),
+    use_container_width=True, hide_index=True,
+)
+st.caption(
+    (f"mútuo com a Empresta: {fmt(MUTUO_EMPRESTA_PRINCIPAL)} de principal, corrigido a {TAXA_CDI*100:.0f}% a.a. "
+     f"(proxy do CDI) desde {MUTUO_EMPRESTA_INICIO.strftime('%d/%m/%Y')} — vira {fmt(mutuo_empresta_hoje)} hoje. "
+     "os demais bancos mostram o último print recebido no Zap."
+     ).replace("R$", "R\\$")
+)
 
 # ============== Imobilizado — bens e dívidas ==============
 st.markdown('<h3 style="margin-top:20px">Bens e dívidas</h3>', unsafe_allow_html=True)
