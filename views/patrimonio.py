@@ -131,26 +131,30 @@ if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
 else:
     st.info("Mande o print do app do banco no grupo do Zap — o patrimônio entra sozinho.")
 
-# ============== Onde está — por instituição (só o que é Investível de verdade) ==============
+# ============== Onde está — por pessoa + instituição (só o que é Investível de verdade) ==============
 st.markdown('<h4 style="margin-top:14px">Onde está</h4>', unsafe_allow_html=True)
 _linhas_banco = []
-if not df_saldo.empty and "Modalidade" in df_saldo.columns:
+if not df_saldo.empty and "Modalidade" in df_saldo.columns and "Pessoa" in df_saldo.columns:
     _tem_data = "Data Snapshot_dt" in df_saldo.columns
-    for mod, g in df_saldo.groupby("Modalidade"):
+    # agrupa por PESSOA + banco — mesma instituição pra Wesley e Sabrina são contas diferentes,
+    # nunca devem se misturar numa linha só (bug 10/08: o Inter da Sabrina sumia atrás do do Wesley)
+    for (pessoa_g, mod), g in df_saldo.groupby(["Pessoa", "Modalidade"]):
         g2 = g.sort_values("Data Snapshot_dt", ascending=False) if _tem_data else g
         ultimo = g2.iloc[0]
+        _rend = float(ultimo.get("Rendimento Calc", 0) or 0)
         _linhas_banco.append({
+            "Pessoa": pessoa_g,
             "Instituição": mod,
-            "Saldo": float(ultimo.get("Saldo Total", 0) or 0),
+            "Alocação": str(ultimo.get("Produto", "") or "—"),
+            "Saldo": fmt(float(ultimo.get("Saldo Total", 0) or 0)),
+            "Rendimento": fmt(_rend) if _rend > 0 else "—",
             "Atualizado em": ultimo.get("Data Snapshot", "—"),
+            "_saldo_sort": float(ultimo.get("Saldo Total", 0) or 0),
         })
 if _linhas_banco:
-    _df_banco = pd.DataFrame(_linhas_banco).sort_values("Saldo", ascending=False)
-    st.dataframe(
-        _df_banco.style.format({"Saldo": lambda v: fmt(v)}),
-        use_container_width=True, hide_index=True,
-    )
-    st.caption("cada banco mostra o último print recebido no Zap.")
+    _df_banco = pd.DataFrame(_linhas_banco).sort_values("_saldo_sort", ascending=False).drop(columns=["_saldo_sort"])
+    st.dataframe(_df_banco, use_container_width=True, hide_index=True)
+    st.caption("cada banco mostra o último print recebido no Zap, separado por pessoa.")
 
 # ============== A Receber — recebíveis de prazo incerto ==============
 st.markdown('<h3 style="margin-top:20px">A Receber</h3>', unsafe_allow_html=True)
