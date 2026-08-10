@@ -8,6 +8,9 @@ import streamlit as st
 
 from lib.components import COR, PLOTLY_CONFIG, barra_navegacao, faixa_titulo, fig_mobile, tema_verde_premium
 from lib.data import (
+    MUTUO_EMPRESTA_INICIO,
+    MUTUO_EMPRESTA_PRINCIPAL,
+    TAXA_CDI_MUTUO,
     custo_capital_corrigido,
     kpis_familia,
     load_ap_claudio_aportes,
@@ -19,6 +22,7 @@ from lib.data import (
     rendimento_investido,
     saldo_estocado_atual,
     serie_estocado,
+    valor_a_receber_hoje,
 )
 
 tema_verde_premium()
@@ -36,17 +40,14 @@ df_lanc = load_lancamentos(False)
 df_saldo = load_saldo_investido()
 df_bens = load_bens()
 
-# Mútuo de sócio à Empresta — corrigido pelo CDI a partir do início (posição, não snapshot de banco)
-MUTUO_EMPRESTA_PRINCIPAL = 235_612.0
-MUTUO_EMPRESTA_INICIO = datetime(2026, 8, 1)
-TAXA_CDI = 0.11  # ajustar conforme CDI vigente
-_df_mutuo = pd.DataFrame([{"Valor Pago": MUTUO_EMPRESTA_PRINCIPAL, "Data_dt": MUTUO_EMPRESTA_INICIO}])
-mutuo_empresta_hoje = custo_capital_corrigido(_df_mutuo, TAXA_CDI, datetime.now())
-
 _est = saldo_estocado_atual(df_saldo)
-estocado = (sum(_est.values()) if _est else 0.0) + mutuo_empresta_hoje
+estocado = sum(_est.values()) if _est else 0.0
 _imob = patrimonio_imobilizado(df_bens)
-patr_total = estocado + _imob["total"]
+# A receber = recebíveis de prazo incerto (mútuo Empresta) — bucket próprio, não é
+# Investível (sem liquidez de banco) nem Imobilizado (não é bem físico).
+a_receber = valor_a_receber_hoje()
+mutuo_empresta_hoje = a_receber  # alias — hoje "a receber" é só o mútuo
+patr_total = estocado + _imob["total"] + a_receber
 
 _PRIV = bool(st.session_state.get("modo_privado", False))
 
@@ -65,14 +66,19 @@ def fmt0(v):
     return "R$ " + f"{v:,.0f}".replace(",", ".")
 
 
-# ============== KPIs — investível | imobilizado | total ==============
+# ============== KPIs — investível | a receber | imobilizado | total ==============
 st.markdown(
     f"""
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
       <div style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(12,60,45,0.06)">
         <div style="font-size:11.5px;color:#5C6B62;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Investível</div>
         <div style="font-size:19px;font-weight:800;margin-top:4px;color:{COR['investimento']}">{fmt0(estocado)}</div>
         <div style="font-size:11px;color:#8B978F;margin-top:2px">bancos e corretoras</div>
+      </div>
+      <div style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(12,60,45,0.06)">
+        <div style="font-size:11.5px;color:#5C6B62;font-weight:700;text-transform:uppercase;letter-spacing:.04em">A Receber</div>
+        <div style="font-size:19px;font-weight:800;margin-top:4px;color:{COR['alerta']}">{fmt0(a_receber)}</div>
+        <div style="font-size:11px;color:#8B978F;margin-top:2px">recebíveis de prazo incerto</div>
       </div>
       <div style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(12,60,45,0.06)">
         <div style="font-size:11.5px;color:#5C6B62;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Imobilizado</div>
@@ -82,7 +88,7 @@ st.markdown(
       <div style="background:linear-gradient(160deg,#0C5949,#082744);border-radius:14px;padding:14px;box-shadow:0 4px 14px rgba(12,60,45,0.18)">
         <div style="font-size:11.5px;color:#B8E8D4;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Total</div>
         <div style="font-size:19px;font-weight:800;margin-top:4px;color:#fff">{fmt0(patr_total)}</div>
-        <div style="font-size:11px;color:#B8E8D4;margin-top:2px">investível + imobilizado</div>
+        <div style="font-size:11px;color:#B8E8D4;margin-top:2px">investível + a receber + imobilizado</div>
       </div>
     </div>
     """,
@@ -125,7 +131,7 @@ if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
 else:
     st.info("Mande o print do app do banco no grupo do Zap — o patrimônio entra sozinho.")
 
-# ============== Onde está — por instituição ==============
+# ============== Onde está — por instituição (só o que é Investível de verdade) ==============
 st.markdown('<h4 style="margin-top:14px">Onde está</h4>', unsafe_allow_html=True)
 _linhas_banco = []
 if not df_saldo.empty and "Modalidade" in df_saldo.columns:
@@ -138,21 +144,34 @@ if not df_saldo.empty and "Modalidade" in df_saldo.columns:
             "Saldo": float(ultimo.get("Saldo Total", 0) or 0),
             "Atualizado em": ultimo.get("Data Snapshot", "—"),
         })
-_linhas_banco.append({
-    "Instituição": "Mútuo Empresta (sócio)",
-    "Saldo": mutuo_empresta_hoje,
-    "Atualizado em": f"corrigido pelo CDI desde {MUTUO_EMPRESTA_INICIO.strftime('%m/%Y')}",
-})
-_df_banco = pd.DataFrame(_linhas_banco).sort_values("Saldo", ascending=False)
-st.dataframe(
-    _df_banco.style.format({"Saldo": lambda v: fmt(v)}),
-    use_container_width=True, hide_index=True,
+if _linhas_banco:
+    _df_banco = pd.DataFrame(_linhas_banco).sort_values("Saldo", ascending=False)
+    st.dataframe(
+        _df_banco.style.format({"Saldo": lambda v: fmt(v)}),
+        use_container_width=True, hide_index=True,
+    )
+    st.caption("cada banco mostra o último print recebido no Zap.")
+
+# ============== A Receber — recebíveis de prazo incerto ==============
+st.markdown('<h3 style="margin-top:20px">A Receber</h3>', unsafe_allow_html=True)
+st.markdown(
+    f"""
+    <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(12,60,45,0.06)">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px">
+        <div style="color:#5C6B62">Mútuo Empresta (sócio) — principal</div><div style="text-align:right;font-weight:700">{fmt(MUTUO_EMPRESTA_PRINCIPAL)}</div>
+        <div style="color:#5C6B62">Taxa aplicada</div><div style="text-align:right;font-weight:700">{TAXA_CDI_MUTUO*100:.0f}% a.a. (proxy do CDI)</div>
+        <div style="color:#5C6B62">Desde</div><div style="text-align:right;font-weight:700">{MUTUO_EMPRESTA_INICIO.strftime('%d/%m/%Y')}</div>
+        <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;color:#1C2420;font-weight:800">Valor corrigido hoje</div>
+        <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;text-align:right;font-weight:800;color:{COR['alerta']}">{fmt(a_receber)}</div>
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 st.caption(
-    (f"mútuo com a Empresta: {fmt(MUTUO_EMPRESTA_PRINCIPAL)} de principal, corrigido a {TAXA_CDI*100:.0f}% a.a. "
-     f"(proxy do CDI) desde {MUTUO_EMPRESTA_INICIO.strftime('%d/%m/%Y')} — vira {fmt(mutuo_empresta_hoje)} hoje. "
-     "os demais bancos mostram o último print recebido no Zap."
-     ).replace("R$", "R\\$")
+    "recebível de prazo incerto — a Empresta paga conforme a disponibilidade de caixa da empresa, "
+    "sem data fixa. Por isso fica separado do Investível: não tem a liquidez de um saldo em banco "
+    "(não dá pra sacar quando quiser), mas também não é bem físico (não é Imobilizado)."
 )
 
 # ============== Imobilizado — bens e dívidas ==============

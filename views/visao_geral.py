@@ -31,6 +31,7 @@ from lib.data import (
     rendimento_investido,
     serie_estocado,
     split_movimentos,
+    valor_a_receber_hoje,
 )
 
 # ============== Tema Verde Premium (compartilhado) ==============
@@ -323,7 +324,8 @@ col_p, col_f = st.columns(2, gap="medium")
 
 df_bens = load_bens()
 _imob = patrimonio_imobilizado(df_bens)
-_patr_total = estocado + _imob["total"]
+_a_receber = valor_a_receber_hoje()
+_patr_total = estocado + _imob["total"] + _a_receber
 _patr_val = fmt(_patr_total) if _patr_total > 0 else "—"
 _p_ctx = col_p.container(key="lin-patr")
 with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=False):
@@ -342,10 +344,11 @@ with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=Fal
     st.markdown(
         '<div style="background:#F2F7F3;border-radius:12px;padding:10px 14px;margin-bottom:6px">'
         + _linha_patr("investível", estocado, "dinheiro que vira caixa fácil: bancos/corretoras (snapshots)")
+        + _linha_patr("a receber", _a_receber, "recebíveis de prazo incerto (ex: mútuo Empresta) — sem a liquidez de banco, não é bem físico")
         + _linha_patr("imobilizado", _imob["total"], "bens a valor de mercado − saldo devedor (aba Bens)")
         + _linha_patr("investido no mês", caixa["aporte_total"],
                       "quanto saiu do caixa pra patrimônio neste mês (aportes + compra de bens − resgates)")
-        + _linha_patr("total", _patr_total, "investível + imobilizado", forte=True)
+        + _linha_patr("total", _patr_total, "investível + a receber + imobilizado", forte=True)
         + "</div>",
         unsafe_allow_html=True,
     )

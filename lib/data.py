@@ -333,6 +333,20 @@ def custo_capital_corrigido(df_aportes: pd.DataFrame, taxa_aa: float, data_ref: 
     return total
 
 
+# Mútuo de sócio à Empresta — recebível de prazo incerto (pago conforme caixa da empresa
+# permitir), corrigido pelo CDI a partir do início. NÃO é Investível (sem liquidez de banco)
+# nem Imobilizado (não é bem físico) — bucket próprio "A Receber" no patrimônio.
+MUTUO_EMPRESTA_PRINCIPAL = 235_612.0
+MUTUO_EMPRESTA_INICIO = datetime(2026, 8, 1)
+TAXA_CDI_MUTUO = 0.11  # proxy do CDI — ajustar conforme taxa vigente
+
+
+def valor_a_receber_hoje() -> float:
+    """Soma dos recebíveis de prazo incerto (hoje: só o mútuo Empresta), corrigidos até hoje."""
+    df = pd.DataFrame([{"Valor Pago": MUTUO_EMPRESTA_PRINCIPAL, "Data_dt": MUTUO_EMPRESTA_INICIO}])
+    return custo_capital_corrigido(df, TAXA_CDI_MUTUO, datetime.now())
+
+
 @st.cache_data(ttl=60)
 def load_bens_snapshots() -> pd.DataFrame:
     try:
