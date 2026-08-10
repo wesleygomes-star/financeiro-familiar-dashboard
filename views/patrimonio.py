@@ -346,9 +346,35 @@ if not _ap.empty:
          ).replace("R$", "R\\$")
     )
 
+    # ---------- Top 10 dividendos B3 2025 (dados reais) ----------
+    TOP10_DIVIDENDOS_2025 = [
+        ("Syn Prop & Tech", "SYNE3", 54.87),
+        ("Guararapes", "GUAR3", 49.98),
+        ("JSL", "JSLG3", 35.33),
+        ("Vulcabras", "VULC3", 35.12),
+        ("Grendene", "GRND3", 34.90),
+        ("Alpargatas", "ALPA4", 29.90),
+        ("Direcional", "DIRR3", 29.77),
+        ("Lavvi", "LAVV3", 27.57),
+        ("Unipar", "UNIP6", 26.11),
+        ("Cury S/A", "CURY3", 25.99),
+    ]
+    TAXA_ACOES_DIV = sum(dy for _, _, dy in TOP10_DIVIDENDOS_2025) / len(TOP10_DIVIDENDOS_2025) / 100
+
+    st.markdown('<h3 style="margin-top:20px">Top 10 dividendos B3 (2025)</h3>', unsafe_allow_html=True)
+    _df_top10 = pd.DataFrame(
+        [{"Empresa": nome, "Ticker": tk, "Dividend Yield 2025": f"{dy:.2f}%"} for nome, tk, dy in TOP10_DIVIDENDOS_2025]
+    )
+    st.dataframe(_df_top10, use_container_width=True, hide_index=True)
+    st.caption(
+        (f"yield REALIZADO em 2025 (não é promessa nem média de longo prazo) — média simples dos 10: {TAXA_ACOES_DIV*100:.2f}% a.a. "
+         "vários desses yields vieram de distribuição extraordinária (ex: venda de ativo), não é o que se repete todo ano — "
+         "trate como cenário otimista/melhor-caso observado, não como expectativa. fonte: B3 (Bora Investir)."
+         )
+    )
+
     # ---------- Comparativo com outras aplicações (mesmo fluxo de caixa, taxas alternativas) ----------
     TAXA_CDB = 0.11  # CDB ~100% CDI — ajustar conforme CDI vigente
-    TAXA_ACOES_DIV = 0.15  # média histórica aprox. de longo prazo de carteiras de dividendos (IDIV/B3) — MUITO mais volátil, sem garantia
     equity_imovel = vm - saldo_dev
     cdb_corrigido = custo_capital_corrigido(df_aportes, TAXA_CDB, hoje) if not df_aportes.empty else 0.0
     acoes_corrigido = custo_capital_corrigido(df_aportes, TAXA_ACOES_DIV, hoje) if not df_aportes.empty else 0.0
@@ -358,7 +384,7 @@ if not _ap.empty:
         [
             {"Aplicação": "AP 501 (equity atual, bruto)", "Taxa considerada": "ganho real do imóvel", "Valor hoje": equity_imovel, "vs. imóvel": 0.0},
             {"Aplicação": "CDB (100% CDI)", "Taxa considerada": f"{TAXA_CDB*100:.0f}% a.a.", "Valor hoje": cdb_corrigido, "vs. imóvel": cdb_corrigido - equity_imovel},
-            {"Aplicação": "Ações dividendos (12 principais)", "Taxa considerada": f"{TAXA_ACOES_DIV*100:.0f}% a.a. (histórico)", "Valor hoje": acoes_corrigido, "vs. imóvel": acoes_corrigido - equity_imovel},
+            {"Aplicação": "Top 10 dividendos B3 2025 (real)", "Taxa considerada": f"{TAXA_ACOES_DIV*100:.2f}% a.a. (melhor caso 2025)", "Valor hoje": acoes_corrigido, "vs. imóvel": acoes_corrigido - equity_imovel},
         ]
     )
     st.dataframe(
@@ -368,10 +394,10 @@ if not _ap.empty:
     st.caption(
         (f"mesmo fluxo de aportes ({fmt(total_aportado)}, nas mesmas datas) corrigido pela taxa de cada aplicação até hoje, "
          f"comparado com o equity bruto do imóvel hoje ({fmt(equity_imovel)} = valor de mercado − saldo devedor, sem tributos "
-         "de venda). CDB é baixo risco e o rendimento é praticamente garantido pelo emissor; ações de dividendos têm risco de "
-         "preço real — a taxa aqui é uma média histórica de longo prazo, não uma promessa, o ano-a-ano oscila bem mais que isso. "
-         "nenhum dos três desconta o imposto de saída de cada aplicação (IR regressivo no CDB, ganho de capital nas ações) — "
-         "só a venda do imóvel tem essa conta feita, na simulação abaixo."
+         "de venda). CDB é baixo risco e o rendimento é praticamente garantido pelo emissor; mesmo no cenário otimista dos "
+         "10 melhores pagadores de dividendos de 2025 (tabela acima), o imóvel ainda ganha. nenhum dos três desconta o "
+         "imposto de saída de cada aplicação (IR regressivo no CDB, ganho de capital nas ações) — só a venda do imóvel "
+         "tem essa conta feita, na simulação abaixo."
          ).replace("R$", "R\\$")
     )
 
