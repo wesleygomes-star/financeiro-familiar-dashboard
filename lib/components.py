@@ -475,8 +475,10 @@ def projecao_6_meses(df_lancamentos: pd.DataFrame, df_recorrentes: pd.DataFrame,
         comp = f"{m:02d}/{y}"
         is_atual = (m == hoje.month and y == hoje.year)
         lanc_mes = df_lancamentos[df_lancamentos[coluna_mes] == comp]
-        rec_lanc = lanc_mes[lanc_mes["Tipo"] == "Receita"]["Valor"].sum()
-        desp_lanc = lanc_mes[lanc_mes["Tipo"] == "Despesa"]["Valor"].sum()
+        from lib.data import split_movimentos
+        _splits_mes = split_movimentos(lanc_mes)
+        rec_lanc = _splits_mes["receitas"]["Valor"].sum()
+        desp_lanc = _splits_mes["despesas"]["Valor"].sum()
 
         # Stack pra mostrar composição: Já lançado vs Recorrentes projetadas
         desp_lancada = 0.0
@@ -703,8 +705,10 @@ def comparativo_mensal(df_lancamentos: pd.DataFrame, df_tetos: pd.DataFrame, mod
             m += 12; y -= 1
         meses.append(f"{m:02d}/{y}")
 
-    # Despesas por categoria × mês
-    despesas = df_lancamentos[df_lancamentos["Tipo"] == "Despesa"].copy()
+    # Despesas por categoria × mês (RD/investimento/pagamento de fatura são neutros)
+    from lib.data import split_movimentos
+    _splits_cmp = split_movimentos(df_lancamentos)
+    despesas = _splits_cmp["despesas"].copy()
     if despesas.empty:
         st.info("Sem despesas pra comparar.")
         return
@@ -772,7 +776,7 @@ def comparativo_mensal(df_lancamentos: pd.DataFrame, df_tetos: pd.DataFrame, mod
     st.dataframe(styled, use_container_width=True, height=min(600, 40 + 35 * len(pivot_filtrado.index)))
 
     # Linha de total despesa × receita por mês (overview)
-    receitas = df_lancamentos[df_lancamentos["Tipo"] == "Receita"]
+    receitas = _splits_cmp["receitas"]
     despesas_total = pivot.sum(axis=0)
     receitas_total = receitas.groupby(coluna_mes)["Valor"].sum().reindex(meses, fill_value=0)
     saldo_total = receitas_total - despesas_total
