@@ -344,7 +344,7 @@ with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=Fal
     st.markdown(
         '<div style="background:#F2F7F3;border-radius:12px;padding:10px 14px;margin-bottom:6px">'
         + _linha_patr("investível", estocado, "dinheiro que vira caixa fácil: bancos/corretoras (snapshots)")
-        + _linha_patr("a receber", _a_receber, "recebíveis de prazo incerto (ex: mútuo Empresta) — sem a liquidez de banco, não é bem físico")
+        + _linha_patr("a receber", _a_receber, "recebíveis de prazo incerto (mútuo Empresta + sítio) — sem a liquidez de banco, não é bem físico")
         + _linha_patr("imobilizado", _imob["total"], "bens a valor de mercado − saldo devedor (aba Bens)")
         + _linha_patr("investido no mês", caixa["aporte_total"],
                       "quanto saiu do caixa pra patrimônio neste mês (aportes + compra de bens − resgates)")

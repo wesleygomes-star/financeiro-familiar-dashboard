@@ -341,10 +341,20 @@ MUTUO_EMPRESTA_INICIO = datetime(2026, 8, 1)
 TAXA_CDI_MUTUO = 0.11  # proxy do CDI — ajustar conforme taxa vigente
 
 
+# Sítio — ITCD regularizado pelo Wesley (cartório + parcelas + CDA de protesto por rompimento do
+# parcelamento), reembolsável quando o sítio for vendido. Valor fixo (sem correção — ao contrário
+# do mútuo, não tem taxa combinada). Racional completo: Pagamentos Sítio/ANALISE_PROTESTO_ITCD_11-08.md
+SITIO_JA_PAGO = 20_444.84  # cartório (2 inventários) + parcelas ITCD Nov/25-Fev/26, aba "Custo Sítio" linha 26
+SITIO_PAGAMENTO_PENDENTE = 7_802.44  # CDA Wesley (BH), vence 12/08/26 — confirmar quando pago
+SITIO_PREJUIZO_4 = 11_588.20  # custas de protesto + estimativa de rompimento, dos 4 herdeiros — assumido pelo Wesley
+SITIO_A_RECEBER = SITIO_JA_PAGO + SITIO_PAGAMENTO_PENDENTE - SITIO_PREJUIZO_4  # R$16.659,08
+
+
 def valor_a_receber_hoje() -> float:
-    """Soma dos recebíveis de prazo incerto (hoje: só o mútuo Empresta), corrigidos até hoje."""
+    """Soma dos recebíveis de prazo incerto: mútuo Empresta (corrigido pelo CDI) + sítio (fixo)."""
     df = pd.DataFrame([{"Valor Pago": MUTUO_EMPRESTA_PRINCIPAL, "Data_dt": MUTUO_EMPRESTA_INICIO}])
-    return custo_capital_corrigido(df, TAXA_CDI_MUTUO, datetime.now())
+    mutuo = custo_capital_corrigido(df, TAXA_CDI_MUTUO, datetime.now())
+    return mutuo + SITIO_A_RECEBER
 
 
 @st.cache_data(ttl=60)
