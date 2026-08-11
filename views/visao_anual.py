@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from lib.components import barra_navegacao, COR, PLOTLY_CONFIG, faixa_titulo, fig_mobile, tema_verde_premium
-from lib.data import is_investimento, is_pagamento_fatura, load_lancamentos
+from lib.data import is_investimento, is_pagamento_fatura, is_rd, load_lancamentos
 
 tema_verde_premium()
 barra_navegacao("anual")
@@ -62,8 +62,8 @@ def matriz(sub, titulo, cor_total):
 
 
 splits = {
-    "Despesas": dfa[(dfa["Tipo"].astype(str).str.lower() == "despesa") & (~dfa.apply(is_investimento, axis=1)) & (~dfa.apply(is_pagamento_fatura, axis=1))],
-    "Receitas": dfa[dfa["Tipo"].astype(str).str.lower() == "receita"],
+    "Despesas": dfa[(dfa["Tipo"].astype(str).str.lower() == "despesa") & (~dfa.apply(is_investimento, axis=1)) & (~dfa.apply(is_pagamento_fatura, axis=1)) & (~dfa.apply(is_rd, axis=1))],
+    "Receitas": dfa[(dfa["Tipo"].astype(str).str.lower() == "receita") & (~dfa.apply(is_rd, axis=1))],
     "Investimentos": dfa[dfa.apply(is_investimento, axis=1)],
 }
 

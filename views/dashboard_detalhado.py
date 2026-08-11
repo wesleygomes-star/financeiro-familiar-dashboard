@@ -10,7 +10,7 @@ Estrutura:
 """
 import streamlit as st
 from datetime import datetime
-from lib.data import load_lancamentos, load_recorrentes, load_tetos, meses_disponiveis, filtrar, mes_anterior, progresso_mes, classificar_fixa_variavel
+from lib.data import load_lancamentos, load_recorrentes, load_tetos, meses_disponiveis, filtrar, mes_anterior, progresso_mes, classificar_fixa_variavel, split_movimentos
 from lib.components import barra_navegacao, faixa_titulo, kpi_card, donut_categorias, barras_categoria_vs_teto, projecao_6_meses, tabela_top_despesas, detalhar_categoria, comparativo_mensal, fmt_brl, breakdown_fixa_variavel, detalhar_fixa_variavel, tema_verde_premium
 
 
@@ -172,8 +172,9 @@ if forma_avancada != "Todas":
 if cartoes_selecionados:
     df_filtrado = df_filtrado[df_filtrado["Cartão"].isin(cartoes_selecionados)]
 
-df_receitas = df_filtrado[df_filtrado["Tipo"] == "Receita"]
-df_despesas = df_filtrado[df_filtrado["Tipo"] == "Despesa"]
+_splits_filtrado = split_movimentos(df_filtrado)
+df_receitas = _splits_filtrado["receitas"]
+df_despesas = _splits_filtrado["despesas"]
 
 
 # ============== KPIs ==============
@@ -199,8 +200,9 @@ if forma_avancada != "Todas":
 if cartoes_selecionados:
     df_anterior = df_anterior[df_anterior["Cartão"].isin(cartoes_selecionados)]
 
-receita_ant = df_anterior[df_anterior["Tipo"] == "Receita"]["Valor"].sum()
-despesa_ant = df_anterior[df_anterior["Tipo"] == "Despesa"]["Valor"].sum()
+_splits_anterior = split_movimentos(df_anterior)
+receita_ant = _splits_anterior["receitas"]["Valor"].sum()
+despesa_ant = _splits_anterior["despesas"]["Valor"].sum()
 saldo_ant = receita_ant - despesa_ant
 pct_teto_ant = despesa_ant / total_tetos if total_tetos > 0 else 0
 
