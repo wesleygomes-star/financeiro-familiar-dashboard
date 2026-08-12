@@ -119,9 +119,13 @@ st.markdown(
     .st-key-lin-fix     [data-testid="stExpander"] summary > span > span:first-child { background: #E6EEF7; }
     .st-key-lin-consumo [data-testid="stExpander"] summary > span > span:first-child { background: #FBEFE0; }
     .st-key-lin-fat     [data-testid="stExpander"] summary > span > span:first-child { background: #EFEDFB; }
+    .st-key-lin-audit-fatura [data-testid="stExpander"] summary > span > span:first-child { background: #FDECD2; }
     /* remove o gap-fantasma dos containers keyed das linhas */
     div:has(> .st-key-lin-patr), div:has(> .st-key-lin-fix),
-    div:has(> .st-key-lin-consumo), div:has(> .st-key-lin-fat) { display: contents; }
+    div:has(> .st-key-lin-consumo), div:has(> .st-key-lin-fat),
+    div:has(> .st-key-lin-audit-fatura) { display: contents; }
+    /* respiro entre as linhas L4 (a "audit-fatura" fica logo após "fat" sem folga própria) */
+    .st-key-lin-fat, .st-key-lin-audit-fatura { margin-top: 6px; }
     /* rótulos de grupo dentro dos cards de pessoa (caixa × competência) */
     .pss .pgrp { font-size: 9.5px; font-weight: 800; text-transform: uppercase;
       letter-spacing: .09em; color: #9BAaa1; margin: 8px 0 2px; }
@@ -579,7 +583,7 @@ if not df_auditoria_fatura.empty and "Status" in df_auditoria_fatura.columns:
             st.caption("depois de revisar, marque \"Status\" como resolvido direto na aba Auditoria Fatura da planilha.")
 
 # ============== Projeção (linhas: receita, fixas, parcelas e o LIVRE) ==============
-st.subheader("Projeção")
+st.markdown('<h3 style="margin-top:26px;margin-bottom:2px;font-size:19px;color:#1C2420">Projeção</h3>', unsafe_allow_html=True)
 cron = compromissos_proximos_meses(df_lanc, df_rec, df_faturas, 6, partir_de=competencia)
 if not cron.empty:
     receita_proj = 0.0
