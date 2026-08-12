@@ -128,7 +128,21 @@ st.markdown(
     /* remove o gap-fantasma dos containers keyed das linhas */
     div:has(> .st-key-lin-patr), div:has(> .st-key-lin-fix),
     div:has(> .st-key-lin-consumo), div:has(> .st-key-lin-fat),
-    div:has(> .st-key-lin-audit-fatura), div:has(> .st-key-lin-group-b) { display: contents; }
+    div:has(> .st-key-lin-audit-fatura), div:has(> .st-key-lin-group-b),
+    div:has(> .st-key-lin-compos), div:has(> .st-key-lin-rd) { display: contents; }
+    /* o tema pinta TODO stVerticalBlockBorderWrapper como card branco com sombra
+       (components.py) — dentro do grupo B isso recriava um card solto por linha.
+       Neutraliza o invólucro das linhas internas e dos grupos. */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-consumo),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-fat),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-audit-fatura),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-group-b),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-compos),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-rd),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-projecao-card),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-projecao-chart) {
+      background: transparent !important; box-shadow: none !important; border-radius: 0 !important;
+    }
     /* Patrimônio / Contas fixas: cartão próprio com sombra (acesso igual, só ajuste estético) */
     .st-key-lin-patr [data-testid="stExpander"], .st-key-lin-fix [data-testid="stExpander"] {
       box-shadow: 0 3px 12px rgba(12,60,45,0.10) !important;
@@ -143,6 +157,9 @@ st.markdown(
       color: #5C6B62 !important; font-weight: 700 !important; }
     .st-key-lin-patr summary code, .st-key-lin-fix summary code {
       font-size: 16px !important; color: #1C2420 !important; width: 100%; display: block; }
+    /* Contas fixas tem resumo longo (19/21 pagas · X de Y) — quebra em 2 linhas em vez de cortar */
+    .st-key-lin-fix summary code {
+      font-size: 13px !important; white-space: normal !important; line-height: 1.35; }
     /* sem ícone nesses dois (como o mockup) — sobra mais largura pro valor não truncar */
     .st-key-lin-patr summary > span > span:first-child,
     .st-key-lin-fix summary > span > span:first-child { display: none !important; }
@@ -160,22 +177,38 @@ st.markdown(
     }
 
     /* ===== Opção B (12/08): consumo + faturas + auditoria = 1 card único, trilho de cor por linha ===== */
-    .st-key-lin-group-b {
+    .st-key-lin-group-b, .st-key-lin-compos, .st-key-lin-rd {
       background: linear-gradient(180deg, #FBFDFC, #F6FAF7);
       border: 1px solid #E1EAE4; border-radius: 16px; overflow: hidden; margin-top: 2px;
-      gap: 0 !important;
+      padding: 4px 6px; gap: 0 !important;
     }
     .st-key-lin-consumo, .st-key-lin-fat, .st-key-lin-audit-fatura { margin-top: 0 !important; gap: 0 !important; }
-    .st-key-lin-group-b [data-testid="stExpander"] {
+    .st-key-lin-group-b [data-testid="stExpander"],
+    .st-key-lin-compos [data-testid="stExpander"], .st-key-lin-rd [data-testid="stExpander"] {
       background: transparent !important; box-shadow: none !important;
-      border-radius: 0 !important; border-top: none; border-right: none; border-bottom: none;
+      border-radius: 0 !important; border: 0 !important;
+      margin-bottom: 0 !important; position: relative;
     }
-    .st-key-lin-consumo [data-testid="stExpander"] { border-left: 4px solid #E4A15C !important; }
-    .st-key-lin-fat [data-testid="stExpander"] { border-left: 4px solid #A79AE8 !important;
-      border-top: 1px dashed #DCE6E0 !important; }
-    .st-key-lin-audit-fatura [data-testid="stExpander"] { border-left: 4px solid #BA7517 !important;
-      border-top: 1px dashed #DCE6E0 !important; }
-    .st-key-lin-group-b [data-testid="stExpander"] summary { padding-left: 10px !important; }
+    /* trilho de cor: pill inset à esquerda (como o mockup), não uma borda colada no card */
+    .st-key-lin-consumo [data-testid="stExpander"]::before,
+    .st-key-lin-fat [data-testid="stExpander"]::before,
+    .st-key-lin-audit-fatura [data-testid="stExpander"]::before,
+    .st-key-lin-compos [data-testid="stExpander"]::before,
+    .st-key-lin-rd [data-testid="stExpander"]::before {
+      content: ""; position: absolute; left: 4px; top: 12px; bottom: 12px;
+      width: 4px; border-radius: 4px;
+    }
+    .st-key-lin-consumo [data-testid="stExpander"]::before { background: #E4A15C; }
+    .st-key-lin-fat [data-testid="stExpander"]::before { background: #A79AE8; }
+    .st-key-lin-audit-fatura [data-testid="stExpander"]::before { background: #BA7517; }
+    .st-key-lin-compos [data-testid="stExpander"]::before { background: #185FA5; }
+    .st-key-lin-rd [data-testid="stExpander"]::before { background: #1D9E75; }
+    /* separador tracejado entre as linhas do grupo */
+    .st-key-lin-fat [data-testid="stExpander"],
+    .st-key-lin-audit-fatura [data-testid="stExpander"] { border-top: 1px dashed #DCE6E0 !important; }
+    .st-key-lin-group-b [data-testid="stExpander"] summary,
+    .st-key-lin-compos [data-testid="stExpander"] summary,
+    .st-key-lin-rd [data-testid="stExpander"] summary { padding-left: 18px !important; }
     /* card do gráfico de Projeção — topo arredondado, base colada na legenda (Opção B, 12/08) */
     .st-key-lin-projecao-card { gap: 0 !important; }
     .st-key-lin-projecao-chart {
@@ -464,7 +497,7 @@ with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=Fal
     else:
         st.info("Mande o print do app do banco no grupo do Zap — o patrimônio entra sozinho.")
 
-_resumo_fixas = "tudo pago" if _fixas_restante <= 0.5 else fmt(_fixas_restante)
+_resumo_fixas = f"{n_pagas}/{n_fixas} pagas · {fmt(_fixas_pago)} de {fmt(_fixas_provisao)}"
 _f_ctx = col_f.container(key="lin-fix")
 with _f_ctx.expander(f"**Contas fixas** `{_resumo_fixas}`", icon="🕐", expanded=False):
     if not audit.empty:
@@ -703,7 +736,8 @@ if not cron.empty:
             f'LIVRE = receita − fixas − parcelas − faturas em aberto</div>',
             unsafe_allow_html=True,
     )
-    with st.expander("ver composição mês a mês"):
+    _compos_ctx = st.container(key="lin-compos")
+    with _compos_ctx.expander("**ver composição mês a mês**"):
         _dcron = cron[["Mês"] + comp_cols + ["Compromissos", "Livre"]].copy()
         _dcron.insert(1, "Receita prevista", receita_proj)
         st.dataframe(_dcron, use_container_width=True, hide_index=True,
@@ -711,8 +745,9 @@ if not cron.empty:
                                     for c in _dcron.columns if c != "Mês"})
 
 # ============== RD — despesas corporativas ==============
-with st.expander(f"🏢 RD — despesas corporativas · a receber {fmt(_rd_saldo)}" if _rd_saldo > 0.005
-                 else "🏢 RD — despesas corporativas", expanded=False):
+_rd_ctx = st.container(key="lin-rd")
+with _rd_ctx.expander(f"**RD — despesas corporativas** `{fmt(_rd_saldo)} a receber`" if _rd_saldo > 0.005
+                      else "**RD — despesas corporativas**", icon="🏢", expanded=False):
     if df_rd.empty:
         st.caption("Nenhum lançamento RD. Marque no Zap incluindo **RD** na mensagem — "
                    "ex: `120 almoço cliente RD` · reembolso: `1500 reembolso RD`. Comando `rd` mostra o saldo.")
