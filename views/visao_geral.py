@@ -189,6 +189,13 @@ st.markdown(
       border-radius: 0 !important; border: 0 !important;
       margin-bottom: 0 !important; position: relative;
     }
+    /* o <details> nativo do expander tem borda+raio próprios — era ele que ainda
+       desenhava um "sub-card" branco por linha dentro do grupo */
+    .st-key-lin-group-b [data-testid="stExpander"] details,
+    .st-key-lin-compos [data-testid="stExpander"] details,
+    .st-key-lin-rd [data-testid="stExpander"] details {
+      border: 0 !important; border-radius: 0 !important; background: transparent !important;
+    }
     /* trilho de cor: pill inset à esquerda (como o mockup), não uma borda colada no card */
     .st-key-lin-consumo [data-testid="stExpander"]::before,
     .st-key-lin-fat [data-testid="stExpander"]::before,
