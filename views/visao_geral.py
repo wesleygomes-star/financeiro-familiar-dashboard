@@ -149,6 +149,7 @@ st.markdown(
       border-top: 1px dashed #DCE6E0 !important; }
     .st-key-lin-group-b [data-testid="stExpander"] summary { padding-left: 10px !important; }
     /* card do gráfico de Projeção — topo arredondado, base colada na legenda (Opção B, 12/08) */
+    .st-key-lin-projecao-card { gap: 0 !important; }
     .st-key-lin-projecao-chart {
       background: #fff; border-radius: 16px 16px 4px 4px; box-shadow: 0 2px 8px rgba(12,60,45,0.06);
       padding: 14px 6px 2px; margin-top: 2px; border-bottom: 3px solid #EAF0EC;
@@ -663,13 +664,14 @@ if not cron.empty:
                        font=dict(color="#2C2C2A", size=12),
                        legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="center", x=0.5),
                        yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)"))
-    with st.container(key="lin-projecao-chart"):
-        st.plotly_chart(fig_mobile(figj), use_container_width=True, config=PLOTLY_CONFIG)
-    st.markdown(
-        f'<div class="proj-cap-b">'
-        f'<b>Receita prevista {fmt(receita_proj)}</b> (média dos últimos 3 meses) · '
-        f'LIVRE = receita − fixas − parcelas − faturas em aberto</div>',
-        unsafe_allow_html=True,
+    with st.container(key="lin-projecao-card"):
+        with st.container(key="lin-projecao-chart"):
+            st.plotly_chart(fig_mobile(figj), use_container_width=True, config=PLOTLY_CONFIG)
+        st.markdown(
+            f'<div class="proj-cap-b">'
+            f'<b>Receita prevista {fmt(receita_proj)}</b> (média dos últimos 3 meses) · '
+            f'LIVRE = receita − fixas − parcelas − faturas em aberto</div>',
+            unsafe_allow_html=True,
     )
     with st.expander("ver composição mês a mês"):
         _dcron = cron[["Mês"] + comp_cols + ["Compromissos", "Livre"]].copy()
