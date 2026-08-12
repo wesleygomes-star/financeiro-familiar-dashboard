@@ -123,27 +123,39 @@ st.markdown(
     /* remove o gap-fantasma dos containers keyed das linhas */
     div:has(> .st-key-lin-patr), div:has(> .st-key-lin-fix),
     div:has(> .st-key-lin-consumo), div:has(> .st-key-lin-fat),
-    div:has(> .st-key-lin-audit-fatura) { display: contents; }
-    /* respiro entre as linhas L4 (a "audit-fatura" fica logo após "fat" sem folga própria) */
-    .st-key-lin-fat, .st-key-lin-audit-fatura { margin-top: 6px; }
-    /* "cards soltos": o Streamlit já dá sombra+raio+margem padrão no stExpander, mas é sutil
-       demais pra ler como elevação numa tela pequena — intensifica pros 5 cards L4 (mockup A, 12/08) */
-    .st-key-lin-patr [data-testid="stExpander"], .st-key-lin-fix [data-testid="stExpander"],
-    .st-key-lin-consumo [data-testid="stExpander"], .st-key-lin-fat [data-testid="stExpander"],
-    .st-key-lin-audit-fatura [data-testid="stExpander"] {
+    div:has(> .st-key-lin-audit-fatura), div:has(> .st-key-lin-group-b) { display: contents; }
+    /* Patrimônio / Contas fixas: cartão próprio com sombra (acesso igual, só ajuste estético) */
+    .st-key-lin-patr [data-testid="stExpander"], .st-key-lin-fix [data-testid="stExpander"] {
       box-shadow: 0 3px 12px rgba(12,60,45,0.10) !important;
       margin-bottom: 10px !important;
     }
-    /* card de auditoria pendente ganha fundo e sombra âmbar — chama atenção sem gritar */
-    .st-key-lin-audit-fatura [data-testid="stExpander"] {
-      background: #FFFBF3 !important;
-      box-shadow: 0 3px 12px rgba(186,117,23,0.16) !important;
+
+    /* ===== Opção B (12/08): consumo + faturas + auditoria = 1 card único, trilho de cor por linha ===== */
+    .st-key-lin-group-b {
+      background: linear-gradient(180deg, #FBFDFC, #F6FAF7);
+      border: 1px solid #E1EAE4; border-radius: 16px; overflow: hidden; margin-top: 2px;
     }
-    /* card do gráfico de Projeção (mockup A, 12/08) */
+    .st-key-lin-consumo, .st-key-lin-fat, .st-key-lin-audit-fatura { margin-top: 0 !important; }
+    .st-key-lin-group-b [data-testid="stExpander"] {
+      background: transparent !important; box-shadow: none !important;
+      border-radius: 0 !important; border-top: none; border-right: none; border-bottom: none;
+    }
+    .st-key-lin-consumo [data-testid="stExpander"] { border-left: 4px solid #E4A15C !important; }
+    .st-key-lin-fat [data-testid="stExpander"] { border-left: 4px solid #A79AE8 !important;
+      border-top: 1px dashed #DCE6E0 !important; }
+    .st-key-lin-audit-fatura [data-testid="stExpander"] { border-left: 4px solid #BA7517 !important;
+      border-top: 1px dashed #DCE6E0 !important; }
+    .st-key-lin-group-b [data-testid="stExpander"] summary { padding-left: 10px !important; }
+    /* card do gráfico de Projeção — topo arredondado, base colada na legenda (Opção B, 12/08) */
     .st-key-lin-projecao-chart {
-      background: #fff; border-radius: 16px; box-shadow: 0 3px 12px rgba(12,60,45,0.08);
-      padding: 14px 6px 2px; margin-top: 2px;
+      background: #fff; border-radius: 16px 16px 4px 4px; box-shadow: 0 2px 8px rgba(12,60,45,0.06);
+      padding: 14px 6px 2px; margin-top: 2px; border-bottom: 3px solid #EAF0EC;
     }
+    .proj-cap-b {
+      background: #fff; border-radius: 0 0 12px 12px; box-shadow: 0 2px 8px rgba(12,60,45,0.06);
+      margin-top: -1px; padding: 9px 14px 12px; font-size: 11.5px; color: #5C6B62; line-height: 1.4;
+    }
+    .proj-cap-b b { color: #1C2420; }
     /* rótulos de grupo dentro dos cards de pessoa (caixa × competência) */
     .pss .pgrp { font-size: 9.5px; font-weight: 800; text-transform: uppercase;
       letter-spacing: .09em; color: #9BAaa1; margin: 8px 0 2px; }
@@ -449,162 +461,165 @@ _seg = "".join(
 )
 
 _consumo_baldes = sum(baldes[b]["total"] for b in baldes)
-_c_ctx = st.container(key="lin-consumo")
-with _c_ctx.expander(f"**Para onde foi o consumo** `{fmt(_consumo_baldes)}`", icon="🧭", expanded=False):
-    st.markdown(f'<div class="segbar">{_seg}</div>', unsafe_allow_html=True)
-    _pb = st.columns(3)
-    for _i, b in enumerate(["Fixo", "Recorrente", "Flexível"]):
-        pct_b = baldes[b]["total"] / tot_baldes * 100
-        with _pb[_i].popover(f"{BALDE_META[b][0].split(' ·')[0]} · {fmt_mil(baldes[b]['total'])} ({pct_b:.0f}%)",
-                             use_container_width=True):
-            st.markdown(f"**{BALDE_META[b][0]}** — {fmt(baldes[b]['total'])}")
-            for it in baldes[b]["itens"]:
-                cc1, cc2 = st.columns([3, 1])
-                cc1.caption(it["desc"])
-                cc2.caption(fmt(it["valor"]))
+with st.container(key="lin-group-b"):
+    _c_ctx = st.container(key="lin-consumo")
+    with _c_ctx.expander(f"**Para onde foi o consumo** `{fmt(_consumo_baldes)}`", icon="🧭", expanded=False):
+        st.markdown(f'<div class="segbar">{_seg}</div>', unsafe_allow_html=True)
+        _pb = st.columns(3)
+        for _i, b in enumerate(["Fixo", "Recorrente", "Flexível"]):
+            pct_b = baldes[b]["total"] / tot_baldes * 100
+            with _pb[_i].popover(f"{BALDE_META[b][0].split(' ·')[0]} · {fmt_mil(baldes[b]['total'])} ({pct_b:.0f}%)",
+                                 use_container_width=True):
+                st.markdown(f"**{BALDE_META[b][0]}** — {fmt(baldes[b]['total'])}")
+                for it in baldes[b]["itens"]:
+                    cc1, cc2 = st.columns([3, 1])
+                    cc1.caption(it["desc"])
+                    cc2.caption(fmt(it["valor"]))
 
-    mInvest = meta_valor(df_metas, "investir")
-    mPoup = meta_valor(df_metas, "poupança")
-    mFlex = meta_valor(df_metas, "flexível")
-    flex_real = baldes["Flexível"]["total"]
-    poup_real = (k["saldo_mes"] / k["receita_total"] * 100) if k["receita_total"] > 0 else 0
+        mInvest = meta_valor(df_metas, "investir")
+        mPoup = meta_valor(df_metas, "poupança")
+        mFlex = meta_valor(df_metas, "flexível")
+        flex_real = baldes["Flexível"]["total"]
+        poup_real = (k["saldo_mes"] / k["receita_total"] * 100) if k["receita_total"] > 0 else 0
 
-    def _ring(pct, cor, valor_txt, label):
-        C = 163.4
-        off = C * (1 - min(max(pct, 0), 1))
-        return (
-            f'<div class="ring"><svg viewBox="0 0 62 62">'
-            f'<circle cx="31" cy="31" r="26" fill="none" stroke="#EDF2EE" stroke-width="7"/>'
-            f'<circle cx="31" cy="31" r="26" fill="none" stroke="{cor}" stroke-width="7" '
-            f'stroke-linecap="round" stroke-dasharray="{C}" stroke-dashoffset="{off:.0f}"/></svg>'
-            f'<div class="rv">{valor_txt}</div><div class="rl">{label}</div></div>'
+        def _ring(pct, cor, valor_txt, label):
+            C = 163.4
+            off = C * (1 - min(max(pct, 0), 1))
+            return (
+                f'<div class="ring"><svg viewBox="0 0 62 62">'
+                f'<circle cx="31" cy="31" r="26" fill="none" stroke="#EDF2EE" stroke-width="7"/>'
+                f'<circle cx="31" cy="31" r="26" fill="none" stroke="{cor}" stroke-width="7" '
+                f'stroke-linecap="round" stroke-dasharray="{C}" stroke-dashoffset="{off:.0f}"/></svg>'
+                f'<div class="rv">{valor_txt}</div><div class="rl">{label}</div></div>'
+            )
+
+        p_inv = (aporte_fin / mInvest) if mInvest > 0 else 0
+        p_poup = (poup_real / mPoup) if mPoup > 0 else 0
+        p_flex = (flex_real / mFlex) if mFlex > 0 else 0
+        cor_flex = COR["flexivel"] if p_flex <= 1 else COR["despesa"]
+        st.markdown(
+            '<h4 style="margin:14px 0 8px;font-size:13.5px">Metas do mês</h4><div class="rings">'
+            + _ring(p_inv, COR["investimento"], f"{p_inv*100:.0f}%", f"investir<br>{fmt_mil(aporte_fin)} / {fmt_mil(mInvest)}")
+            + _ring(p_poup, COR["receita"], f"{p_poup*100:.0f}%", f"poupança<br>{poup_real:.0f}% / {mPoup:.0f}%")
+            + _ring(p_flex, cor_flex, f"{p_flex*100:.0f}%", f"teto flexível<br>{fmt_mil(flex_real)} / {fmt_mil(mFlex)}")
+            + "</div>",
+            unsafe_allow_html=True,
         )
 
-    p_inv = (aporte_fin / mInvest) if mInvest > 0 else 0
-    p_poup = (poup_real / mPoup) if mPoup > 0 else 0
-    p_flex = (flex_real / mFlex) if mFlex > 0 else 0
-    cor_flex = COR["flexivel"] if p_flex <= 1 else COR["despesa"]
-    st.markdown(
-        '<h4 style="margin:14px 0 8px;font-size:13.5px">Metas do mês</h4><div class="rings">'
-        + _ring(p_inv, COR["investimento"], f"{p_inv*100:.0f}%", f"investir<br>{fmt_mil(aporte_fin)} / {fmt_mil(mInvest)}")
-        + _ring(p_poup, COR["receita"], f"{p_poup*100:.0f}%", f"poupança<br>{poup_real:.0f}% / {mPoup:.0f}%")
-        + _ring(p_flex, cor_flex, f"{p_flex*100:.0f}%", f"teto flexível<br>{fmt_mil(flex_real)} / {fmt_mil(mFlex)}")
-        + "</div>",
-        unsafe_allow_html=True,
-    )
-
-    try:
-        df_tetos = load_tetos()
-    except Exception:
-        df_tetos = pd.DataFrame()
-    _pop_tetos = st.popover("tetos por categoria · abrir", use_container_width=True)
-    if not df_tetos.empty and "Categoria" in df_tetos.columns:
-        _desp_cat = split_movimentos(no_mes)["despesas"].groupby("Categoria")["Valor"].sum()
-        _tmap = dict(zip(df_tetos["Categoria"], pd.to_numeric(df_tetos.get("Teto Mensal", 0), errors="coerce").fillna(0)))
-        _linhas_teto = ""
-        for cat, gasto in _desp_cat.sort_values(ascending=False).head(6).items():
-            teto = float(_tmap.get(cat, 0) or 0)
-            pct = gasto / teto if teto > 0 else 0
-            cor_b = COR["receita"] if pct < 0.8 else (COR["alerta"] if pct <= 1 else COR["despesa"])
-            largura = min(pct, 1.15) / 1.15 * 100 if teto > 0 else 0
-            rot = f"{pct*100:.0f}% do teto" if teto > 0 else "sem teto"
-            _linhas_teto += (
-                f'<div style="margin:7px 0"><div style="display:flex;justify-content:space-between;font-size:12.5px">'
-                f'<span>{cat}</span><b>{fmt(gasto)} <span style="color:#8B978F;font-weight:500">· {rot}</span></b></div>'
-                f'<div style="height:6px;border-radius:4px;background:#EDF2EE;margin-top:3px">'
-                f'<div style="width:{largura:.0f}%;height:6px;border-radius:4px;background:{cor_b}"></div></div></div>'
-            )
-        with _pop_tetos:
-            st.markdown(_linhas_teto, unsafe_allow_html=True)
-
-# ============== Faturas (fechado · filtro por mês) ==============
-def _fatura_rows(df_f):
-    rows = ""
-    for _, r in df_f.iterrows():
-        cartao = str(r.get("Cartão", "?")); mes_ref = str(r.get("Mês Referência", "?"))
-        carregada = str(r.get("Status", "")).lower() == "carregada"
-        total = float(r.get("Total_num", 0) or 0)
-        venc = str(r.get("Vencimento", ""))
-        if total <= 0:
-            total, _q = fatura_estimada(cartao, mes_ref, df_lanc, vencimento=venc)
-        d = int(r["_dias"])
-        if carregada:
-            cor_s, status = COR["receita"], "carregada · conciliada"
-        elif d < 0:
-            cor_s, status = COR["despesa"], f"venceu há {abs(d)}d" + (" · ~valor estimado" if total > 0 else "")
-        else:
-            cor_s, status = COR["alerta"], f"vence em {d}d · aguardando fatura" + (" · ~valor estimado" if total > 0 else "")
-        val_txt = fmt(total) if (carregada or total > 0) else "—"
-        prefixo = "" if carregada else "~ "
-        rows += (
-            f'<div class="frow"><span class="fstripe" style="background:{cor_s}"></span>'
-            f'<span class="fmeio"><span class="ft">{cartao} · {mes_ref}</span>'
-            f'<div class="fs">{status}</div></span>'
-            f'<span class="fval">{prefixo if val_txt != "—" else ""}{val_txt}</span></div>'
-        )
-    return rows
-
-
-_fat_ctx = st.container(key="lin-fat")
-with _fat_ctx.expander(f"**Faturas** `{_prox_fat_val or '—'}`", icon="💳", expanded=False):
-    st.caption(f"próxima: {_prox_fat_txt}")
-    if not ab.empty:
-        fc0, fc1, fc2 = st.columns(3)
-        _meses_f = ["todos os meses"] + sorted(ab["Mês Referência"].astype(str).unique().tolist(), reverse=True)
-        f_mes = fc0.selectbox("Mês", _meses_f)
-        _cartoes = ["todos os cartões"] + sorted(ab["Cartão"].astype(str).unique().tolist())
-        f_cart = fc1.selectbox("Cartão", _cartoes)
-        f_stat = fc2.selectbox("Status", ["todas", "aguardando fatura", "vencidas", "carregadas"])
-        filt = ab.copy()
-        if f_mes != "todos os meses":
-            filt = filt[filt["Mês Referência"].astype(str) == f_mes]
-        if f_cart != "todos os cartões":
-            filt = filt[filt["Cartão"].astype(str) == f_cart]
-        _low = filt["Status"].astype(str).str.lower()
-        if f_stat == "aguardando fatura":
-            filt = filt[(_low != "carregada") & (filt["_dias"] >= 0)]
-        elif f_stat == "vencidas":
-            filt = filt[(_low != "carregada") & (filt["_dias"] < 0)]
-        elif f_stat == "carregadas":
-            filt = filt[_low == "carregada"]
-        if filt.empty:
-            st.caption("nada com esse filtro")
-        else:
-            st.markdown(f'<div class="c5">{_fatura_rows(filt)}</div>', unsafe_allow_html=True)
-    else:
-        st.info("Aba Faturas vazia.")
-
-# ============== Auditoria de cartão (apontamentos do WF1) ==============
-df_auditoria_fatura = load_auditoria_fatura()
-if not df_auditoria_fatura.empty and "Status" in df_auditoria_fatura.columns:
-    _audit_pend = df_auditoria_fatura[df_auditoria_fatura["Status"].astype(str).str.strip().str.lower() == "pendente"]
-    if not _audit_pend.empty:
-        _audit_ctx = st.container(key="lin-audit-fatura")
-        with _audit_ctx.expander(f"**⚠️ Auditoria de cartão** `{len(_audit_pend)} pendente(s)`", icon="🔍", expanded=False):
-            st.caption(
-                "a fatura mostra esta transação, mas o valor+data+pessoa também batem com um "
-                "lançamento já existente em OUTRO cartão do mesmo banco — pode ser cartão errado "
-                "no lançamento antigo, ou coincidência. A transação da fatura foi inserida normalmente; "
-                "revise e corrija/apague o lançamento duplicado se for o caso."
-            )
-            for _, r in _audit_pend.sort_values("Data Processamento_dt", ascending=False).iterrows():
-                st.markdown(
-                    f"""
-                    <div style="background:#FFF7ED;border:1px solid #FCD9A8;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:13px">
-                      <div style="font-weight:700;color:#1C2420">{r.get('Descrição', '?')} — {fmt(float(r.get('Valor_num', 0) or 0))}</div>
-                      <div style="color:#5C6B62;margin-top:2px">Fatura: <b>{r.get('Fatura Cartão', '?')}</b> · {r.get('Data Transação', '?')}</div>
-                      <div style="color:#B45309;margin-top:2px">Lançamento existente em <b>{r.get('Cartão Existente (possível)', '?')}</b> — {r.get('Lançamento Existente', '?')}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
+        try:
+            df_tetos = load_tetos()
+        except Exception:
+            df_tetos = pd.DataFrame()
+        _pop_tetos = st.popover("tetos por categoria · abrir", use_container_width=True)
+        if not df_tetos.empty and "Categoria" in df_tetos.columns:
+            _desp_cat = split_movimentos(no_mes)["despesas"].groupby("Categoria")["Valor"].sum()
+            _tmap = dict(zip(df_tetos["Categoria"], pd.to_numeric(df_tetos.get("Teto Mensal", 0), errors="coerce").fillna(0)))
+            _linhas_teto = ""
+            for cat, gasto in _desp_cat.sort_values(ascending=False).head(6).items():
+                teto = float(_tmap.get(cat, 0) or 0)
+                pct = gasto / teto if teto > 0 else 0
+                cor_b = COR["receita"] if pct < 0.8 else (COR["alerta"] if pct <= 1 else COR["despesa"])
+                largura = min(pct, 1.15) / 1.15 * 100 if teto > 0 else 0
+                rot = f"{pct*100:.0f}% do teto" if teto > 0 else "sem teto"
+                _linhas_teto += (
+                    f'<div style="margin:7px 0"><div style="display:flex;justify-content:space-between;font-size:12.5px">'
+                    f'<span>{cat}</span><b>{fmt(gasto)} <span style="color:#8B978F;font-weight:500">· {rot}</span></b></div>'
+                    f'<div style="height:6px;border-radius:4px;background:#EDF2EE;margin-top:3px">'
+                    f'<div style="width:{largura:.0f}%;height:6px;border-radius:4px;background:{cor_b}"></div></div></div>'
                 )
-            st.caption("depois de revisar, marque \"Status\" como resolvido direto na aba Auditoria Fatura da planilha.")
+            with _pop_tetos:
+                st.markdown(_linhas_teto, unsafe_allow_html=True)
+
+    # ============== Faturas (fechado · filtro por mês) ==============
+    def _fatura_rows(df_f):
+        rows = ""
+        for _, r in df_f.iterrows():
+            cartao = str(r.get("Cartão", "?")); mes_ref = str(r.get("Mês Referência", "?"))
+            carregada = str(r.get("Status", "")).lower() == "carregada"
+            total = float(r.get("Total_num", 0) or 0)
+            venc = str(r.get("Vencimento", ""))
+            if total <= 0:
+                total, _q = fatura_estimada(cartao, mes_ref, df_lanc, vencimento=venc)
+            d = int(r["_dias"])
+            if carregada:
+                cor_s, status = COR["receita"], "carregada · conciliada"
+            elif d < 0:
+                cor_s, status = COR["despesa"], f"venceu há {abs(d)}d" + (" · ~valor estimado" if total > 0 else "")
+            else:
+                cor_s, status = COR["alerta"], f"vence em {d}d · aguardando fatura" + (" · ~valor estimado" if total > 0 else "")
+            val_txt = fmt(total) if (carregada or total > 0) else "—"
+            prefixo = "" if carregada else "~ "
+            rows += (
+                f'<div class="frow"><span class="fstripe" style="background:{cor_s}"></span>'
+                f'<span class="fmeio"><span class="ft">{cartao} · {mes_ref}</span>'
+                f'<div class="fs">{status}</div></span>'
+                f'<span class="fval">{prefixo if val_txt != "—" else ""}{val_txt}</span></div>'
+            )
+        return rows
+
+
+    _fat_ctx = st.container(key="lin-fat")
+    with _fat_ctx.expander(f"**Faturas** `{_prox_fat_val or '—'}`", icon="💳", expanded=False):
+        st.caption(f"próxima: {_prox_fat_txt}")
+        if not ab.empty:
+            fc0, fc1, fc2 = st.columns(3)
+            _meses_f = ["todos os meses"] + sorted(ab["Mês Referência"].astype(str).unique().tolist(), reverse=True)
+            f_mes = fc0.selectbox("Mês", _meses_f)
+            _cartoes = ["todos os cartões"] + sorted(ab["Cartão"].astype(str).unique().tolist())
+            f_cart = fc1.selectbox("Cartão", _cartoes)
+            f_stat = fc2.selectbox("Status", ["todas", "aguardando fatura", "vencidas", "carregadas"])
+            filt = ab.copy()
+            if f_mes != "todos os meses":
+                filt = filt[filt["Mês Referência"].astype(str) == f_mes]
+            if f_cart != "todos os cartões":
+                filt = filt[filt["Cartão"].astype(str) == f_cart]
+            _low = filt["Status"].astype(str).str.lower()
+            if f_stat == "aguardando fatura":
+                filt = filt[(_low != "carregada") & (filt["_dias"] >= 0)]
+            elif f_stat == "vencidas":
+                filt = filt[(_low != "carregada") & (filt["_dias"] < 0)]
+            elif f_stat == "carregadas":
+                filt = filt[_low == "carregada"]
+            if filt.empty:
+                st.caption("nada com esse filtro")
+            else:
+                st.markdown(f'<div class="c5">{_fatura_rows(filt)}</div>', unsafe_allow_html=True)
+        else:
+            st.info("Aba Faturas vazia.")
+
+    # ============== Auditoria de cartão (apontamentos do WF1) ==============
+    df_auditoria_fatura = load_auditoria_fatura()
+    if not df_auditoria_fatura.empty and "Status" in df_auditoria_fatura.columns:
+        _audit_pend = df_auditoria_fatura[df_auditoria_fatura["Status"].astype(str).str.strip().str.lower() == "pendente"]
+        if not _audit_pend.empty:
+            _audit_ctx = st.container(key="lin-audit-fatura")
+            with _audit_ctx.expander(f"**⚠️ Auditoria de cartão** `{len(_audit_pend)} pendente(s)`", icon="🔍", expanded=False):
+                st.caption(
+                    "a fatura mostra esta transação, mas o valor+data+pessoa também batem com um "
+                    "lançamento já existente em OUTRO cartão do mesmo banco — pode ser cartão errado "
+                    "no lançamento antigo, ou coincidência. A transação da fatura foi inserida normalmente; "
+                    "revise e corrija/apague o lançamento duplicado se for o caso."
+                )
+                for _, r in _audit_pend.sort_values("Data Processamento_dt", ascending=False).iterrows():
+                    st.markdown(
+                        f"""
+                        <div style="background:#FFF7ED;border:1px solid #FCD9A8;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:13px">
+                          <div style="font-weight:700;color:#1C2420">{r.get('Descrição', '?')} — {fmt(float(r.get('Valor_num', 0) or 0))}</div>
+                          <div style="color:#5C6B62;margin-top:2px">Fatura: <b>{r.get('Fatura Cartão', '?')}</b> · {r.get('Data Transação', '?')}</div>
+                          <div style="color:#B45309;margin-top:2px">Lançamento existente em <b>{r.get('Cartão Existente (possível)', '?')}</b> — {r.get('Lançamento Existente', '?')}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                st.caption("depois de revisar, marque \"Status\" como resolvido direto na aba Auditoria Fatura da planilha.")
 
 # ============== Projeção (linhas: receita, fixas, parcelas e o LIVRE) ==============
 st.markdown(
-    f'<div style="display:flex;align-items:center;gap:8px;margin:26px 0 10px 2px">'
-    f'<span style="width:7px;height:7px;border-radius:50%;background:{COR["investimento"]};flex:0 0 7px"></span>'
-    f'<h3 style="margin:0;font-size:19px;color:#1C2420">Projeção</h3></div>',
+    f'<div style="position:relative;padding-left:12px;margin:26px 0 10px 2px">'
+    f'<span style="position:absolute;left:0;top:2px;bottom:2px;width:4px;border-radius:4px;'
+    f'background:{COR["investimento"]}"></span>'
+    f'<h3 style="margin:0;font-size:19px;color:#1C2420">Projeção</h3>'
+    f'<span style="font-size:11px;color:#97A69D">próximos 6 meses</span></div>',
     unsafe_allow_html=True,
 )
 cron = compromissos_proximos_meses(df_lanc, df_rec, df_faturas, 6, partir_de=competencia)
@@ -649,12 +664,9 @@ if not cron.empty:
     with st.container(key="lin-projecao-chart"):
         st.plotly_chart(fig_mobile(figj), use_container_width=True, config=PLOTLY_CONFIG)
     st.markdown(
-        f'<div style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;'
-        f'background:#EAF3EE;border-radius:10px;padding:9px 11px">'
-        f'<span style="font-size:12px;margin-top:1px">💡</span>'
-        f'<p style="font-size:11.5px;color:#33473C;line-height:1.45;margin:0">'
+        f'<div class="proj-cap-b">'
         f'<b>Receita prevista {fmt(receita_proj)}</b> (média dos últimos 3 meses) · '
-        f'LIVRE = receita − fixas − parcelas − faturas em aberto</p></div>',
+        f'LIVRE = receita − fixas − parcelas − faturas em aberto</div>',
         unsafe_allow_html=True,
     )
     with st.expander("ver composição mês a mês"):
