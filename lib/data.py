@@ -379,6 +379,59 @@ def valor_a_receber_hoje() -> float:
     return mutuo + SITIO_A_RECEBER
 
 
+# Caixa da Pelada de Futevôlei — dinheiro da galera (mensalidades + avulsos) que passa pela
+# gestão do Wesley, NÃO é patrimônio dele. Fica só como apontamento informativo (decisão 11/08).
+PELADA_SHEET_ID = "1aGiTGqU7DwUsE6maNF_WX-KsiSCOU6Tg-ViZWg9dpaY"
+PELADA_GID_HISTORICO = 0
+PELADA_GID_LANCAMENTOS = 786788221
+
+
+@st.cache_data(ttl=300)
+def caixa_pelada_atual() -> dict:
+    """Saldo atual do caixa da pelada, calculado igual ao dashboard n8n
+    (Pelada_Dashboard_n8n_import.json): saldo base = SaldoFim do último mês na aba Histórico,
+    + lançamentos da aba Lançamentos desde então (Mensal/Avulso somam, Despesa subtrai;
+    Festa vira fundo separado, não entra no operacional). Planilha pública (CSV export),
+    sem credencial — mesma fonte usada pelo projeto Pelada Futevôlei."""
+    import csv
+    import io
+    import urllib.request
+
+    def _get_csv(gid):
+        url = f"https://docs.google.com/spreadsheets/d/{PELADA_SHEET_ID}/export?format=csv&gid={gid}"
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            return list(csv.DictReader(io.StringIO(resp.read().decode("utf-8"))))
+
+    def _v(s):
+        s = str(s).replace(".", "").replace(",", ".")
+        try:
+            return float(s)
+        except ValueError:
+            return 0.0
+
+    try:
+        hist = _get_csv(PELADA_GID_HISTORICO)
+        lanc = _get_csv(PELADA_GID_LANCAMENTOS)
+    except Exception:
+        return {"operacional": 0.0, "festa": 0.0, "ok": False}
+
+    if not hist:
+        return {"operacional": 0.0, "festa": 0.0, "ok": False}
+
+    op = _v(hist[-1].get("SaldoFim", 0))
+    festa = 0.0
+    for r in lanc:
+        tipo = str(r.get("Tipo", "")).strip()
+        v = _v(r.get("Valor", 0))
+        if tipo == "Festa":
+            festa += v
+        elif tipo == "Despesa":
+            op -= v
+        else:
+            op += v
+    return {"operacional": op, "festa": festa, "ok": True}
+
+
 @st.cache_data(ttl=60)
 def load_bens_snapshots() -> pd.DataFrame:
     try:

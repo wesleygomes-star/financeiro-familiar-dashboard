@@ -15,6 +15,7 @@ from lib.data import (
     SITIO_PREJUIZO_4,
     SITIO_A_RECEBER,
     TAXA_CDI_MUTUO,
+    caixa_pelada_atual,
     custo_capital_corrigido,
     kpis_familia,
     load_ap_claudio_aportes,
@@ -194,6 +195,31 @@ st.caption(
     "conforme disponibilidade de caixa. Sítio: reembolsável quando o imóvel for vendido — detalhe "
     "do cálculo em Pagamentos Sítio/ANALISE_PROTESTO_ITCD_11-08.md."
 )
+
+# ============== Sob custódia — não é patrimônio (caixa da pelada) ==============
+_pelada = caixa_pelada_atual()
+if _pelada.get("ok") and (_pelada["operacional"] > 0 or _pelada["festa"] > 0):
+    st.markdown('<h3 style="margin-top:20px">Sob custódia (não é seu)</h3>', unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(12,60,45,0.06)">
+          <div style="font-size:12.5px;color:#5C6B62;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Caixa da Pelada de Futevôlei</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px">
+            <div style="color:#5C6B62">Operacional</div><div style="text-align:right;font-weight:700">{fmt(_pelada['operacional'])}</div>
+            <div style="color:#5C6B62">Fundo da festa</div><div style="text-align:right;font-weight:700">{fmt(_pelada['festa'])}</div>
+            <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;color:#1C2420;font-weight:800">Total sob custódia</div>
+            <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;text-align:right;font-weight:800;color:{COR['alerta']}">{fmt(_pelada['operacional'] + _pelada['festa'])}</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "dinheiro da galera (mensalidades + avulsos) que passa pela sua gestão — não é seu "
+        "patrimônio, fica aqui só pra deixar explícito que parte do que está no banco não é "
+        "dinheiro livre. Não entra no total do Patrimônio acima. Fonte: planilha Caixa Pelada "
+        "Futevôlei, mesmo cálculo do dashboard n8n (atualiza a cada 5min)."
+    )
 
 # ============== Imobilizado — bens e dívidas ==============
 st.markdown('<h3 style="margin-top:20px">Bens e dívidas</h3>', unsafe_allow_html=True)
