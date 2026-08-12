@@ -111,11 +111,15 @@ st.markdown(
       font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis;
       min-width: 0; flex: 0 1 auto; }
     /* markdown ocupa a largura → o valor vai pra ponta direita */
-    [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] { flex: 1 1 auto; }
+    [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] { flex: 1 1 auto; min-width: 0; }
+    /* summary é flex mas o span-filho (ícone+texto) não herda o limite de largura sozinho —
+       sem min-width:0 aqui, o conteúdo vaza pra fora do card em colunas estreitas */
+    [data-testid="stExpander"] summary { width: 100%; box-sizing: border-box; }
+    [data-testid="stExpander"] summary > span { min-width: 0; flex: 1 1 auto; }
     /* ícone (emoji do param icon=) vira bolha colorida por seção — é o 1º span DENTRO do span-flex */
     [data-testid="stExpander"] summary > span > span:first-child {
       border-radius: 9px; padding: 5px 6px; margin-right: 6px; line-height: 1;
-      display: inline-flex; align-items: center; }
+      display: inline-flex; align-items: center; flex: 0 0 auto; }
     .st-key-lin-patr    [data-testid="stExpander"] summary > span > span:first-child { background: #E7F5EF; }
     .st-key-lin-fix     [data-testid="stExpander"] summary > span > span:first-child { background: #E6EEF7; }
     .st-key-lin-consumo [data-testid="stExpander"] summary > span > span:first-child { background: #FBEFE0; }
