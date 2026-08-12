@@ -143,6 +143,9 @@ st.markdown(
       color: #5C6B62 !important; font-weight: 700 !important; }
     .st-key-lin-patr summary code, .st-key-lin-fix summary code {
       font-size: 16px !important; color: #1C2420 !important; width: 100%; display: block; }
+    /* sem ícone nesses dois (como o mockup) — sobra mais largura pro valor não truncar */
+    .st-key-lin-patr summary > span > span:first-child,
+    .st-key-lin-fix summary > span > span:first-child { display: none !important; }
     /* Patrimônio + Contas fixas ficam lado a lado mesmo no celular (o Streamlit empilha
        colunas sozinho abaixo de ~640px; o mockup sempre mostra as duas juntas, tipo KPI) */
     div[data-testid="stHorizontalBlock"]:has(.st-key-lin-patr),
@@ -461,10 +464,7 @@ with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=Fal
     else:
         st.info("Mande o print do app do banco no grupo do Zap — o patrimônio entra sozinho.")
 
-_resumo_fixas = (
-    f"{n_pagas}/{n_fixas} pagas" if _fixas_restante <= 0.5
-    else f"{n_pagas}/{n_fixas} · {fmt(_fixas_restante)} a pagar"
-)
+_resumo_fixas = "tudo pago" if _fixas_restante <= 0.5 else fmt(_fixas_restante)
 _f_ctx = col_f.container(key="lin-fix")
 with _f_ctx.expander(f"**Contas fixas** `{_resumo_fixas}`", icon="🕐", expanded=False):
     if not audit.empty:
