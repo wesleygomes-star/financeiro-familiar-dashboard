@@ -562,9 +562,12 @@ def aportes_historico(df_lanc: pd.DataFrame, n_meses: int = 12) -> pd.DataFrame:
 def _lancamentos_da_fatura(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame, vencimento: str = None) -> pd.DataFrame:
     """Lançamentos de crédito que pertencem a uma fatura.
 
-    Chave correta: Data Caixa == Vencimento da fatura (o WF1 calcula Data Caixa
+    Chave correta: Data Caixa ≈ Vencimento da fatura (o WF1 calcula Data Caixa
     pelo ciclo do cartão exatamente pra isso). Competência NÃO serve — a fatura
     de junho carrega compras de maio (lição de 11/06: rateio não batia).
+    Tolerância de ±6 dias: vencimento nominal em fim de semana desloca pro dia
+    útil no PDF do banco (lição de 12/08: 08/08 era sábado, PDF dizia 10/08 e a
+    igualdade exata de string zerava a conciliação inteira).
     Fallback por competência só quando o vencimento não é informado.
     """
     if df_lanc.empty or "Cartão" not in df_lanc.columns:
@@ -577,7 +580,11 @@ def _lancamentos_da_fatura(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame,
         & df_lanc["Forma Pgto"].astype(str).str.lower().str.contains("crédito|credito", na=False, regex=True)
     ]
     if vencimento:
-        return base[base["Data Caixa"].astype(str).str.strip() == str(vencimento).strip()]
+        venc_dt = pd.to_datetime(str(vencimento).strip(), format="%d/%m/%Y", errors="coerce")
+        if pd.isna(venc_dt):
+            return base[base["Data Caixa"].astype(str).str.strip() == str(vencimento).strip()]
+        dc_dt = pd.to_datetime(base["Data Caixa"].astype(str).str.strip(), format="%d/%m/%Y", errors="coerce")
+        return base[(dc_dt - venc_dt).abs().dt.days <= 6]
     if mes_ref:
         return base[base["Competência"] == mes_ref]
     return pd.DataFrame()
@@ -919,17 +926,15 @@ def compromissos_proximos_meses(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, df_
             for _, fr in f_mes.iterrows():
                 total_fat = float(fr.get("Total_num", 0) or 0)
                 if total_fat <= 0 and not df_lanc.empty:
-                    # estima pelo somatório de lançamentos individuais (cartão+mês_ref+crédito)
-                    cartao_str = str(fr.get("Cartão", "")).strip()
-                    mes_ref = str(fr.get("Mês Referência", "")).strip()
-                    primeira = cartao_str.split()[0] if cartao_str else ""
-                    if primeira and mes_ref:
-                        sub = df_lanc[
-                            df_lanc["Cartão"].astype(str).str.lower().str.contains(primeira.lower(), na=False)
-                            & (df_lanc["Competência"] == mes_ref)
-                            & df_lanc["Forma Pgto"].astype(str).str.lower().str.contains("crédito|credito", na=False, regex=True)
-                        ]
-                        total_fat = float(sub["Valor"].sum())
+                    # mesma estimativa do card Faturas (Data Caixa ≈ vencimento) — estimar por
+                    # competência pegava compras do mês errado do ciclo (fatura de agosto
+                    # carrega compras de julho) e divergia do card
+                    total_fat, _ = fatura_estimada(
+                        str(fr.get("Cartão", "")).strip(),
+                        str(fr.get("Mês Referência", "")).strip(),
+                        df_lanc,
+                        vencimento=str(fr.get("Vencimento", "")).strip(),
+                    )
                 faturas_abertas += total_fat
 
         out.append({

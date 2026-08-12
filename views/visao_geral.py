@@ -661,10 +661,10 @@ with st.container(key="lin-group-b"):
             _audit_ctx = st.container(key="lin-audit-fatura")
             with _audit_ctx.expander(f"**⚠️ Auditoria de cartão** `{len(_audit_pend)} pendente(s)`", icon="🔍", expanded=False):
                 st.caption(
-                    "a fatura mostra esta transação, mas o valor+data+pessoa também batem com um "
-                    "lançamento já existente em OUTRO cartão do mesmo banco — pode ser cartão errado "
-                    "no lançamento antigo, ou coincidência. A transação da fatura foi inserida normalmente; "
-                    "revise e corrija/apague o lançamento duplicado se for o caso."
+                    "transações da fatura que NÃO foram lançadas antes no Zap — confira se a compra "
+                    "é sua mesmo (assinatura esquecida, parcela antiga ou cobrança errada da bandeira). "
+                    "Quando o apontamento cita outro cartão do mesmo banco, pode ser lançamento feito "
+                    "no cartão errado. Nada foi bloqueado: a transação entrou normalmente no consumo."
                 )
                 for _, r in _audit_pend.sort_values("Data Processamento_dt", ascending=False).iterrows():
                     st.markdown(
