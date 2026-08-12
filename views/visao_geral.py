@@ -126,6 +126,24 @@ st.markdown(
     div:has(> .st-key-lin-audit-fatura) { display: contents; }
     /* respiro entre as linhas L4 (a "audit-fatura" fica logo após "fat" sem folga própria) */
     .st-key-lin-fat, .st-key-lin-audit-fatura { margin-top: 6px; }
+    /* "cards soltos": o Streamlit já dá sombra+raio+margem padrão no stExpander, mas é sutil
+       demais pra ler como elevação numa tela pequena — intensifica pros 5 cards L4 (mockup A, 12/08) */
+    .st-key-lin-patr [data-testid="stExpander"], .st-key-lin-fix [data-testid="stExpander"],
+    .st-key-lin-consumo [data-testid="stExpander"], .st-key-lin-fat [data-testid="stExpander"],
+    .st-key-lin-audit-fatura [data-testid="stExpander"] {
+      box-shadow: 0 3px 12px rgba(12,60,45,0.10) !important;
+      margin-bottom: 10px !important;
+    }
+    /* card de auditoria pendente ganha fundo e sombra âmbar — chama atenção sem gritar */
+    .st-key-lin-audit-fatura [data-testid="stExpander"] {
+      background: #FFFBF3 !important;
+      box-shadow: 0 3px 12px rgba(186,117,23,0.16) !important;
+    }
+    /* card do gráfico de Projeção (mockup A, 12/08) */
+    .st-key-lin-projecao-chart {
+      background: #fff; border-radius: 16px; box-shadow: 0 3px 12px rgba(12,60,45,0.08);
+      padding: 14px 6px 2px; margin-top: 2px;
+    }
     /* rótulos de grupo dentro dos cards de pessoa (caixa × competência) */
     .pss .pgrp { font-size: 9.5px; font-weight: 800; text-transform: uppercase;
       letter-spacing: .09em; color: #9BAaa1; margin: 8px 0 2px; }
@@ -583,7 +601,12 @@ if not df_auditoria_fatura.empty and "Status" in df_auditoria_fatura.columns:
             st.caption("depois de revisar, marque \"Status\" como resolvido direto na aba Auditoria Fatura da planilha.")
 
 # ============== Projeção (linhas: receita, fixas, parcelas e o LIVRE) ==============
-st.markdown('<h3 style="margin-top:26px;margin-bottom:2px;font-size:19px;color:#1C2420">Projeção</h3>', unsafe_allow_html=True)
+st.markdown(
+    f'<div style="display:flex;align-items:center;gap:8px;margin:26px 0 10px 2px">'
+    f'<span style="width:7px;height:7px;border-radius:50%;background:{COR["investimento"]};flex:0 0 7px"></span>'
+    f'<h3 style="margin:0;font-size:19px;color:#1C2420">Projeção</h3></div>',
+    unsafe_allow_html=True,
+)
 cron = compromissos_proximos_meses(df_lanc, df_rec, df_faturas, 6, partir_de=competencia)
 if not cron.empty:
     receita_proj = 0.0
@@ -623,10 +646,16 @@ if not cron.empty:
                        font=dict(color="#2C2C2A", size=12),
                        legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="center", x=0.5),
                        yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)"))
-    st.plotly_chart(fig_mobile(figj), use_container_width=True, config=PLOTLY_CONFIG)
-    st.caption(
-        f"receita prevista = média dos últimos 3 meses ({fmt(receita_proj)}). "
-        f"LIVRE = receita − fixas − parcelas − faturas em aberto (faturas entram no cálculo)."
+    with st.container(key="lin-projecao-chart"):
+        st.plotly_chart(fig_mobile(figj), use_container_width=True, config=PLOTLY_CONFIG)
+    st.markdown(
+        f'<div style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;'
+        f'background:#EAF3EE;border-radius:10px;padding:9px 11px">'
+        f'<span style="font-size:12px;margin-top:1px">💡</span>'
+        f'<p style="font-size:11.5px;color:#33473C;line-height:1.45;margin:0">'
+        f'<b>Receita prevista {fmt(receita_proj)}</b> (média dos últimos 3 meses) · '
+        f'LIVRE = receita − fixas − parcelas − faturas em aberto</p></div>',
+        unsafe_allow_html=True,
     )
     with st.expander("ver composição mês a mês"):
         _dcron = cron[["Mês"] + comp_cols + ["Compromissos", "Livre"]].copy()
