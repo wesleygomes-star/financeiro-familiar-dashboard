@@ -130,6 +130,18 @@ st.markdown(
       box-shadow: 0 3px 12px rgba(12,60,45,0.10) !important;
       margin-bottom: 10px !important;
     }
+    /* Patrimônio + Contas fixas ficam lado a lado mesmo no celular (o Streamlit empilha
+       colunas sozinho abaixo de ~640px; o mockup sempre mostra as duas juntas, tipo KPI) */
+    div[data-testid="stHorizontalBlock"]:has(.st-key-lin-patr),
+    div[data-testid="stHorizontalBlock"]:has(.st-key-lin-fix) {
+      flex-wrap: nowrap !important;
+    }
+    div[data-testid="stHorizontalBlock"]:has(.st-key-lin-patr) > div[data-testid="stColumn"],
+    div[data-testid="stHorizontalBlock"]:has(.st-key-lin-patr) > div[data-testid="column"],
+    div[data-testid="stHorizontalBlock"]:has(.st-key-lin-fix) > div[data-testid="stColumn"],
+    div[data-testid="stHorizontalBlock"]:has(.st-key-lin-fix) > div[data-testid="column"] {
+      width: 50% !important; flex: 1 1 50% !important; min-width: 0 !important;
+    }
 
     /* ===== Opção B (12/08): consumo + faturas + auditoria = 1 card único, trilho de cor por linha ===== */
     .st-key-lin-group-b {
