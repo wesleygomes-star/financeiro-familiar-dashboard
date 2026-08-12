@@ -104,11 +104,12 @@ st.markdown(
       display: flex; align-items: baseline; justify-content: space-between;
       width: 100%; gap: 12px; margin: 0; font-size: 14.5px; }
     [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] strong {
-      font-weight: 700; color: #21322A; }
+      font-weight: 700; color: #21322A; flex: 0 0 auto; }
     [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] code {
       background: none !important; color: #21322A; font-family: inherit !important;
       font-weight: 800; font-size: 14.5px; white-space: nowrap; padding: 0;
-      font-variant-numeric: tabular-nums; }
+      font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis;
+      min-width: 0; flex: 0 1 auto; }
     /* markdown ocupa a largura → o valor vai pra ponta direita */
     [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] { flex: 1 1 auto; }
     /* ícone (emoji do param icon=) vira bolha colorida por seção — é o 1º span DENTRO do span-flex */
@@ -134,8 +135,9 @@ st.markdown(
     .st-key-lin-group-b {
       background: linear-gradient(180deg, #FBFDFC, #F6FAF7);
       border: 1px solid #E1EAE4; border-radius: 16px; overflow: hidden; margin-top: 2px;
+      gap: 0 !important;
     }
-    .st-key-lin-consumo, .st-key-lin-fat, .st-key-lin-audit-fatura { margin-top: 0 !important; }
+    .st-key-lin-consumo, .st-key-lin-fat, .st-key-lin-audit-fatura { margin-top: 0 !important; gap: 0 !important; }
     .st-key-lin-group-b [data-testid="stExpander"] {
       background: transparent !important; box-shadow: none !important;
       border-radius: 0 !important; border-top: none; border-right: none; border-bottom: none;
