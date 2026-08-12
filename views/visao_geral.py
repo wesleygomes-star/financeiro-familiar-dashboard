@@ -19,6 +19,7 @@ from lib.data import (
     compromissos_proximos_meses,
     fatura_estimada,
     kpis_familia,
+    load_auditoria_fatura,
     load_bens,
     load_faturas,
     patrimonio_imobilizado,
@@ -550,6 +551,32 @@ with _fat_ctx.expander(f"**Faturas** `{_prox_fat_val or '—'}`", icon="💳", e
             st.markdown(f'<div class="c5">{_fatura_rows(filt)}</div>', unsafe_allow_html=True)
     else:
         st.info("Aba Faturas vazia.")
+
+# ============== Auditoria de cartão (apontamentos do WF1) ==============
+df_auditoria_fatura = load_auditoria_fatura()
+if not df_auditoria_fatura.empty and "Status" in df_auditoria_fatura.columns:
+    _audit_pend = df_auditoria_fatura[df_auditoria_fatura["Status"].astype(str).str.strip().str.lower() == "pendente"]
+    if not _audit_pend.empty:
+        _audit_ctx = st.container(key="lin-audit-fatura")
+        with _audit_ctx.expander(f"**⚠️ Auditoria de cartão** `{len(_audit_pend)} pendente(s)`", icon="🔍", expanded=False):
+            st.caption(
+                "a fatura mostra esta transação, mas o valor+data+pessoa também batem com um "
+                "lançamento já existente em OUTRO cartão do mesmo banco — pode ser cartão errado "
+                "no lançamento antigo, ou coincidência. A transação da fatura foi inserida normalmente; "
+                "revise e corrija/apague o lançamento duplicado se for o caso."
+            )
+            for _, r in _audit_pend.sort_values("Data Processamento_dt", ascending=False).iterrows():
+                st.markdown(
+                    f"""
+                    <div style="background:#FFF7ED;border:1px solid #FCD9A8;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:13px">
+                      <div style="font-weight:700;color:#1C2420">{r.get('Descrição', '?')} — {fmt(float(r.get('Valor_num', 0) or 0))}</div>
+                      <div style="color:#5C6B62;margin-top:2px">Fatura: <b>{r.get('Fatura Cartão', '?')}</b> · {r.get('Data Transação', '?')}</div>
+                      <div style="color:#B45309;margin-top:2px">Lançamento existente em <b>{r.get('Cartão Existente (possível)', '?')}</b> — {r.get('Lançamento Existente', '?')}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            st.caption("depois de revisar, marque \"Status\" como resolvido direto na aba Auditoria Fatura da planilha.")
 
 # ============== Projeção (linhas: receita, fixas, parcelas e o LIVRE) ==============
 st.subheader("Projeção")

@@ -262,6 +262,28 @@ def load_faturas() -> pd.DataFrame:
 
 
 @st.cache_data(ttl=60)
+def load_auditoria_fatura() -> pd.DataFrame:
+    """Aba 'Auditoria Fatura' — apontamentos gerados pelo WF1 quando uma transação da fatura
+    bate valor+data+pessoa com um lançamento já existente, mas em outro cartão do MESMO banco
+    (ex: fatura é do Itaú Visa, mas o lançamento manual foi feito no Itaú Master). Não impede o
+    insert da transação real — é só o sinal pra revisar e corrigir o cartão do lançamento antigo,
+    ou confirmar que são duas compras diferentes por coincidência. Endurecido 11/08 (pendência
+    antiga: dedupe batia só pelo banco, deixava passar cartão errado sem avisar)."""
+    try:
+        rows = _records_formatted("Auditoria Fatura")
+    except Exception:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    if "Valor" in df.columns:
+        df["Valor_num"] = df["Valor"].apply(_parse_valor)
+    if "Data Processamento" in df.columns:
+        df["Data Processamento_dt"] = df["Data Processamento"].apply(_parse_data)
+    return df
+
+
+@st.cache_data(ttl=60)
 def load_bens() -> pd.DataFrame:
     """Aba Bens — patrimônio real (imóveis, veículos). Linhas Status=Ativo com Valor de Mercado."""
     try:
