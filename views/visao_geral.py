@@ -134,6 +134,15 @@ st.markdown(
       box-shadow: 0 3px 12px rgba(12,60,45,0.10) !important;
       margin-bottom: 10px !important;
     }
+    /* rótulo em cima / valor embaixo (tipo KPI, como o mockup) — só nesses dois, que agora
+       dividem a largura ao meio; lado a lado numa linha só não cabia rótulo + valor juntos */
+    .st-key-lin-patr summary p, .st-key-lin-fix summary p {
+      flex-direction: column !important; align-items: flex-start !important; gap: 2px !important; }
+    .st-key-lin-patr summary strong, .st-key-lin-fix summary strong {
+      font-size: 10.5px !important; text-transform: uppercase; letter-spacing: .04em;
+      color: #5C6B62 !important; font-weight: 700 !important; }
+    .st-key-lin-patr summary code, .st-key-lin-fix summary code {
+      font-size: 16px !important; color: #1C2420 !important; width: 100%; display: block; }
     /* Patrimônio + Contas fixas ficam lado a lado mesmo no celular (o Streamlit empilha
        colunas sozinho abaixo de ~640px; o mockup sempre mostra as duas juntas, tipo KPI) */
     div[data-testid="stHorizontalBlock"]:has(.st-key-lin-patr),
