@@ -674,12 +674,20 @@ with st.container(key="lin-group-b"):
                     "no cartão errado. Nada foi bloqueado: a transação entrou normalmente no consumo."
                 )
                 for _, r in _audit_pend.sort_values("Data Processamento_dt", ascending=False).iterrows():
+                    _tipo = str(r.get("Tipo", "") or "").strip()
+                    _eh_ecom = "commerce" in _tipo.lower() or "assinatura" in _tipo.lower()
+                    _pill = (f'<span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;'
+                             f'background:{"#E6EEF7" if _eh_ecom else "#EFEDE5"};color:{"#1D4FA0" if _eh_ecom else "#6B6455"};'
+                             f'margin-left:8px;white-space:nowrap">{_tipo}</span>') if _tipo else ""
+                    _cartao_ex = str(r.get("Cartão Existente (possível)", "") or "").strip()
+                    _rodape = (f'Lançamento existente em <b>{_cartao_ex}</b> — {r.get("Lançamento Existente", "?")}'
+                               if _cartao_ex else str(r.get("Lançamento Existente", "")))
                     st.markdown(
                         f"""
                         <div style="background:#FFF7ED;border:1px solid #FCD9A8;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:13px">
-                          <div style="font-weight:700;color:#1C2420">{r.get('Descrição', '?')} — {fmt(float(r.get('Valor_num', 0) or 0))}</div>
+                          <div style="font-weight:700;color:#1C2420">{r.get('Descrição', '?')} — {fmt(float(r.get('Valor_num', 0) or 0))}{_pill}</div>
                           <div style="color:#5C6B62;margin-top:2px">Fatura: <b>{r.get('Fatura Cartão', '?')}</b> · {r.get('Data Transação', '?')}</div>
-                          <div style="color:#B45309;margin-top:2px">Lançamento existente em <b>{r.get('Cartão Existente (possível)', '?')}</b> — {r.get('Lançamento Existente', '?')}</div>
+                          <div style="color:#B45309;margin-top:2px">{_rodape}</div>
                         </div>
                         """,
                         unsafe_allow_html=True,
