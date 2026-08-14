@@ -18,6 +18,7 @@ from lib.data import (
     classificar_baldes,
     compromissos_proximos_meses,
     fatura_estimada,
+    fatura_split_pessoa,
     kpis_familia,
     load_auditoria_fatura,
     load_bens,
@@ -348,6 +349,11 @@ if not df_faturas.empty and "Vencimento_dt" in df_faturas.columns:
         _d0 = int(r0["_dias"])
         _prox_fat_val = ("~" if float(r0.get("Total_num", 0) or 0) <= 0 else "") + fmt(_t0) if _t0 > 0 else "—"
         _prox_fat_txt = f"{_c0} · " + (f"vence em {_d0}d" if _d0 >= 0 else f"venceu há {abs(_d0)}d")
+        if _c0.lower().startswith("xp"):
+            _sp0 = fatura_split_pessoa(_c0, str(r0.get("Mês Referência", "")), df_lanc,
+                                       vencimento=str(r0.get("Vencimento", "")))
+            if _sp0:
+                _prox_fat_txt += " · " + " · ".join(f"{p} {fmt_mil(v)}" for p, v in _sp0.items())
 
 # ============== v7 · Linha 1: CAIXA (verde) | COMPETÊNCIA (azul) ==============
 def _num_hero(v: float) -> str:
@@ -622,10 +628,18 @@ with st.container(key="lin-group-b"):
                 cor_s, status = COR["alerta"], f"vence em {d}d · aguardando fatura" + (" · ~valor estimado" if total > 0 else "")
             val_txt = fmt(total) if (carregada or total > 0) else "—"
             prefixo = "" if carregada else "~ "
+            # XP Visa é cartão único com 2 portadores — mostra o rateio Wesley × Sabrina
+            _split_txt = ""
+            if cartao.lower().startswith("xp"):
+                _split = fatura_split_pessoa(cartao, mes_ref, df_lanc, vencimento=venc)
+                if _split:
+                    _split_txt = ('<div class="fs" style="color:#185FA5;font-weight:600">'
+                                  + " · ".join(f"{p} {fmt_mil(v)}" for p, v in _split.items())
+                                  + "</div>")
             rows += (
                 f'<div class="frow"><span class="fstripe" style="background:{cor_s}"></span>'
                 f'<span class="fmeio"><span class="ft">{cartao} · {mes_ref}</span>'
-                f'<div class="fs">{status}</div></span>'
+                f'<div class="fs">{status}</div>{_split_txt}</span>'
                 f'<span class="fval">{prefixo if val_txt != "—" else ""}{val_txt}</span></div>'
             )
         return rows
