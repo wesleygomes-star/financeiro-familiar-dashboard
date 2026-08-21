@@ -575,10 +575,17 @@ def _lancamentos_da_fatura(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame,
     primeira = cartao_str.split()[0] if cartao_str else ""
     if not primeira:
         return pd.DataFrame()
-    base = df_lanc[
-        df_lanc["Cartão"].astype(str).str.lower().str.contains(primeira.lower(), na=False)
-        & df_lanc["Forma Pgto"].astype(str).str.lower().str.contains("crédito|credito", na=False, regex=True)
-    ]
+    _cart_norm = df_lanc["Cartão"].astype(str).str.lower().str.strip()
+    _alvo = cartao_str.lower().strip()
+    _eh_credito = df_lanc["Forma Pgto"].astype(str).str.lower().str.contains("crédito|credito", na=False, regex=True)
+    # label exato + rótulos LEGADO curtos (<3 palavras, ex. 'XP Wesley'). O contains por
+    # 1ª palavra puro fazia os dois Santander da Sabrina ('… 2' e '… 0064') dividirem os
+    # MESMOS lançamentos — cada fatura pendente contava tudo de novo (bug 21/08: R$ 404
+    # virava R$ 808 na projeção). Rótulo completo de OUTRO cartão nunca entra.
+    _legado = _cart_norm.str.contains(primeira.lower(), na=False) & (
+        _cart_norm.str.split().str.len() < 3
+    )
+    base = df_lanc[((_cart_norm == _alvo) | _legado) & _eh_credito]
     if vencimento:
         venc_dt = pd.to_datetime(str(vencimento).strip(), format="%d/%m/%Y", errors="coerce")
         if pd.isna(venc_dt):

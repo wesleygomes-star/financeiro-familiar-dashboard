@@ -227,6 +227,18 @@ st.markdown(
       background: #fff; border-radius: 0 0 12px 12px; box-shadow: 0 2px 8px rgba(12,60,45,0.06);
       margin-top: -1px; padding: 9px 14px 12px; font-size: 11.5px; color: #5C6B62; line-height: 1.4;
     }
+    /* tabela da composição mês a mês — transparente, sem card-sobre-card (21/08) */
+    .cmtbl-wrap { overflow-x: auto; margin: 2px 0 4px; }
+    .cmtbl { width: 100%; border-collapse: collapse; font-size: 12.5px; background: transparent; }
+    .cmtbl th { text-align: right; font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+      color: #7C8A81; font-weight: 700; padding: 6px 10px; border-bottom: 1px solid #DCE6E0;
+      cursor: help; white-space: nowrap; }
+    .cmtbl th:first-child, .cmtbl td.tmes { text-align: left; }
+    .cmtbl td { text-align: right; padding: 6px 10px; font-variant-numeric: tabular-nums;
+      border-bottom: 1px dashed #E4EDE7; color: #33473C; white-space: nowrap; }
+    .cmtbl tr:last-child td { border-bottom: 0; }
+    .cmtbl td.tmes { font-weight: 700; color: #1C2420; }
+    .cmtbl td:last-child { font-weight: 800; color: #185FA5; }
     .proj-cap-b b { color: #1C2420; }
     /* rótulos de grupo dentro dos cards de pessoa (caixa × competência) */
     .pss .pgrp { font-size: 9.5px; font-weight: 800; text-transform: uppercase;
@@ -421,14 +433,22 @@ col_cp.markdown(
 
 # ============== Quem movimenta ==============
 st.markdown('<h2 style="text-align:center">Quem movimenta</h2>', unsafe_allow_html=True)
-# abertura da receita por pessoa (pedido 18/08): mesmas linhas que compõem o "entrou"
-# (split_movimentos sobre o mês caixa — idêntico ao cálculo do kpis_familia)
-_rec_det = {}
+# abertura da receita e da despesa por pessoa (pedidos 18 e 21/08): mesmas linhas que
+# compõem o "entrou"/"saiu" (split_movimentos sobre o mês caixa — idêntico ao kpis_familia)
+_rec_det, _desp_det = {}, {}
 if not df_lanc.empty and "Mês Caixa" in df_lanc.columns:
-    _rc = split_movimentos(df_lanc[df_lanc["Mês Caixa"] == competencia])["receitas"]
+    _splits_cx = split_movimentos(df_lanc[df_lanc["Mês Caixa"] == competencia])
+    _rc = _splits_cx["receitas"]
     if not _rc.empty and "Pessoa" in _rc.columns:
         for _p, _g in _rc.groupby("Pessoa"):
             _rec_det[_p] = _g[["Descrição", "Valor"]].sort_values("Valor", ascending=False).values.tolist()
+    _dc = _splits_cx["despesas"]
+    if not _dc.empty and "Pessoa" in _dc.columns and "Categoria" in _dc.columns:
+        _dc = _dc.copy()
+        _dc["Categoria"] = _dc["Categoria"].astype(str).str.strip().replace("", "Outros")
+        for _p, _g in _dc.groupby("Pessoa"):
+            _desp_det[_p] = (_g.groupby("Categoria")["Valor"].sum()
+                             .sort_values(ascending=False).reset_index().values.tolist())
 
 _cards = ""
 for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexivel"])]:
@@ -448,13 +468,22 @@ for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexive
                    f'<b>{fmt(rec)}</b></summary><div class="pdd">{_det_rows}</div></details>')
     else:
         _entrou = f'<div class="pr"><span>entrou</span><b>{fmt(rec) if rec > 0 else "—"}</b></div>'
+    _dd_rows = "".join(
+        f'<div class="pr"><span>{str(c)[:28]}</span><b>{fmt(float(v))}</b></div>'
+        for c, v in _desp_det.get(pessoa, [])
+    )
+    if desp > 0 and _dd_rows:
+        _saiu = (f'<details class="pdet"><summary class="pr"><span>saiu</span>'
+                 f'<b>{fmt(desp)}</b></summary><div class="pdd">{_dd_rows}</div></details>')
+    else:
+        _saiu = f'<div class="pr"><span>saiu</span><b>{fmt(desp)}</b></div>'
     _cards += (
         f'<div class="pss" style="border:2px solid {cor_av}"><div class="ph"><span class="pa" style="background:{cor_av}">{pessoa[0]}</span>'
         f'<span class="pn">{pessoa}</span>'
         f'<span class="psaldo" style="color:{cor_saldo}" title="entrou − saiu (caixa)">{"+" if saldo >= 0 else "−"}{fmt(abs(saldo))}</span></div>'
         f'<div class="pgrp">caixa · conta no mês</div>'
         f'{_entrou}'
-        f'<div class="pr"><span>saiu</span><b>{fmt(desp)}</b></div>{_inv}'
+        f'{_saiu}{_inv}'
         f'<div class="pgrp">competência</div>'
         f'<div class="pr" title="outra lente sobre o mesmo mês: compra no cartão conta na hora, mesmo pagando a fatura depois">'
         f'<span style="color:#8B978F">consumo do mês</span><b style="color:#8B978F">{fmt(consumo_p)}</b></div>'
@@ -799,9 +828,28 @@ if not cron.empty:
     with _compos_ctx.expander("**ver composição mês a mês**"):
         _dcron = cron[["Mês"] + comp_cols + ["Compromissos", "Livre"]].copy()
         _dcron.insert(1, "Receita prevista", receita_proj)
-        st.dataframe(_dcron, use_container_width=True, hide_index=True,
-                     column_config={c: st.column_config.NumberColumn(format="R$ %.0f")
-                                    for c in _dcron.columns if c != "Mês"})
+        _TIT = {
+            "Receita prevista": "média das receitas dos últimos 3 meses",
+            "Parcelas em curso": "parcelas de compras JÁ FEITAS que ainda vão cair nas faturas desse mês",
+            "Contas fixas": "provisão do cadastro de contas recorrentes",
+            "Faturas em aberto": "faturas ainda não carregadas com vencimento nesse mês (real ou estimado)",
+            "Compromissos": "parcelas + contas fixas + faturas em aberto",
+            "Livre": "receita prevista − compromissos",
+        }
+        _th = "".join(f'<th title="{_TIT.get(c, "")}">{c}</th>' for c in _dcron.columns)
+        _trs = ""
+        for _, _r in _dcron.iterrows():
+            _tds = f'<td class="tmes">{_r["Mês"]}</td>' + "".join(
+                f"<td>{fmt(float(_r[c]))}</td>" for c in _dcron.columns if c != "Mês")
+            _trs += f"<tr>{_tds}</tr>"
+        st.markdown(
+            f'<div class="cmtbl-wrap"><table class="cmtbl">'
+            f"<thead><tr>{_th}</tr></thead><tbody>{_trs}</tbody></table></div>",
+            unsafe_allow_html=True,
+        )
+        st.caption("Parcelas em curso = compras parceladas já feitas · Contas fixas = provisão do cadastro · "
+                   "Faturas em aberto = ainda não carregadas · LIVRE = receita − compromissos "
+                   "(passa o mouse no cabeçalho pra ver a definição)")
 
 # ============== RD — despesas corporativas ==============
 _rd_ctx = st.container(key="lin-rd")
