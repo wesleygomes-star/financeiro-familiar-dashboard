@@ -232,6 +232,17 @@ st.markdown(
     .pss .pgrp { font-size: 9.5px; font-weight: 800; text-transform: uppercase;
       letter-spacing: .09em; color: #9BAaa1; margin: 8px 0 2px; }
     .pss .pgrp { color: #97A69D; }
+    /* abertura da receita: "entrou" vira clicável e mostra as linhas que compõem (18/08) */
+    .pss details.pdet summary { cursor: pointer; list-style: none; }
+    .pss details.pdet summary::-webkit-details-marker { display: none; }
+    .pss details.pdet summary > span:first-child::after {
+      content: "⌄"; font-size: 10px; color: #97A69D; margin-left: 5px; font-weight: 800; }
+    .pss details.pdet[open] summary > span:first-child::after { content: "⌃"; }
+    .pss .pdd { margin: 2px 0 5px; padding: 4px 10px; background: #F2F7F3; border-radius: 8px; }
+    .pss .pdd .pr { padding: 2px 0; }
+    .pss .pdd .pr span { font-size: 11px; color: #7C8A81; font-weight: 600;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pss .pdd .pr b { font-size: 11.5px; color: #4A564E; }
     </style>""",
     unsafe_allow_html=True,
 )
@@ -410,6 +421,15 @@ col_cp.markdown(
 
 # ============== Quem movimenta ==============
 st.markdown('<h2 style="text-align:center">Quem movimenta</h2>', unsafe_allow_html=True)
+# abertura da receita por pessoa (pedido 18/08): mesmas linhas que compõem o "entrou"
+# (split_movimentos sobre o mês caixa — idêntico ao cálculo do kpis_familia)
+_rec_det = {}
+if not df_lanc.empty and "Mês Caixa" in df_lanc.columns:
+    _rc = split_movimentos(df_lanc[df_lanc["Mês Caixa"] == competencia])["receitas"]
+    if not _rc.empty and "Pessoa" in _rc.columns:
+        for _p, _g in _rc.groupby("Pessoa"):
+            _rec_det[_p] = _g[["Descrição", "Valor"]].sort_values("Valor", ascending=False).values.tolist()
+
 _cards = ""
 for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexivel"])]:
     rec = caixa["receita_por_pessoa"].get(pessoa, 0)
@@ -419,12 +439,21 @@ for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexive
     saldo = rec - desp - apo  # fecha com as linhas do card: entrou − saiu − investido
     cor_saldo = COR["receita"] if saldo >= 0 else COR["despesa"]
     _inv = f'<div class="pr"><span>investido</span><b>{fmt(apo)}</b></div>' if apo > 0 else ""
+    _det_rows = "".join(
+        f'<div class="pr"><span>{str(d)[:28]}</span><b>{fmt(float(v))}</b></div>'
+        for d, v in _rec_det.get(pessoa, [])
+    )
+    if rec > 0 and _det_rows:
+        _entrou = (f'<details class="pdet"><summary class="pr"><span>entrou</span>'
+                   f'<b>{fmt(rec)}</b></summary><div class="pdd">{_det_rows}</div></details>')
+    else:
+        _entrou = f'<div class="pr"><span>entrou</span><b>{fmt(rec) if rec > 0 else "—"}</b></div>'
     _cards += (
         f'<div class="pss" style="border:2px solid {cor_av}"><div class="ph"><span class="pa" style="background:{cor_av}">{pessoa[0]}</span>'
         f'<span class="pn">{pessoa}</span>'
         f'<span class="psaldo" style="color:{cor_saldo}" title="entrou − saiu (caixa)">{"+" if saldo >= 0 else "−"}{fmt(abs(saldo))}</span></div>'
         f'<div class="pgrp">caixa · conta no mês</div>'
-        f'<div class="pr"><span>entrou</span><b>{fmt(rec) if rec > 0 else "—"}</b></div>'
+        f'{_entrou}'
         f'<div class="pr"><span>saiu</span><b>{fmt(desp)}</b></div>{_inv}'
         f'<div class="pgrp">competência · consumo</div>'
         f'<div class="pr"><span style="color:#8B978F">consumo do mês</span><b style="color:#8B978F">{fmt(consumo_p)}</b></div>'
