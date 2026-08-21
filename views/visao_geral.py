@@ -239,6 +239,13 @@ st.markdown(
     .cmtbl tr:last-child td { border-bottom: 0; }
     .cmtbl td.tmes { font-weight: 700; color: #1C2420; }
     .cmtbl td:last-child { font-weight: 800; color: #185FA5; }
+    /* abertura das parcelas em curso dentro da composição */
+    details.parc-det { margin-top: 6px; }
+    details.parc-det summary { cursor: pointer; list-style: none; font-size: 12.5px;
+      font-weight: 700; color: #185FA5; padding: 4px 0; }
+    details.parc-det summary::-webkit-details-marker { display: none; }
+    details.parc-det summary::after { content: " ⌄"; font-size: 10px; }
+    details.parc-det[open] summary::after { content: " ⌃"; }
     .proj-cap-b b { color: #1C2420; }
     /* rótulos de grupo dentro dos cards de pessoa (caixa × competência) */
     .pss .pgrp { font-size: 9.5px; font-weight: 800; text-transform: uppercase;
@@ -850,6 +857,26 @@ if not cron.empty:
         st.caption("Parcelas em curso = compras parceladas já feitas · Contas fixas = provisão do cadastro · "
                    "Faturas em aberto = ainda não carregadas · LIVRE = receita − compromissos "
                    "(passa o mouse no cabeçalho pra ver a definição)")
+        # o que compõe as parcelas em curso do mês selecionado (pedido 21/08)
+        _parc_mes = df_lanc[
+            (df_lanc["Mês Caixa"] == competencia)
+            & (df_lanc["Tipo"].astype(str).str.lower() == "despesa")
+            & (df_lanc["Parcela"].astype(str).str.strip() != "")
+        ] if not df_lanc.empty and "Mês Caixa" in df_lanc.columns else pd.DataFrame()
+        if not _parc_mes.empty:
+            _prows = "".join(
+                f'<tr><td class="tmes">{str(r["Descrição"])[:34]}</td>'
+                f'<td>{r["Parcela"]}</td><td>{r["Pessoa"]}</td><td>{fmt(float(r["Valor"]))}</td></tr>'
+                for _, r in _parc_mes.sort_values("Valor", ascending=False).iterrows()
+            )
+            st.markdown(
+                f'<details class="parc-det"><summary>ver as {len(_parc_mes)} parcelas em curso de {competencia} '
+                f'· {fmt(float(_parc_mes["Valor"].sum()))}</summary>'
+                f'<div class="cmtbl-wrap"><table class="cmtbl">'
+                f"<thead><tr><th>Compra</th><th>Parcela</th><th>Pessoa</th><th>Valor</th></tr></thead>"
+                f"<tbody>{_prows}</tbody></table></div></details>",
+                unsafe_allow_html=True,
+            )
 
 # ============== RD — despesas corporativas ==============
 _rd_ctx = st.container(key="lin-rd")
