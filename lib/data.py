@@ -529,14 +529,17 @@ def is_rd(row) -> bool:
 
 def split_movimentos(df: pd.DataFrame) -> dict:
     """Separa em receitas, despesas reais (sem investimento, sem pagamento de fatura
-    e sem RD) e aportes. RD sai dos dois lados (gasto E reembolso) — neutro."""
+    e sem RD) e aportes. RD sai dos dois lados (gasto E reembolso) — neutro.
+    Subcategoria 'ESTORNADO' (par cobrança+estorno que se anula) também é neutra —
+    não é custo nem receita, só rastro auditável (decisão Wesley 21/08)."""
     if df.empty:
         return {"receitas": df, "despesas": df, "aportes": df, "pagamentos": df, "rd": df}
     mask_inv = df.apply(is_investimento, axis=1)
     mask_pgto = df.apply(is_pagamento_fatura, axis=1)
     mask_rd = df.apply(is_rd, axis=1)
-    mask_rec = (df["Tipo"].astype(str).str.strip().str.lower() == "receita") & (~mask_rd)
-    mask_desp = (df["Tipo"].astype(str).str.strip().str.lower() == "despesa") & (~mask_inv) & (~mask_pgto) & (~mask_rd)
+    mask_est = df.get("Subcategoria", pd.Series("", index=df.index)).astype(str).str.strip().str.upper() == "ESTORNADO"
+    mask_rec = (df["Tipo"].astype(str).str.strip().str.lower() == "receita") & (~mask_rd) & (~mask_est)
+    mask_desp = (df["Tipo"].astype(str).str.strip().str.lower() == "despesa") & (~mask_inv) & (~mask_pgto) & (~mask_rd) & (~mask_est)
     return {
         "receitas": df[mask_rec].copy(),
         "despesas": df[mask_desp].copy(),
