@@ -455,8 +455,9 @@ for pessoa, cor_av in [("Wesley", COR["investimento"]), ("Sabrina", COR["flexive
         f'<div class="pgrp">caixa · conta no mês</div>'
         f'{_entrou}'
         f'<div class="pr"><span>saiu</span><b>{fmt(desp)}</b></div>{_inv}'
-        f'<div class="pgrp">competência · consumo</div>'
-        f'<div class="pr"><span style="color:#8B978F">consumo do mês</span><b style="color:#8B978F">{fmt(consumo_p)}</b></div>'
+        f'<div class="pgrp">competência</div>'
+        f'<div class="pr" title="outra lente sobre o mesmo mês: compra no cartão conta na hora, mesmo pagando a fatura depois">'
+        f'<span style="color:#8B978F">consumo do mês</span><b style="color:#8B978F">{fmt(consumo_p)}</b></div>'
         f'</div>'
     )
 st.markdown(f'<div class="casal">{_cards}</div>', unsafe_allow_html=True)
