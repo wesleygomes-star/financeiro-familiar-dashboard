@@ -8,8 +8,12 @@ import streamlit as st
 
 from lib.components import COR, PLOTLY_CONFIG, barra_navegacao, faixa_titulo, fig_mobile, tema_verde_premium
 from lib.data import (
-    MUTUO_EMPRESTA_INICIO,
-    MUTUO_EMPRESTA_PRINCIPAL,
+    MUTUO_EMPRESTA_APORTADO,
+    MUTUO_EMPRESTA_DATA_BASE,
+    MUTUO_EMPRESTA_PRIMEIRO_APORTE,
+    MUTUO_EMPRESTA_RECEBIDO,
+    MUTUO_EMPRESTA_RENDIMENTO,
+    MUTUO_EMPRESTA_SALDO_BASE,
     SITIO_JA_PAGO,
     SITIO_PAGAMENTO_PENDENTE,
     SITIO_PREJUIZO_4,
@@ -51,7 +55,7 @@ _imob = patrimonio_imobilizado(df_bens)
 # A receber = recebíveis de prazo incerto (mútuo Empresta + sítio) — bucket próprio, não é
 # Investível (sem liquidez de banco) nem Imobilizado (não é bem físico).
 a_receber = valor_a_receber_hoje()
-_df_mutuo = pd.DataFrame([{"Valor Pago": MUTUO_EMPRESTA_PRINCIPAL, "Data_dt": MUTUO_EMPRESTA_INICIO}])
+_df_mutuo = pd.DataFrame([{"Valor Pago": MUTUO_EMPRESTA_SALDO_BASE, "Data_dt": MUTUO_EMPRESTA_DATA_BASE}])
 mutuo_empresta_hoje = custo_capital_corrigido(_df_mutuo, TAXA_CDI_MUTUO, datetime.now())
 patr_total = estocado + _imob["total"] + a_receber
 
@@ -169,9 +173,12 @@ st.markdown(
     <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(12,60,45,0.06);margin-bottom:10px">
       <div style="font-size:12.5px;color:#5C6B62;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Mútuo Empresta (sócio)</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px">
-        <div style="color:#5C6B62">Principal</div><div style="text-align:right;font-weight:700">{fmt(MUTUO_EMPRESTA_PRINCIPAL)}</div>
-        <div style="color:#5C6B62">Taxa aplicada</div><div style="text-align:right;font-weight:700">{TAXA_CDI_MUTUO*100:.0f}% a.a. (proxy do CDI)</div>
-        <div style="color:#5C6B62">Desde</div><div style="text-align:right;font-weight:700">{MUTUO_EMPRESTA_INICIO.strftime('%d/%m/%Y')}</div>
+        <div style="color:#5C6B62">Saldo no sistema Empresta ({MUTUO_EMPRESTA_DATA_BASE.strftime('%d/%m/%Y')})</div><div style="text-align:right;font-weight:700">{fmt(MUTUO_EMPRESTA_SALDO_BASE)}</div>
+        <div style="color:#5C6B62">Total aportado</div><div style="text-align:right;font-weight:700">{fmt(MUTUO_EMPRESTA_APORTADO)}</div>
+        <div style="color:#5C6B62">Total recebido</div><div style="text-align:right;font-weight:700">{fmt(MUTUO_EMPRESTA_RECEBIDO)}</div>
+        <div style="color:#5C6B62">Rendimento acumulado</div><div style="text-align:right;font-weight:700;color:{COR['investimento']}">+{fmt(MUTUO_EMPRESTA_RENDIMENTO)}</div>
+        <div style="color:#5C6B62">Primeiro aporte</div><div style="text-align:right;font-weight:700">{MUTUO_EMPRESTA_PRIMEIRO_APORTE.strftime('%d/%m/%Y')}</div>
+        <div style="color:#5C6B62">Correção desde a posição</div><div style="text-align:right;font-weight:700">{TAXA_CDI_MUTUO*100:.0f}% a.a. (proxy do CDI)</div>
         <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;color:#1C2420;font-weight:800">Valor corrigido hoje</div>
         <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;text-align:right;font-weight:800;color:{COR['alerta']}">{fmt(mutuo_empresta_hoje)}</div>
       </div>

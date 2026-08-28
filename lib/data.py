@@ -356,10 +356,15 @@ def custo_capital_corrigido(df_aportes: pd.DataFrame, taxa_aa: float, data_ref: 
 
 
 # Mútuo de sócio à Empresta — recebível de prazo incerto (pago conforme caixa da empresa
-# permitir), corrigido pelo CDI a partir do início. NÃO é Investível (sem liquidez de banco)
-# nem Imobilizado (não é bem físico) — bucket próprio "A Receber" no patrimônio.
-MUTUO_EMPRESTA_PRINCIPAL = 235_612.0
-MUTUO_EMPRESTA_INICIO = datetime(2026, 8, 1)
+# permitir). A posição oficial vem do card do sistema da Empresta (print do Wesley); entre
+# atualizações, o saldo é corrigido pelo proxy do CDI a partir da data da posição. NÃO é
+# Investível (sem liquidez de banco) nem Imobilizado (não é bem físico) — bucket "A Receber".
+MUTUO_EMPRESTA_SALDO_BASE = 236_633.0  # saldo no sistema da Empresta na data-base
+MUTUO_EMPRESTA_DATA_BASE = datetime(2026, 8, 28)
+MUTUO_EMPRESTA_APORTADO = 355_648.0    # total aportado (posição da data-base)
+MUTUO_EMPRESTA_RECEBIDO = 374_690.0    # total recebido (posição da data-base)
+MUTUO_EMPRESTA_RENDIMENTO = 255_675.0  # rendimento acumulado (posição da data-base)
+MUTUO_EMPRESTA_PRIMEIRO_APORTE = datetime(2026, 5, 31)  # como exibido no card da Empresta
 TAXA_CDI_MUTUO = 0.11  # proxy do CDI — ajustar conforme taxa vigente
 
 
@@ -374,7 +379,7 @@ SITIO_A_RECEBER = SITIO_JA_PAGO + SITIO_PAGAMENTO_PENDENTE - SITIO_PREJUIZO_4  #
 
 def valor_a_receber_hoje() -> float:
     """Soma dos recebíveis de prazo incerto: mútuo Empresta (corrigido pelo CDI) + sítio (fixo)."""
-    df = pd.DataFrame([{"Valor Pago": MUTUO_EMPRESTA_PRINCIPAL, "Data_dt": MUTUO_EMPRESTA_INICIO}])
+    df = pd.DataFrame([{"Valor Pago": MUTUO_EMPRESTA_SALDO_BASE, "Data_dt": MUTUO_EMPRESTA_DATA_BASE}])
     mutuo = custo_capital_corrigido(df, TAXA_CDI_MUTUO, datetime.now())
     return mutuo + SITIO_A_RECEBER
 
