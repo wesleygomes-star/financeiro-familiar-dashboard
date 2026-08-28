@@ -356,16 +356,17 @@ def custo_capital_corrigido(df_aportes: pd.DataFrame, taxa_aa: float, data_ref: 
 
 
 # Mútuo de sócio à Empresta — recebível de prazo incerto (pago conforme caixa da empresa
-# permitir). A posição oficial vem do card do sistema da Empresta (print do Wesley); entre
-# atualizações, o saldo é corrigido pelo proxy do CDI a partir da data da posição. NÃO é
-# Investível (sem liquidez de banco) nem Imobilizado (não é bem físico) — bucket "A Receber".
+# permitir). A posição oficial vem do card do sistema da Empresta (print do Wesley), que
+# corrige o mútuo pelo CDI desde jul/2026; entre um print e outro, o painel espelha essa
+# correção com o proxy abaixo a partir da data da posição. NÃO é Investível (sem liquidez
+# de banco) nem Imobilizado (não é bem físico) — bucket "A Receber".
 MUTUO_EMPRESTA_SALDO_BASE = 236_633.0  # saldo no sistema da Empresta na data-base
 MUTUO_EMPRESTA_DATA_BASE = datetime(2026, 8, 28)
 MUTUO_EMPRESTA_APORTADO = 355_648.0    # total aportado (posição da data-base)
 MUTUO_EMPRESTA_RECEBIDO = 374_690.0    # total recebido (posição da data-base)
 MUTUO_EMPRESTA_RENDIMENTO = 255_675.0  # rendimento acumulado (posição da data-base)
 MUTUO_EMPRESTA_PRIMEIRO_APORTE = datetime(2026, 5, 31)  # como exibido no card da Empresta
-TAXA_CDI_MUTUO = 0.11  # proxy do CDI — ajustar conforme taxa vigente
+TAXA_CDI_MUTUO = 0.11  # proxy do CDI usado entre prints — ajustar conforme taxa vigente
 
 
 # Sítio — ITCD regularizado pelo Wesley (cartório + parcelas + CDA de protesto por rompimento do

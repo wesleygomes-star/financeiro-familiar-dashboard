@@ -178,7 +178,8 @@ st.markdown(
         <div style="color:#5C6B62">Total recebido</div><div style="text-align:right;font-weight:700">{fmt(MUTUO_EMPRESTA_RECEBIDO)}</div>
         <div style="color:#5C6B62">Rendimento acumulado</div><div style="text-align:right;font-weight:700;color:{COR['investimento']}">+{fmt(MUTUO_EMPRESTA_RENDIMENTO)}</div>
         <div style="color:#5C6B62">Primeiro aporte</div><div style="text-align:right;font-weight:700">{MUTUO_EMPRESTA_PRIMEIRO_APORTE.strftime('%d/%m/%Y')}</div>
-        <div style="color:#5C6B62">Correção desde a posição</div><div style="text-align:right;font-weight:700">{TAXA_CDI_MUTUO*100:.0f}% a.a. (proxy do CDI)</div>
+        <div style="color:#5C6B62">Correção Empresta</div><div style="text-align:right;font-weight:700">CDI, desde jul/2026</div>
+        <div style="color:#5C6B62">Atualização entre posições</div><div style="text-align:right;font-weight:700">{TAXA_CDI_MUTUO*100:.0f}% a.a. (proxy do CDI)</div>
         <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;color:#1C2420;font-weight:800">Valor corrigido hoje</div>
         <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;text-align:right;font-weight:800;color:{COR['alerta']}">{fmt(mutuo_empresta_hoje)}</div>
       </div>
