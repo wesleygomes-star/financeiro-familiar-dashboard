@@ -786,12 +786,14 @@ st.markdown(
 cron = compromissos_proximos_meses(df_lanc, df_rec, df_faturas, 6, partir_de=competencia)
 if not cron.empty:
     receita_proj = 0.0
-    receitas = df_lanc[df_lanc["Tipo"].astype(str).str.lower() == "receita"]
+    receitas = df_lanc[(df_lanc["Tipo"].astype(str).str.lower() == "receita") & (~df_lanc.apply(is_rd, axis=1))]
     if not receitas.empty:
         por_mes = receitas.groupby("Competência")["Valor"].sum()
-        # ordem CRONOLÓGICA e só meses até o atual — groupby ordena "MM/YYYY" alfabeticamente,
-        # e parcelas antigas de fatura criam competências de anos anteriores no fim da lista
-        _ult = sorted([c for c in por_mes.index if 0 < _key(c) <= _hoje], key=_key)[-3:]
+        # ordem CRONOLÓGICA e só meses FECHADOS (< mês atual) — groupby ordena "MM/YYYY" alfabeticamente,
+        # e parcelas antigas de fatura criam competências de anos anteriores no fim da lista.
+        # 08/09/2026: o mês corrente entrava parcial (dia 8, só o salário) e derrubava a média
+        # de ~76k pra ~57k ("provisão de receita está menor" — Wesley). RD (reembolso) também fora.
+        _ult = sorted([c for c in por_mes.index if 0 < _key(c) < _hoje], key=_key)[-3:]
         receita_proj = float(por_mes.loc[_ult].mean()) if _ult else 0
     comp_cols = [c for c in ("Parcelas em curso", "Contas fixas", "Faturas em aberto") if c in cron.columns]
     cron["Compromissos"] = cron[comp_cols].sum(axis=1)
@@ -827,7 +829,7 @@ if not cron.empty:
             st.plotly_chart(fig_mobile(figj), use_container_width=True, config=PLOTLY_CONFIG)
         st.markdown(
             f'<div class="proj-cap-b">'
-            f'<b>Receita prevista {fmt(receita_proj)}</b> (média dos últimos 3 meses) · '
+            f'<b>Receita prevista {fmt(receita_proj)}</b> (média dos últimos 3 meses fechados) · '
             f'LIVRE = receita − fixas − parcelas − faturas em aberto</div>',
             unsafe_allow_html=True,
     )
@@ -836,7 +838,7 @@ if not cron.empty:
         _dcron = cron[["Mês"] + comp_cols + ["Compromissos", "Livre"]].copy()
         _dcron.insert(1, "Receita prevista", receita_proj)
         _TIT = {
-            "Receita prevista": "média das receitas dos últimos 3 meses",
+            "Receita prevista": "média das receitas dos últimos 3 meses fechados (sem RD)",
             "Parcelas em curso": "parcelas de compras JÁ FEITAS que ainda vão cair nas faturas desse mês",
             "Contas fixas": "provisão do cadastro de contas recorrentes",
             "Faturas em aberto": "faturas ainda não carregadas com vencimento nesse mês (real ou estimado)",
