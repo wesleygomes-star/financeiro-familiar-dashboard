@@ -774,6 +774,42 @@ def _emparelhar_recorrentes(df_desp: pd.DataFrame, df_rec: pd.DataFrame, compete
     return mp
 
 
+@st.cache_data(ttl=60)
+def evolucao_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, ano: str) -> dict:
+    """Evolução das contas fixas: recorrente × mês do ano (competência), com o valor PAGO
+    (lançamento casado pelo mesmo pareamento do card Contas fixas — `_emparelhar_recorrentes`)
+    e o valor ESPERADO do cadastro. Meses futuros (ano corrente) ficam fora; o mês corrente é
+    marcado `em_curso`. Aprovado pelo Wesley em 08/09/2026 (mockup "Contas fixas · evolução").
+
+    Retorna {meses, labels, em_curso, contas:[{nome, categoria, esperado, vals{mes: v|None}, vigente[mes]}],
+             tot_pago, tot_esp, n_pago, n_vig}.
+    """
+    hoje = datetime.now()
+    ultimo = 12 if str(ano) != str(hoje.year) else hoje.month
+    meses = [f"{m:02d}/{ano}" for m in range(1, ultimo + 1)]
+    contas: dict = {}
+    if df_rec is None or df_rec.empty:
+        return {"meses": meses, "labels": [], "em_curso": None, "contas": [], "tot_pago": {}, "tot_esp": {}, "n_pago": {}, "n_vig": {}}
+    col_desc = next((c for c in ("Descrição", "Descricao", "Item", "Nome") if c in df_rec.columns), "Descrição")
+    for comp in meses:
+        mes = df_lanc[df_lanc["Competência"].astype(str) == comp] if "Competência" in df_lanc.columns else df_lanc.iloc[0:0]
+        ra = _recorrentes_despesa(df_rec, comp)
+        mp = _emparelhar_recorrentes(mes, df_rec, comp) if not mes.empty else {}
+        for j, r in ra.iterrows():
+            nome = str(r.get(col_desc, "")).strip()
+            c = contas.setdefault(nome, {"nome": nome, "categoria": str(r.get("Categoria", "")), "esperado": _num_rec(r.get("Valor", 0)), "vals": {}, "vigente": []})
+            c["vigente"].append(comp)
+            c["vals"][comp] = float(mes.loc[mp[j], "Valor"]) if j in mp else None
+    lista = sorted(contas.values(), key=lambda c: -c["esperado"])
+    tot_pago = {m: sum((c["vals"].get(m) or 0.0) for c in lista if m in c["vals"]) for m in meses}
+    tot_esp = {m: sum(c["esperado"] for c in lista if m in c["vals"]) for m in meses}
+    n_pago = {m: sum(1 for c in lista if c["vals"].get(m) is not None) for m in meses}
+    n_vig = {m: sum(1 for c in lista if m in c["vals"]) for m in meses}
+    em_curso = meses[-1] if str(ano) == str(hoje.year) else None
+    return {"meses": meses, "labels": [m[:2] for m in meses], "em_curso": em_curso, "contas": lista,
+            "tot_pago": tot_pago, "tot_esp": tot_esp, "n_pago": n_pago, "n_vig": n_vig}
+
+
 def auditar_contas_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competencia: str) -> pd.DataFrame:
     """Retorna DataFrame com 1 linha por recorrente ATIVA, status do mês.
 
