@@ -828,7 +828,16 @@ def auditar_contas_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competenci
     # fixa paga no cartão (caixa mês seguinte) conta como paga; e o pool NÃO herda as compras
     # de junho da fatura (que geravam pares-lixo tipo Cemig←ELECTROLUX no modo Caixa).
     lanc_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df_lanc.columns else df_lanc
-    lanc_mes = split_movimentos(lanc_mes)["despesas"]
+    _sp = split_movimentos(lanc_mes)
+    # (11/09/2026) Parcela de acordo/financiamento de imóvel chega com Tipo=Despesa e categoria
+    # "Investimentos em Imóvel" (é patrimônio, não consumo — fica fora dos gastos), mas TEM
+    # recorrente própria (ex.: "AP Cláudio 501 — acordo saldo final"). Sem isto a conta fixa
+    # aparecia "Atrasada" mesmo paga. Entram no pool só as linhas Tipo=Despesa desse balde;
+    # aportes financeiros (Tipo=Investimento), pagamento de fatura, RD e ESTORNADO seguem fora.
+    _inv_desp = _sp["aportes"]
+    if not _inv_desp.empty and "Tipo" in _inv_desp.columns:
+        _inv_desp = _inv_desp[_inv_desp["Tipo"].astype(str).str.strip().str.lower() == "despesa"]
+    lanc_mes = pd.concat([_sp["despesas"], _inv_desp]) if not _inv_desp.empty else _sp["despesas"]
 
     try:
         m, y = competencia.split("/")
