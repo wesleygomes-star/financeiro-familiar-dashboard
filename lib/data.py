@@ -378,11 +378,33 @@ SITIO_PREJUIZO_4 = 11_588.20  # custas de protesto + estimativa de rompimento, d
 SITIO_A_RECEBER = SITIO_JA_PAGO + SITIO_PAGAMENTO_PENDENTE - SITIO_PREJUIZO_4  # R$16.659,08
 
 
-def valor_a_receber_hoje() -> float:
-    """Soma dos recebíveis de prazo incerto: mútuo Empresta (corrigido pelo CDI) + sítio (fixo)."""
+def mutuo_recebido_apos_base(df_lanc: pd.DataFrame) -> float:
+    """Recebimentos parciais do mútuo lançados na planilha DEPOIS da data-base do print
+    (Tipo=Investimento, Subcategoria='Mútuo Empresta', valor NEGATIVO = dinheiro que voltou).
+    Decisão Wesley 17/09/2026: pagamento parcial do mútuo abate o investimento (não é receita)
+    e o fluxo fica anotado linha a linha. Retorna valor positivo (total recebido)."""
+    if df_lanc is None or df_lanc.empty or "Subcategoria" not in df_lanc.columns:
+        return 0.0
+    m = df_lanc[
+        (df_lanc["Subcategoria"].astype(str).str.strip().str.lower() == "mútuo empresta")
+        & (df_lanc["Tipo"].astype(str).str.strip().str.lower() == "investimento")
+        & (df_lanc["Data_dt"] > MUTUO_EMPRESTA_DATA_BASE)
+        & (df_lanc["Valor"] < 0)
+    ]
+    return float(-m["Valor"].sum()) if not m.empty else 0.0
+
+
+def mutuo_empresta_hoje(df_lanc: pd.DataFrame = None) -> float:
+    """Saldo do mútuo hoje = posição da data-base corrigida pelo CDI − recebimentos posteriores."""
     df = pd.DataFrame([{"Valor Pago": MUTUO_EMPRESTA_SALDO_BASE, "Data_dt": MUTUO_EMPRESTA_DATA_BASE}])
-    mutuo = custo_capital_corrigido(df, TAXA_CDI_MUTUO, datetime.now())
-    return mutuo + SITIO_A_RECEBER
+    corrigido = custo_capital_corrigido(df, TAXA_CDI_MUTUO, datetime.now())
+    return corrigido - mutuo_recebido_apos_base(df_lanc)
+
+
+def valor_a_receber_hoje(df_lanc: pd.DataFrame = None) -> float:
+    """Soma dos recebíveis de prazo incerto: mútuo Empresta (corrigido pelo CDI, líquido dos
+    recebimentos parciais lançados) + sítio (fixo)."""
+    return mutuo_empresta_hoje(df_lanc) + SITIO_A_RECEBER
 
 
 # Caixa da Pelada de Futevôlei — dinheiro da galera (mensalidades + avulsos) que passa pela

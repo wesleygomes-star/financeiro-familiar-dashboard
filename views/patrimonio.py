@@ -32,6 +32,8 @@ from lib.data import (
     saldo_estocado_atual,
     serie_estocado,
     valor_a_receber_hoje,
+    mutuo_recebido_apos_base,
+    mutuo_empresta_hoje as _mutuo_hoje,
 )
 
 tema_verde_premium()
@@ -54,9 +56,11 @@ estocado = sum(_est.values()) if _est else 0.0
 _imob = patrimonio_imobilizado(df_bens)
 # A receber = recebíveis de prazo incerto (mútuo Empresta + sítio) — bucket próprio, não é
 # Investível (sem liquidez de banco) nem Imobilizado (não é bem físico).
-a_receber = valor_a_receber_hoje()
-_df_mutuo = pd.DataFrame([{"Valor Pago": MUTUO_EMPRESTA_SALDO_BASE, "Data_dt": MUTUO_EMPRESTA_DATA_BASE}])
-mutuo_empresta_hoje = custo_capital_corrigido(_df_mutuo, TAXA_CDI_MUTUO, datetime.now())
+a_receber = valor_a_receber_hoje(df_lanc)
+# 17/09/2026: recebimentos parciais do mútuo (Tipo=Investimento, Sub='Mútuo Empresta', negativo)
+# abatem o saldo e aparecem no card — o fluxo fica na planilha, linha a linha.
+mutuo_recebido_pos_base = mutuo_recebido_apos_base(df_lanc)
+mutuo_empresta_hoje = _mutuo_hoje(df_lanc)
 patr_total = estocado + _imob["total"] + a_receber
 
 _PRIV = bool(st.session_state.get("modo_privado", False))
@@ -176,6 +180,7 @@ st.markdown(
         <div style="color:#5C6B62">Saldo no sistema Empresta ({MUTUO_EMPRESTA_DATA_BASE.strftime('%d/%m/%Y')})</div><div style="text-align:right;font-weight:700">{fmt(MUTUO_EMPRESTA_SALDO_BASE)}</div>
         <div style="color:#5C6B62">Total aportado</div><div style="text-align:right;font-weight:700">{fmt(MUTUO_EMPRESTA_APORTADO)}</div>
         <div style="color:#5C6B62">Total recebido</div><div style="text-align:right;font-weight:700">{fmt(MUTUO_EMPRESTA_RECEBIDO)}</div>
+        <div style="color:#5C6B62">Recebido após {MUTUO_EMPRESTA_DATA_BASE.strftime('%d/%m/%Y')} (planilha)</div><div style="text-align:right;font-weight:700">{fmt(mutuo_recebido_pos_base)}</div>
         <div style="color:#5C6B62">Rendimento acumulado</div><div style="text-align:right;font-weight:700;color:{COR['investimento']}">+{fmt(MUTUO_EMPRESTA_RENDIMENTO)}</div>
         <div style="color:#5C6B62">Primeiro aporte</div><div style="text-align:right;font-weight:700">{MUTUO_EMPRESTA_PRIMEIRO_APORTE.strftime('%d/%m/%Y')}</div>
         <div style="color:#5C6B62">Correção Empresta</div><div style="text-align:right;font-weight:700">CDI, desde jul/2026</div>
