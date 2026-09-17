@@ -775,7 +775,7 @@ with st.container(key="lin-group-b"):
 
     if not _pend_f.empty:
         _audit_ctx = st.container(key="lin-audit-fatura")
-        with _audit_ctx.expander(f"**🔍 Auditoria de cartão** `{len(_pend_f)} pendente(s)`", icon="🔍", expanded=False):
+        with _audit_ctx.expander(f"**Auditoria de cartão** `{len(_pend_f)} pendente(s)`", icon="🔍", expanded=False):
             st.caption(
                 "veio na fatura e NÃO tinha sido lançado no Zap. A compra já está no consumo — aqui você "
                 "confirma que é sua, aponta que já tinha lançado (cancela o manual duplicado) ou marca em disputa."
@@ -829,7 +829,7 @@ with st.container(key="lin-group-b"):
 
     if not _pend_l.empty:
         _audl_ctx = st.container(key="lin-audit-lanc")
-        with _audl_ctx.expander(f"**📝 Auditoria de lançamento** `{len(_pend_l)} pendente(s)`", icon="📝", expanded=False):
+        with _audl_ctx.expander(f"**Auditoria de lançamento** `{len(_pend_l)} pendente(s)`", icon="📝", expanded=False):
             st.caption(
                 "lançado no Zap com o caixa dessa fatura, mas a fatura não trouxe. Ou é a mesma compra com valor "
                 "diferente (a fatura prevalece: cancelar o manual), ou vem na próxima fatura, ou não foi no cartão."
@@ -876,7 +876,7 @@ with st.container(key="lin-group-b"):
     if _dn["novas"] or _dn["virou_recorrente"]:
         _dn_ctx = st.container(key="lin-desp-novas")
         with _dn_ctx.expander(
-            f"**🆕 Despesas novas** `{len(_dn['novas'])} nova(s) · {len(_dn['virou_recorrente'])} sem cadastro`",
+            f"**Despesas novas** `{len(_dn['novas'])} nova(s) · {len(_dn['virou_recorrente'])} sem cadastro`",
             icon="🆕", expanded=False,
         ):
             if _dn["novas"]:
