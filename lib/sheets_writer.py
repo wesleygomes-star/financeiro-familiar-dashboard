@@ -46,3 +46,38 @@ def append_lancamentos(rows: list[list]) -> int:
     ws = write_ws("Lançamentos")
     ws.append_rows(rows, value_input_option="USER_ENTERED")
     return len(rows)
+
+
+# ===== Auditoria com botões (17/09/2026) — escrita mínima e reversível =====
+def _col_status(ws) -> int:
+    hdr = ws.row_values(1)
+    return hdr.index("Status") + 1
+
+
+def resolver_auditoria(aba: str, row_number: int, status: str) -> None:
+    """Escreve o Status de UM apontamento (aba 'Auditoria Fatura' ou 'Auditoria Lançamento')."""
+    ws = write_ws(aba)
+    ws.update_cell(int(row_number), _col_status(ws), status)
+
+
+def resolver_auditoria_lote(aba: str, rows: list, status: str) -> int:
+    """Mesmo Status pra vários apontamentos de uma vez (miúdos, 'todas desta fatura')."""
+    if not rows:
+        return 0
+    ws = write_ws(aba)
+    col = _col_status(ws)
+    letra = gspread.utils.rowcol_to_a1(1, col).rstrip("1")
+    ws.batch_update([{"range": f"{letra}{int(r)}", "values": [[status]]} for r in rows], value_input_option="RAW")
+    return len(rows)
+
+
+def cancelar_lancamento(row_number: int, motivo: str) -> None:
+    """Backup = Status 'Cancelado' (nunca apaga). O motivo vai pra Mensagem Original (col J)
+    pra ficar rastreável, no mesmo padrão das conciliações feitas pelo Claude."""
+    ws = write_ws("Lançamentos")
+    r = int(row_number)
+    msg = ws.acell(f"J{r}").value or ""
+    ws.batch_update([
+        {"range": f"O{r}", "values": [["Cancelado"]]},
+        {"range": f"J{r}", "values": [[(msg + " " + motivo).strip()]]},
+    ], value_input_option="RAW")

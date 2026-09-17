@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from lib.components import COR, PLOTLY_CONFIG, barra_navegacao, fig_mobile, tema_verde_premium
+from lib.sheets_writer import cancelar_lancamento, resolver_auditoria, resolver_auditoria_lote
 from lib.data import (
     auditar_contas_fixas,
     load_tetos,
@@ -21,6 +22,9 @@ from lib.data import (
     fatura_split_pessoa,
     kpis_familia,
     load_auditoria_fatura,
+    load_auditoria_lancamento,
+    candidatos_zap,
+    despesas_novas,
     load_bens,
     load_faturas,
     patrimonio_imobilizado,
@@ -126,10 +130,13 @@ st.markdown(
     .st-key-lin-consumo [data-testid="stExpander"] summary > span > span:first-child { background: #FBEFE0; }
     .st-key-lin-fat     [data-testid="stExpander"] summary > span > span:first-child { background: #EFEDFB; }
     .st-key-lin-audit-fatura [data-testid="stExpander"] summary > span > span:first-child { background: #FDECD2; }
+    .st-key-lin-audit-lanc [data-testid="stExpander"] summary > span > span:first-child { background: #FDE2E2; }
+    .st-key-lin-desp-novas [data-testid="stExpander"] summary > span > span:first-child { background: #E3F4EA; }
     /* remove o gap-fantasma dos containers keyed das linhas */
     div:has(> .st-key-lin-patr), div:has(> .st-key-lin-fix),
     div:has(> .st-key-lin-consumo), div:has(> .st-key-lin-fat),
     div:has(> .st-key-lin-audit-fatura), div:has(> .st-key-lin-group-b),
+    div:has(> .st-key-lin-audit-lanc), div:has(> .st-key-lin-desp-novas),
     div:has(> .st-key-lin-compos), div:has(> .st-key-lin-rd) { display: contents; }
     /* o tema pinta TODO stVerticalBlockBorderWrapper como card branco com sombra
        (components.py) — dentro do grupo B isso recriava um card solto por linha.
@@ -137,6 +144,8 @@ st.markdown(
     div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-consumo),
     div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-fat),
     div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-audit-fatura),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-audit-lanc),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-desp-novas),
     div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-group-b),
     div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-compos),
     div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-lin-rd),
@@ -183,7 +192,7 @@ st.markdown(
       border: 1px solid #E1EAE4; border-radius: 16px; overflow: hidden; margin-top: 2px;
       padding: 4px 6px; gap: 0 !important;
     }
-    .st-key-lin-consumo, .st-key-lin-fat, .st-key-lin-audit-fatura { margin-top: 0 !important; gap: 0 !important; }
+    .st-key-lin-consumo, .st-key-lin-fat, .st-key-lin-audit-fatura, .st-key-lin-audit-lanc, .st-key-lin-desp-novas { margin-top: 0 !important; gap: 0 !important; }
     .st-key-lin-group-b [data-testid="stExpander"],
     .st-key-lin-compos [data-testid="stExpander"], .st-key-lin-rd [data-testid="stExpander"] {
       background: transparent !important; box-shadow: none !important;
@@ -201,6 +210,8 @@ st.markdown(
     .st-key-lin-consumo [data-testid="stExpander"]::before,
     .st-key-lin-fat [data-testid="stExpander"]::before,
     .st-key-lin-audit-fatura [data-testid="stExpander"]::before,
+    .st-key-lin-audit-lanc [data-testid="stExpander"]::before,
+    .st-key-lin-desp-novas [data-testid="stExpander"]::before,
     .st-key-lin-compos [data-testid="stExpander"]::before,
     .st-key-lin-rd [data-testid="stExpander"]::before {
       content: ""; position: absolute; left: 4px; top: 12px; bottom: 12px;
@@ -209,11 +220,15 @@ st.markdown(
     .st-key-lin-consumo [data-testid="stExpander"]::before { background: #E4A15C; }
     .st-key-lin-fat [data-testid="stExpander"]::before { background: #A79AE8; }
     .st-key-lin-audit-fatura [data-testid="stExpander"]::before { background: #BA7517; }
+    .st-key-lin-audit-lanc [data-testid="stExpander"]::before { background: #C0392B; }
+    .st-key-lin-desp-novas [data-testid="stExpander"]::before { background: #1D9E75; }
     .st-key-lin-compos [data-testid="stExpander"]::before { background: #185FA5; }
     .st-key-lin-rd [data-testid="stExpander"]::before { background: #1D9E75; }
     /* separador tracejado entre as linhas do grupo */
     .st-key-lin-fat [data-testid="stExpander"],
-    .st-key-lin-audit-fatura [data-testid="stExpander"] { border-top: 1px dashed #DCE6E0 !important; }
+    .st-key-lin-audit-fatura [data-testid="stExpander"],
+    .st-key-lin-audit-lanc [data-testid="stExpander"],
+    .st-key-lin-desp-novas [data-testid="stExpander"] { border-top: 1px dashed #DCE6E0 !important; }
     .st-key-lin-group-b [data-testid="stExpander"] summary,
     .st-key-lin-compos [data-testid="stExpander"] summary,
     .st-key-lin-rd [data-testid="stExpander"] summary { padding-left: 18px !important; }
@@ -740,39 +755,140 @@ with st.container(key="lin-group-b"):
         else:
             st.info("Aba Faturas vazia.")
 
-    # ============== Auditoria de cartão (apontamentos do WF1) ==============
-    df_auditoria_fatura = load_auditoria_fatura()
-    if not df_auditoria_fatura.empty and "Status" in df_auditoria_fatura.columns:
-        _audit_pend = df_auditoria_fatura[df_auditoria_fatura["Status"].astype(str).str.strip().str.lower() == "pendente"]
-        if not _audit_pend.empty:
-            _audit_ctx = st.container(key="lin-audit-fatura")
-            with _audit_ctx.expander(f"**⚠️ Auditoria de cartão** `{len(_audit_pend)} pendente(s)`", icon="🔍", expanded=False):
-                st.caption(
-                    "transações da fatura que NÃO foram lançadas antes no Zap — confira se a compra "
-                    "é sua mesmo (assinatura esquecida, parcela antiga ou cobrança errada da bandeira). "
-                    "Quando o apontamento cita outro cartão do mesmo banco, pode ser lançamento feito "
-                    "no cartão errado. Nada foi bloqueado: a transação entrou normalmente no consumo."
+    # ============== Auditorias com botões (cartão × lançamento) + Despesas novas — 17/09/2026 ==============
+    # Regra Wesley 17/09: a fatura prevalece sobre o lançamento manual. A compra da fatura que não
+    # passou pelo Zap JÁ está no consumo (o WF1 insere e só aponta); os botões encerram o apontamento
+    # ou cancelam o manual duplicado. Nada é apagado: cancelar = Status 'Cancelado' + motivo na col J.
+    _hoje_txt = datetime.now().strftime("%d/%m/%Y")
+
+    def _apos_escrita():
+        st.cache_data.clear()
+        st.rerun()
+
+    def _pendentes(df):
+        if df.empty or "Status" not in df.columns:
+            return pd.DataFrame()
+        return df[df["Status"].astype(str).str.strip().str.lower() == "pendente"]
+
+    _pend_f = _pendentes(load_auditoria_fatura())
+    _pend_l = _pendentes(load_auditoria_lancamento())
+
+    if not _pend_f.empty:
+        _audit_ctx = st.container(key="lin-audit-fatura")
+        with _audit_ctx.expander(f"**🔍 Auditoria de cartão** `{len(_pend_f)} pendente(s)`", icon="🔍", expanded=False):
+            st.caption(
+                "veio na fatura e NÃO tinha sido lançado no Zap. A compra já está no consumo — aqui você "
+                "confirma que é sua, aponta que já tinha lançado (cancela o manual duplicado) ou marca em disputa."
+            )
+            _miudos = _pend_f[_pend_f["Valor_num"].abs() < 20]
+            if st.button(f"✅ confirmar todos os miúdos < R$ 20 ({len(_miudos)})", key="aud_f_miudos",
+                         disabled=_miudos.empty, use_container_width=True):
+                resolver_auditoria_lote("Auditoria Fatura", [int(r) for r in _miudos["row_number"]],
+                                        f"Resolvido — miúdo (<R$ 20) confirmado no painel {_hoje_txt}")
+                _apos_escrita()
+            for (_cart, _venc), _grp in _pend_f.groupby(["Fatura Cartão", "Fatura Vencimento"], sort=False):
+                st.markdown(
+                    f'<div style="font-weight:700;color:#1C2420;margin:12px 0 4px;padding-top:8px;border-top:1px solid #E1EAE4">'
+                    f'{_cart} · venc {_venc} · {len(_grp)} item(ns) · {fmt(float(_grp["Valor_num"].sum()))}</div>',
+                    unsafe_allow_html=True,
                 )
-                for _, r in _audit_pend.sort_values("Data Processamento_dt", ascending=False).iterrows():
+                if st.button(f"✅ todas desta fatura são minhas ({len(_grp)})", key=f"aud_f_all_{_cart}_{_venc}"):
+                    resolver_auditoria_lote("Auditoria Fatura", [int(r) for r in _grp["row_number"]],
+                                            f"Resolvido — confirmada em lote no painel {_hoje_txt}")
+                    _apos_escrita()
+                for _, r in _grp.sort_values("Data Transação").iterrows():
+                    rn = int(r["row_number"])
+                    c1, c2, c3, c4 = st.columns([5, 1.3, 1.5, 1.3])
                     _tipo = str(r.get("Tipo", "") or "").strip()
-                    _eh_ecom = "commerce" in _tipo.lower() or "assinatura" in _tipo.lower()
-                    _pill = (f'<span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;'
-                             f'background:{"#E6EEF7" if _eh_ecom else "#EFEDE5"};color:{"#1D4FA0" if _eh_ecom else "#6B6455"};'
-                             f'margin-left:8px;white-space:nowrap">{_tipo}</span>') if _tipo else ""
-                    _cartao_ex = str(r.get("Cartão Existente (possível)", "") or "").strip()
-                    _rodape = (f'Lançamento existente em <b>{_cartao_ex}</b> — {r.get("Lançamento Existente", "?")}'
-                               if _cartao_ex else str(r.get("Lançamento Existente", "")))
-                    st.markdown(
-                        f"""
-                        <div style="background:#FFF7ED;border:1px solid #FCD9A8;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:13px">
-                          <div style="font-weight:700;color:#1C2420">{r.get('Descrição', '?')} — {fmt(float(r.get('Valor_num', 0) or 0))}{_pill}</div>
-                          <div style="color:#5C6B62;margin-top:2px">Fatura: <b>{r.get('Fatura Cartão', '?')}</b> · {r.get('Data Transação', '?')}</div>
-                          <div style="color:#B45309;margin-top:2px">{_rodape}</div>
-                        </div>
-                        """,
+                    c1.markdown(
+                        f"**{r.get('Descrição', '?')}** — {fmt(float(r.get('Valor_num', 0) or 0))}<br>"
+                        f"<span style='color:#5C6B62;font-size:12px'>{r.get('Data Transação', '')} · {r.get('Pessoa', '')}"
+                        f"{' · ' + _tipo if _tipo else ''}</span>",
                         unsafe_allow_html=True,
                     )
-                st.caption("depois de revisar, marque \"Status\" como resolvido direto na aba Auditoria Fatura da planilha.")
+                    if c2.button("✅ minha", key=f"f_ok_{rn}", use_container_width=True):
+                        resolver_auditoria("Auditoria Fatura", rn, f"Resolvido — confirmada no painel {_hoje_txt}")
+                        _apos_escrita()
+                    with c3.popover("🔁 já lancei", use_container_width=True):
+                        _cands = candidatos_zap(df_lanc, r.get("Fatura Cartão", ""), r.get("Pessoa", ""),
+                                                r.get("Data Transação", ""), float(r.get("Valor_num", 0) or 0))
+                        if _cands.empty:
+                            st.caption("nenhum lançamento manual parecido (mesmo banco, ±5%, ±3 dias)")
+                        for _, cz in _cands.iterrows():
+                            _rz = int(cz["row_number"])
+                            if st.button(f"cancelar L{_rz}: {cz['Descrição']} · {fmt(float(cz['Valor']))} · {cz['Data']}",
+                                         key=f"f_dup_{rn}_{_rz}"):
+                                cancelar_lancamento(_rz, f"[painel {_hoje_txt}: duplicado da fatura {r.get('Fatura Cartão', '')} "
+                                                         f"({r.get('Descrição', '')} {r.get('Valor', '')}); fatura prevalece]")
+                                resolver_auditoria("Auditoria Fatura", rn,
+                                                   f"Resolvido — duplicado do manual L{_rz} (cancelado no painel {_hoje_txt})")
+                                _apos_escrita()
+                    if c4.button("❌ não é", key=f"f_no_{rn}", use_container_width=True):
+                        resolver_auditoria("Auditoria Fatura", rn, f"Em disputa — não reconhecida no painel {_hoje_txt}")
+                        _apos_escrita()
+
+    if not _pend_l.empty:
+        _audl_ctx = st.container(key="lin-audit-lanc")
+        with _audl_ctx.expander(f"**📝 Auditoria de lançamento** `{len(_pend_l)} pendente(s)`", icon="📝", expanded=False):
+            st.caption(
+                "lançado no Zap com o caixa dessa fatura, mas a fatura não trouxe. Ou é a mesma compra com valor "
+                "diferente (a fatura prevalece: cancelar o manual), ou vem na próxima fatura, ou não foi no cartão."
+            )
+            for (_cart, _venc), _grp in _pend_l.groupby(["Fatura Cartão", "Fatura Vencimento"], sort=False):
+                st.markdown(
+                    f'<div style="font-weight:700;color:#1C2420;margin:12px 0 4px;padding-top:8px;border-top:1px solid #E1EAE4">'
+                    f'{_cart} · venc {_venc} · {len(_grp)} item(ns) · {fmt(float(_grp["Valor_num"].sum()))}</div>',
+                    unsafe_allow_html=True,
+                )
+                for _, r in _grp.iterrows():
+                    rn = int(r["row_number"])
+                    try:
+                        _lin = int(str(r.get("Linha", "")).strip() or 0)
+                    except Exception:
+                        _lin = 0
+                    c1, c2, c3, c4 = st.columns([5, 1.5, 1.5, 1.2])
+                    _sit = str(r.get("Situação", "") or "")
+                    _cand = str(r.get("Candidato na Fatura", "") or "")
+                    _cor = "#B45309" if "Provável" in _sit else "#5C6B62"
+                    c1.markdown(
+                        f"**L{_lin} · {r.get('Descrição', '?')}** — {fmt(float(r.get('Valor_num', 0) or 0))}<br>"
+                        f"<span style='color:#5C6B62;font-size:12px'>{r.get('Data Lançamento', '')} · {r.get('Pessoa', '')}</span><br>"
+                        f"<span style='color:{_cor};font-size:12px'>{_sit}{' → ' + _cand if _cand else ''}</span>",
+                        unsafe_allow_html=True,
+                    )
+                    if c2.button("🔁 mesma compra", key=f"l_dup_{rn}", disabled=not _lin, use_container_width=True,
+                                 help="cancela o lançamento manual; a linha da fatura fica (fatura prevalece)"):
+                        cancelar_lancamento(_lin, f"[painel {_hoje_txt}: mesma compra da fatura {r.get('Fatura Cartão', '')} "
+                                                  f"venc {r.get('Fatura Vencimento', '')} ({_cand or 'sem candidato'}); fatura prevalece]")
+                        resolver_auditoria("Auditoria Lançamento", rn, f"Resolvido — manual L{_lin} cancelado no painel {_hoje_txt}")
+                        _apos_escrita()
+                    if c3.button("⏳ próxima fatura", key=f"l_wait_{rn}", use_container_width=True,
+                                 help="mantém o lançamento; se não vier na próxima, cancelar"):
+                        resolver_auditoria("Auditoria Lançamento", rn, f"Aguardando próxima fatura — marcado no painel {_hoje_txt}")
+                        _apos_escrita()
+                    if c4.button("✅ manter", key=f"l_keep_{rn}", use_container_width=True,
+                                 help="foi pago por outro meio / é legítimo — fica como está"):
+                        resolver_auditoria("Auditoria Lançamento", rn, f"Resolvido — mantido no painel {_hoje_txt}")
+                        _apos_escrita()
+
+    # ============== Despesas novas (1ª aparição) + virou recorrente? ==============
+    _dn = despesas_novas(df_lanc, df_rec)
+    if _dn["novas"] or _dn["virou_recorrente"]:
+        _dn_ctx = st.container(key="lin-desp-novas")
+        with _dn_ctx.expander(
+            f"**🆕 Despesas novas** `{len(_dn['novas'])} nova(s) · {len(_dn['virou_recorrente'])} sem cadastro`",
+            icon="🆕", expanded=False,
+        ):
+            if _dn["novas"]:
+                st.markdown("**Apareceu pela primeira vez nos últimos 60 dias** (total ≥ R$ 150) — quanto está pesando em cada mês:")
+                _dfn = pd.DataFrame(_dn["novas"])
+                _colcfg = {c: st.column_config.NumberColumn(format="R$ %.0f") for c in _dfn.columns if c == "Total" or c[:2] == "20"}
+                st.dataframe(_dfn, hide_index=True, use_container_width=True, column_config=_colcfg)
+            if _dn["virou_recorrente"]:
+                st.markdown("**Virou recorrente e não está nas Recorrentes** (3+ meses distintos) — cadastrar na aba Recorrentes pra entrar no planejado × pago:")
+                _dfr = pd.DataFrame(_dn["virou_recorrente"])
+                st.dataframe(_dfr, hide_index=True, use_container_width=True,
+                             column_config={"Média/mês": st.column_config.NumberColumn(format="R$ %.0f")})
 
 # ============== Projeção (linhas: receita, fixas, parcelas e o LIVRE) ==============
 st.markdown(

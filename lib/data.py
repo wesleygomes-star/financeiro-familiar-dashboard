@@ -103,6 +103,8 @@ def load_lancamentos(incluir_cancelados: bool = False) -> pd.DataFrame:
     df = pd.DataFrame(rows)
     if df.empty:
         return df
+    # número da linha na planilha (header = linha 1) — usado pelos botões da auditoria (17/09/2026)
+    df["row_number"] = df.index + 2
     df["Valor"] = df["Valor"].apply(_parse_valor)
     df["Data_dt"] = df["Data"].apply(_parse_data)
     df["Data Caixa_dt"] = df["Data Caixa"].apply(_parse_data)
@@ -276,11 +278,141 @@ def load_auditoria_fatura() -> pd.DataFrame:
     df = pd.DataFrame(rows)
     if df.empty:
         return df
+    df["row_number"] = df.index + 2
     if "Valor" in df.columns:
         df["Valor_num"] = df["Valor"].apply(_parse_valor)
     if "Data Processamento" in df.columns:
         df["Data Processamento_dt"] = df["Data Processamento"].apply(_parse_data)
     return df
+
+
+@st.cache_data(ttl=60)
+def load_auditoria_lancamento() -> pd.DataFrame:
+    """Aba 'Auditoria Lançamento' (17/09/2026) — espelho da Auditoria Fatura no sentido inverso:
+    lançamentos feitos no Zap com Data Caixa = vencimento da fatura que NÃO casaram com nenhuma
+    transação da fatura carregada. O WF1 grava com Situação = 'Provável mesma compra (valor
+    diferente | dividida em 2 cobranças)' ou 'Não veio na fatura'. Regra Wesley 17/09: a fatura
+    prevalece sobre o manual — o botão do painel cancela o manual ou marca 'aguardando'."""
+    try:
+        rows = _records_formatted("Auditoria Lançamento")
+    except Exception:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    df["row_number"] = df.index + 2
+    if "Valor" in df.columns:
+        df["Valor_num"] = df["Valor"].apply(_parse_valor)
+    if "Data Processamento" in df.columns:
+        df["Data Processamento_dt"] = df["Data Processamento"].apply(_parse_data)
+    return df
+
+
+def candidatos_zap(df_lanc: pd.DataFrame, cartao: str, pessoa: str, data_txt: str, valor: float,
+                   tol_pct: float = 0.05, tol_dias: int = 3) -> pd.DataFrame:
+    """Lançamentos MANUAIS (não vindos de carga de fatura) parecidos com uma transação da fatura:
+    mesmo banco (1ª palavra do cartão), valor ±tol_pct (mín. R$ 1), data ±tol_dias. Serve pro botão
+    '🔁 já lancei' da auditoria de cartão (cancela o manual duplicado — fatura prevalece)."""
+    if df_lanc is None or df_lanc.empty:
+        return pd.DataFrame()
+    d = _parse_data(str(data_txt).strip())
+    if pd.isna(d):
+        return pd.DataFrame()
+    banco = str(cartao or "").strip().lower().split(" ")[0]
+    df = df_lanc.copy()
+    msg = df["Mensagem Original"].astype(str)
+    df = df[~msg.str.contains(r"\[fatura ", regex=True) & ~msg.str.contains("lote=")]
+    df = df[df["Cartão"].astype(str).str.lower().str.strip().str.split(" ").str[0] == banco]
+    if pessoa:
+        df = df[df["Pessoa"].astype(str).str.strip().str.lower() == str(pessoa).strip().lower()]
+    tol = max(1.0, abs(valor) * tol_pct)
+    df = df[(df["Valor"] - valor).abs() <= tol]
+    df = df[(df["Data_dt"] - d).abs() <= pd.Timedelta(days=tol_dias)]
+    return df.sort_values("Data_dt")
+
+
+def _merchant_key(desc: str) -> str:
+    import re as _re
+    d = str(desc or "").upper()
+    d = _re.sub(r"\[.*?\]", "", d)
+    d = _re.sub(r"\(\d+/\d+\)", "", d)
+    d = _re.sub(r"[\*\.\-/]", " ", d)
+    d = _re.sub(r"\d+", "", d)
+    d = _re.sub(r"\s+", " ", d).strip()
+    return " ".join(d.split()[:2])
+
+
+def despesas_novas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, ref: datetime = None,
+                   dias_novo: int = 60, min_total: float = 150.0, min_meses_rec: int = 3) -> dict:
+    """Apontamento de despesas novas (pedido Wesley 17/09/2026):
+    - 'novas': comerciante/descrição (chave = 2 primeiras palavras normalizadas) cuja 1ª aparição
+      foi nos últimos `dias_novo` dias e cujo total >= min_total, com a série por mês da compra —
+      mostra 'quanto está refletindo em cada mês' (ex.: carregador do carro).
+    - 'virou_recorrente': chave presente em >= min_meses_rec meses distintos e SEM recorrente
+      cadastrada (token do nome não aparece em nenhuma Descrição/Subcategoria das Recorrentes).
+    Só despesas de consumo (sem investimento, sem RD/ESTORNADO, sem pagamento de fatura)."""
+    if df_lanc is None or df_lanc.empty:
+        return {"novas": [], "virou_recorrente": []}
+    ref = ref or datetime.now()
+    sp = split_movimentos(df_lanc)
+    d = sp["despesas"].copy()
+    d = d[d["Data_dt"].notna() & (d["Valor"] > 0)]
+    if d.empty:
+        return {"novas": [], "virou_recorrente": []}
+    d["chave"] = d["Descrição"].apply(_merchant_key)
+    d = d[d["chave"] != ""]
+    d["ym"] = d["Data_dt"].dt.strftime("%Y-%m")
+    meses = sorted(d["ym"].unique())[-3:]
+    tokens_rec = set()
+    if df_rec is not None and not df_rec.empty:
+        for col in ("Descrição", "Subcategoria"):
+            if col in df_rec.columns:
+                for v in df_rec[col].astype(str):
+                    tokens_rec.update(t for t in _merchant_key(v).split() if len(t) >= 4)
+
+    def _cadastrada(chave):
+        # token da chave "bate" com token de recorrente por prefixo (COND ↔ CONDOMÍNIO, UNIVERSIDADE ↔ UNIVERSIDADE)
+        for t in chave.split():
+            if len(t) < 4:
+                continue
+            for r in tokens_rec:
+                if t.startswith(r) or r.startswith(t):
+                    return True
+        return False
+
+    primeiro = d.groupby("chave")["Data_dt"].min()
+    novas = []
+    for chave, dmin in primeiro.items():
+        if (ref - dmin).days > dias_novo or _cadastrada(chave):
+            continue
+        sub = d[d["chave"] == chave]
+        tot = float(sub["Valor"].sum())
+        if tot < min_total:
+            continue
+        serie = sub.groupby("ym")["Valor"].sum()
+        novas.append({
+            "Comerciante": chave.title(),
+            "Desde": dmin.strftime("%d/%m/%Y"),
+            "Categoria": str(sub["Categoria"].mode().iloc[0]) if not sub["Categoria"].mode().empty else "",
+            "Total": round(tot, 2),
+            **{m: round(float(serie.get(m, 0.0)), 2) for m in meses},
+        })
+    novas.sort(key=lambda x: -x["Total"])
+    rec = []
+    g = d.groupby("chave").agg(meses=("ym", "nunique"), total=("Valor", "sum"), n=("Valor", "size"))
+    g = g[g["meses"] >= min_meses_rec]
+    GENERICOS = {"ALMOÇO", "ALMOCO", "JANTAR", "LANCHE", "CAFÉ", "CAFE", "SUPERMERCADO", "PRESENTE", "PRESENTES",
+                 "MEDICAMENTO", "MEDICAMENTOS", "FARMÁCIA", "FARMACIA", "PADARIA", "COMBUSTÍVEL", "COMBUSTIVEL",
+                 "ESTACIONAMENTO", "UBER", "DL", "AMAZON", "OUTROS", "ROUPA", "ROUPAS", "MANUTENÇÃO", "MANUTENCAO",
+                 "HOTEL", "VAREJÃO", "VAREJAO", "AÇAÍ", "ACAI", "DOCES", "SALÃO", "SALAO", "LAVAGEM", "ÁGUA", "AGUA"}
+    for chave, row in g.iterrows():
+        toks = chave.split()
+        if not toks or toks[0] in GENERICOS or _cadastrada(chave):
+            continue
+        rec.append({"Comerciante": chave.title(), "Meses": int(row["meses"]), "Média/mês": round(float(row["total"]) / int(row["meses"]), 2),
+                    "Lançamentos": int(row["n"])})
+    rec.sort(key=lambda x: -x["Média/mês"])
+    return {"novas": novas[:20], "virou_recorrente": rec[:20]}
 
 
 @st.cache_data(ttl=60)
