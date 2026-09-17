@@ -336,7 +336,7 @@ def _merchant_key(desc: str) -> str:
     d = str(desc or "").upper()
     d = _re.sub(r"\[.*?\]", "", d)
     d = _re.sub(r"\(\d+/\d+\)", "", d)
-    d = _re.sub(r"[\*\.\-/]", " ", d)
+    d = _re.sub(r"[\*\.\-/()\[\]:,]", " ", d)
     d = _re.sub(r"\d+", "", d)
     d = _re.sub(r"\s+", " ", d).strip()
     return " ".join(d.split()[:2])
