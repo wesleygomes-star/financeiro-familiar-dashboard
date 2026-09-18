@@ -343,14 +343,15 @@ def _merchant_key(desc: str) -> str:
 
 
 def despesas_novas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, ref: datetime = None,
-                   dias_novo: int = 60, min_total: float = 150.0, min_meses_rec: int = 3) -> dict:
-    """Apontamento de despesas novas (pedido Wesley 17/09/2026):
-    - 'novas': comerciante/descrição (chave = 2 primeiras palavras normalizadas) cuja 1ª aparição
-      foi nos últimos `dias_novo` dias e cujo total >= min_total, com a série por mês da compra —
-      mostra 'quanto está refletindo em cada mês' (ex.: carregador do carro).
-    - 'virou_recorrente': chave presente em >= min_meses_rec meses distintos e SEM recorrente
-      cadastrada (token do nome não aparece em nenhuma Descrição/Subcategoria das Recorrentes).
-    Só despesas de consumo (sem investimento, sem RD/ESTORNADO, sem pagamento de fatura)."""
+                   dias_novo: int = 90, min_ocorr: int = 3, min_meses_rec: int = 3) -> dict:
+    """Apontamento de despesas novas (pedido Wesley 17/09/2026, refinado 18/09):
+    - 'novas': tipo de gasto que NÃO existia e PASSOU A SE REPETIR — 1ª aparição nos últimos
+      `dias_novo` dias E (>= 2 meses distintos OU >= `min_ocorr` ocorrências). Compra pontual
+      (Airbnb, protesto, um médico) fica de fora: isso se trata no lançamento. Traz a série por
+      mês da compra ("quanto está pesando em cada mês") — ex.: carregador do carro.
+    - 'virou_recorrente': chave em >= min_meses_rec meses distintos e SEM recorrente cadastrada.
+    Chave de agrupamento = Subcategoria quando preenchida (semântica: 'Carregamento', 'Seguro'),
+    senão as 2 primeiras palavras normalizadas da Descrição. Só despesas de consumo."""
     if df_lanc is None or df_lanc.empty:
         return {"novas": [], "virou_recorrente": []}
     ref = ref or datetime.now()
@@ -359,7 +360,14 @@ def despesas_novas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, ref: datetime = 
     d = d[d["Data_dt"].notna() & (d["Valor"] > 0)]
     if d.empty:
         return {"novas": [], "virou_recorrente": []}
-    d["chave"] = d["Descrição"].apply(_merchant_key)
+
+    def _chave(row):
+        sub = str(row.get("Subcategoria", "") or "").strip()
+        if sub and sub.upper() not in ("RD", "ESTORNADO"):
+            return _merchant_key(sub)
+        return _merchant_key(row.get("Descrição", ""))
+
+    d["chave"] = d.apply(_chave, axis=1)
     d = d[d["chave"] != ""]
     d["ym"] = d["Data_dt"].dt.strftime("%Y-%m")
     meses = sorted(d["ym"].unique())[-3:]
@@ -371,7 +379,6 @@ def despesas_novas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, ref: datetime = 
                     tokens_rec.update(t for t in _merchant_key(v).split() if len(t) >= 4)
 
     def _cadastrada(chave):
-        # token da chave "bate" com token de recorrente por prefixo (COND ↔ CONDOMÍNIO, UNIVERSIDADE ↔ UNIVERSIDADE)
         for t in chave.split():
             if len(t) < 4:
                 continue
@@ -380,36 +387,44 @@ def despesas_novas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, ref: datetime = 
                     return True
         return False
 
-    primeiro = d.groupby("chave")["Data_dt"].min()
-    novas = []
-    for chave, dmin in primeiro.items():
-        if (ref - dmin).days > dias_novo or _cadastrada(chave):
-            continue
-        sub = d[d["chave"] == chave]
-        tot = float(sub["Valor"].sum())
-        if tot < min_total:
-            continue
-        serie = sub.groupby("ym")["Valor"].sum()
-        novas.append({
-            "Comerciante": chave.title(),
-            "Desde": dmin.strftime("%d/%m/%Y"),
-            "Categoria": str(sub["Categoria"].mode().iloc[0]) if not sub["Categoria"].mode().empty else "",
-            "Total": round(tot, 2),
-            **{m: round(float(serie.get(m, 0.0)), 2) for m in meses},
-        })
-    novas.sort(key=lambda x: -x["Total"])
-    rec = []
-    g = d.groupby("chave").agg(meses=("ym", "nunique"), total=("Valor", "sum"), n=("Valor", "size"))
-    g = g[g["meses"] >= min_meses_rec]
     GENERICOS = {"ALMOÇO", "ALMOCO", "JANTAR", "LANCHE", "CAFÉ", "CAFE", "SUPERMERCADO", "PRESENTE", "PRESENTES",
                  "MEDICAMENTO", "MEDICAMENTOS", "FARMÁCIA", "FARMACIA", "PADARIA", "COMBUSTÍVEL", "COMBUSTIVEL",
                  "ESTACIONAMENTO", "UBER", "DL", "AMAZON", "OUTROS", "ROUPA", "ROUPAS", "MANUTENÇÃO", "MANUTENCAO",
-                 "HOTEL", "VAREJÃO", "VAREJAO", "AÇAÍ", "ACAI", "DOCES", "SALÃO", "SALAO", "LAVAGEM", "ÁGUA", "AGUA"}
+                 "HOTEL", "VAREJÃO", "VAREJAO", "AÇAÍ", "ACAI", "DOCES", "SALÃO", "SALAO", "LAVAGEM", "ÁGUA", "AGUA",
+                 "RESTAURANTE", "REATAURANTE", "IFOOD", "MERCADO", "BAR", "PIZZA", "PARQUE", "MÉDICO", "MEDICO", "CONSULTA",
+                 "DENTISTA", "INGRESSO", "TROCA", "FESTA", "ANUIDADE", "CUECA"}
+    # ocorrência = DATA DE COMPRA distinta (parcelas de uma compra só compartilham a data → contam 1)
+    g = d.groupby("chave").agg(primeiro=("Data_dt", "min"), ultimo=("Data_dt", "max"), meses=("ym", "nunique"),
+                               total=("Valor", "sum"), n=("Data_dt", "nunique"))
+    novas = []
     for chave, row in g.iterrows():
+        if (ref - row["primeiro"]).days > dias_novo or _cadastrada(chave):
+            continue
+        toks = chave.split()
+        if not toks or toks[0] in GENERICOS:
+            continue
+        # repetição de verdade: 2+ meses distintos E 3+ compras em datas diferentes
+        if not (row["meses"] >= 2 and row["n"] >= min_ocorr) or float(row["total"]) < 150:
+            continue
+        sub = d[d["chave"] == chave]
+        serie = sub.groupby("ym")["Valor"].sum()
+        novas.append({
+            "Tipo de gasto": chave.title(),
+            "Desde": row["primeiro"].strftime("%d/%m/%Y"),
+            "Categoria": str(sub["Categoria"].mode().iloc[0]) if not sub["Categoria"].mode().empty else "",
+            "Compras": int(row["n"]),
+            "Média/mês": round(float(row["total"]) / max(1, int(row["meses"])), 2),
+            **{m: round(float(serie.get(m, 0.0)), 2) for m in meses},
+            "Total": round(float(row["total"]), 2),
+        })
+    novas.sort(key=lambda x: -x["Média/mês"])
+    rec = []
+    gr = g[g["meses"] >= min_meses_rec]
+    for chave, row in gr.iterrows():
         toks = chave.split()
         if not toks or toks[0] in GENERICOS or _cadastrada(chave):
             continue
-        rec.append({"Comerciante": chave.title(), "Meses": int(row["meses"]), "Média/mês": round(float(row["total"]) / int(row["meses"]), 2),
+        rec.append({"Tipo de gasto": chave.title(), "Meses": int(row["meses"]), "Média/mês": round(float(row["total"]) / int(row["meses"]), 2),
                     "Lançamentos": int(row["n"])})
     rec.sort(key=lambda x: -x["Média/mês"])
     return {"novas": novas[:20], "virou_recorrente": rec[:20]}

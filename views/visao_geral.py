@@ -799,68 +799,95 @@ with st.container(key="lin-group-b"):
             idx = []
         return grp.iloc[idx] if idx else grp.iloc[0:0]
 
+    def _filtros(df, prefixo):
+        """Filtro por cartão e por mês (vencimento MM/AAAA), com 'todos'. Devolve (grupo, chave)."""
+        df = df.copy()
+        df["_mes"] = df["Fatura Vencimento"].astype(str).str.strip().str[3:]
+        cartoes = ["todos"] + sorted(df["Fatura Cartão"].astype(str).unique().tolist())
+        meses = sorted(df["_mes"].unique().tolist(), key=lambda m: (m[3:], m[:2]), reverse=True)
+        meses = ["todos"] + meses
+        f1, f2 = st.columns(2)
+        cart = f1.selectbox("Cartão", cartoes, key=f"{prefixo}_cart", label_visibility="collapsed")
+        mes = f2.selectbox("Mês", meses, index=1 if len(meses) > 1 else 0, key=f"{prefixo}_mes", label_visibility="collapsed")
+        if cart != "todos":
+            df = df[df["Fatura Cartão"].astype(str) == cart]
+        if mes != "todos":
+            df = df[df["_mes"] == mes]
+        return df, f"{cart}_{mes}"
+
+    POR_PAGINA = 15
+
+    def _paginar(grp, chave):
+        """Devolve a fatia da página atual + desenha a navegação (só se precisar)."""
+        total = len(grp)
+        npag = max(1, (total + POR_PAGINA - 1) // POR_PAGINA)
+        k = f"pag_{chave}"
+        pag = int(st.session_state.get(k, 0))
+        pag = min(max(pag, 0), npag - 1)
+        st.session_state[k] = pag
+        if npag > 1:
+            n1, n2, n3 = st.columns([1, 2, 1])
+            if n1.button("‹ anterior", key=f"{k}_prev", disabled=pag == 0, use_container_width=True):
+                st.session_state[k] = pag - 1
+                st.rerun()
+            n2.markdown(f"<div style='text-align:center;color:#5C6B62;font-size:12.5px;padding-top:8px'>"
+                        f"página {pag + 1} de {npag} · {total} itens</div>", unsafe_allow_html=True)
+            if n3.button("próxima ›", key=f"{k}_next", disabled=pag >= npag - 1, use_container_width=True):
+                st.session_state[k] = pag + 1
+                st.rerun()
+        return grp.iloc[pag * POR_PAGINA:(pag + 1) * POR_PAGINA]
+
     if not _pend_f.empty:
         _audit_ctx = st.container(key="lin-audit-fatura")
         with _audit_ctx.expander(f"**Auditoria de cartão** `{len(_pend_f)} pendente(s)`", icon="🔍", expanded=False):
             st.caption(
-                "veio na fatura e NÃO tinha sido lançado no Zap. A compra já está no consumo — marque as linhas e "
-                "confirme que são suas, aponte que já tinha lançado (cancela o manual duplicado) ou marque em disputa."
+                "veio na fatura e NÃO tinha sido lançado no Zap. A compra já está no consumo — "
+                "aqui você só diz se reconhece a despesa. \"Não reconheço\" marca em disputa com a bandeira."
             )
-            _ops = _opcoes_faturas(_pend_f)
-            _sel = st.selectbox("Fatura", _ops, format_func=lambda o: f"{o[0]} · venc {o[1]} · {o[2]} pendente(s)",
-                                key="aud_f_sel", label_visibility="collapsed")
-            _grp = _pend_f[(_pend_f["Fatura Cartão"] == _sel[0]) & (_pend_f["Fatura Vencimento"] == _sel[1])].copy()
+            _grp, _kf = _filtros(_pend_f, "aud_f")
             _grp["_d"] = _grp["Data Transação"].apply(_venc_key)
             _grp = _grp.sort_values("_d").reset_index(drop=True)
             _miudos = _grp[_grp["Valor_num"].abs() < 20]
             b1, b2 = st.columns(2)
-            if b1.button(f"✅ miúdos < R$ 20 desta fatura ({len(_miudos)})", key="aud_f_miudos", disabled=_miudos.empty,
+            if b1.button(f"✅ reconheço os miúdos < R$ 20 ({len(_miudos)})", key="aud_f_miudos", disabled=_miudos.empty,
                          use_container_width=True):
                 resolver_auditoria_lote("Auditoria Fatura", [int(r) for r in _miudos["row_number"]],
-                                        f"Resolvido — miúdo (<R$ 20) confirmado no painel {_hoje_txt}")
+                                        f"Resolvido — miúdo (<R$ 20) reconhecido no painel {_hoje_txt}")
                 _apos_escrita()
-            if b2.button(f"✅ todas desta fatura são minhas ({len(_grp)})", key="aud_f_all", use_container_width=True):
+            if b2.button(f"✅ reconheço todas do filtro ({len(_grp)})", key="aud_f_all", disabled=_grp.empty, use_container_width=True):
                 resolver_auditoria_lote("Auditoria Fatura", [int(r) for r in _grp["row_number"]],
-                                        f"Resolvido — confirmada em lote no painel {_hoje_txt}")
+                                        f"Resolvido — reconhecida em lote no painel {_hoje_txt}")
                 _apos_escrita()
-            _tab = _grp[["Data Transação", "Descrição", "Valor_num", "Pessoa", "Tipo"]].rename(
-                columns={"Data Transação": "Data", "Valor_num": "Valor"})
-            _ev = st.dataframe(
-                _tab, hide_index=True, use_container_width=True, height=min(420, 38 + 35 * len(_tab)),
-                on_select="rerun", selection_mode="multi-row", key=f"aud_f_df_{_sel[0]}_{_sel[1]}",
-                column_config={"Valor": st.column_config.NumberColumn(format="R$ %.2f")},
-            )
-            _selr = _linhas_selecionadas(_ev, _grp)
-            _n = len(_selr)
-            c1, c2, c3 = st.columns(3)
-            if c1.button(f"✅ selecionadas são minhas ({_n})", key="aud_f_ok", disabled=_n == 0, use_container_width=True):
-                resolver_auditoria_lote("Auditoria Fatura", [int(r) for r in _selr["row_number"]],
-                                        f"Resolvido — confirmada no painel {_hoje_txt}")
-                _apos_escrita()
-            if c3.button(f"❌ não reconheço ({_n})", key="aud_f_no", disabled=_n == 0, use_container_width=True):
-                resolver_auditoria_lote("Auditoria Fatura", [int(r) for r in _selr["row_number"]],
-                                        f"Em disputa — não reconhecida no painel {_hoje_txt}")
-                _apos_escrita()
-            with c2.popover("🔁 já lancei no Zap", disabled=_n != 1, use_container_width=True):
-                if _n == 1:
-                    r = _selr.iloc[0]
-                    rn = int(r["row_number"])
-                    st.caption(f"{r['Descrição']} — {fmt(float(r['Valor_num']))} · {r['Data Transação']}")
-                    _cands = candidatos_zap(df_lanc, r.get("Fatura Cartão", ""), r.get("Pessoa", ""),
-                                            r.get("Data Transação", ""), float(r.get("Valor_num", 0) or 0))
-                    if _cands.empty:
-                        st.caption("nenhum lançamento manual parecido (mesmo banco, ±5%, ±3 dias)")
-                    for _, cz in _cands.iterrows():
-                        _rz = int(cz["row_number"])
-                        if st.button(f"cancelar L{_rz}: {cz['Descrição']} · {fmt(float(cz['Valor']))} · {cz['Data']}",
-                                     key=f"f_dup_{rn}_{_rz}"):
-                            cancelar_lancamento(_rz, f"[painel {_hoje_txt}: duplicado da fatura {r.get('Fatura Cartão', '')} "
-                                                     f"({r.get('Descrição', '')} {r.get('Valor', '')}); fatura prevalece]")
-                            resolver_auditoria("Auditoria Fatura", rn,
-                                               f"Resolvido — duplicado do manual L{_rz} (cancelado no painel {_hoje_txt})")
-                            _apos_escrita()
-                else:
-                    st.caption("selecione exatamente 1 linha")
+            _pagina = _paginar(_grp, f"f_{_kf}")
+            for _, r in _pagina.iterrows():
+                rn = int(r["row_number"])
+                _tipo = str(r.get("Tipo", "") or "").strip()
+                _cands = candidatos_zap(df_lanc, r.get("Fatura Cartão", ""), r.get("Pessoa", ""),
+                                        r.get("Data Transação", ""), float(r.get("Valor_num", 0) or 0))
+                _tem_dup = not _cands.empty
+                cols = st.columns([6, 1.6, 1.9, 2.2] if _tem_dup else [6, 1.6, 1.9])
+                cols[0].markdown(
+                    f"<div style='padding-top:6px;line-height:1.25'><b>{r.get('Descrição', '?')}</b> — {fmt(float(r.get('Valor_num', 0) or 0))}"
+                    f"<br><span style='color:#5C6B62;font-size:12px'>{r.get('Data Transação', '')} · {r.get('Pessoa', '')}"
+                    f"{' · ' + _tipo if _tipo else ''} · {r.get('Fatura Cartão', '')} venc {r.get('Fatura Vencimento', '')}</span></div>",
+                    unsafe_allow_html=True,
+                )
+                if cols[1].button("✅ reconheço", key=f"f_ok_{rn}", use_container_width=True):
+                    resolver_auditoria("Auditoria Fatura", rn, f"Resolvido — reconhecida no painel {_hoje_txt}")
+                    _apos_escrita()
+                if cols[2].button("❌ não reconheço", key=f"f_no_{rn}", use_container_width=True):
+                    resolver_auditoria("Auditoria Fatura", rn, f"Em disputa — não reconhecida no painel {_hoje_txt}")
+                    _apos_escrita()
+                if _tem_dup:
+                    cz = _cands.iloc[0]
+                    _rz = int(cz["row_number"])
+                    if cols[3].button(f"🔁 duplicado de L{_rz}", key=f"f_dup_{rn}_{_rz}", use_container_width=True,
+                                      help=f"cancela o manual L{_rz}: {cz['Descrição']} · {fmt(float(cz['Valor']))} · {cz['Data']} (fatura prevalece)"):
+                        cancelar_lancamento(_rz, f"[painel {_hoje_txt}: duplicado da fatura {r.get('Fatura Cartão', '')} "
+                                                 f"({r.get('Descrição', '')} {r.get('Valor', '')}); fatura prevalece]")
+                        resolver_auditoria("Auditoria Fatura", rn,
+                                           f"Resolvido — duplicado do manual L{_rz} (cancelado no painel {_hoje_txt})")
+                        _apos_escrita()
 
     if not _pend_l.empty:
         _audl_ctx = st.container(key="lin-audit-lanc")
@@ -869,52 +896,40 @@ with st.container(key="lin-group-b"):
                 "lançado no Zap com o caixa dessa fatura, mas a fatura não trouxe. Ou é a mesma compra com valor "
                 "diferente (a fatura prevalece: cancelar o manual), ou vem na próxima fatura, ou não foi no cartão."
             )
-            _opl = _opcoes_faturas(_pend_l)
-            _sell = st.selectbox("Fatura", _opl, format_func=lambda o: f"{o[0]} · venc {o[1]} · {o[2]} pendente(s)",
-                                 key="aud_l_sel", label_visibility="collapsed")
-            _grl = _pend_l[(_pend_l["Fatura Cartão"] == _sell[0]) & (_pend_l["Fatura Vencimento"] == _sell[1])].copy()
+            _grl, _kl = _filtros(_pend_l, "aud_l")
             _grl["_d"] = _grl["Data Lançamento"].apply(_venc_key)
             _grl = _grl.sort_values("_d").reset_index(drop=True)
-            _tabl = _grl[["Linha", "Data Lançamento", "Descrição", "Valor_num", "Pessoa", "Situação", "Candidato na Fatura"]].rename(
-                columns={"Data Lançamento": "Data", "Valor_num": "Valor", "Candidato na Fatura": "Na fatura"})
-            _evl = st.dataframe(
-                _tabl, hide_index=True, use_container_width=True, height=min(420, 38 + 35 * len(_tabl)),
-                on_select="rerun", selection_mode="multi-row", key=f"aud_l_df_{_sell[0]}_{_sell[1]}",
-                column_config={"Valor": st.column_config.NumberColumn(format="R$ %.2f")},
-            )
-            _sll = _linhas_selecionadas(_evl, _grl)
-            _nl = len(_sll)
-
-            def _linhas_manual(sel):
-                out = []
-                for _, r in sel.iterrows():
-                    try:
-                        v = int(str(r.get("Linha", "")).strip() or 0)
-                    except Exception:
-                        v = 0
-                    if v:
-                        out.append((v, r))
-                return out
-
-            d1, d2, d3 = st.columns(3)
-            if d1.button(f"🔁 mesma compra ({_nl})", key="aud_l_dup", disabled=_nl == 0, use_container_width=True,
-                         help="cancela o lançamento manual; a linha da fatura fica (fatura prevalece)"):
-                for _lin, r in _linhas_manual(_sll):
-                    cancelar_lancamento(_lin, f"[painel {_hoje_txt}: mesma compra da fatura {r.get('Fatura Cartão', '')} "
-                                              f"venc {r.get('Fatura Vencimento', '')} ({r.get('Candidato na Fatura', '') or 'sem candidato'}); fatura prevalece]")
-                resolver_auditoria_lote("Auditoria Lançamento", [int(r) for r in _sll["row_number"]],
-                                        f"Resolvido — manual cancelado no painel {_hoje_txt}")
-                _apos_escrita()
-            if d2.button(f"⏳ próxima fatura ({_nl})", key="aud_l_wait", disabled=_nl == 0, use_container_width=True,
-                         help="mantém o lançamento; se não vier na próxima, cancelar"):
-                resolver_auditoria_lote("Auditoria Lançamento", [int(r) for r in _sll["row_number"]],
+            if st.button(f"⏳ aguardar a próxima fatura pra todas do filtro ({len(_grl)})", key="aud_l_wait_all", disabled=_grl.empty, use_container_width=True):
+                resolver_auditoria_lote("Auditoria Lançamento", [int(r) for r in _grl["row_number"]],
                                         f"Aguardando próxima fatura — marcado no painel {_hoje_txt}")
                 _apos_escrita()
-            if d3.button(f"✅ manter ({_nl})", key="aud_l_keep", disabled=_nl == 0, use_container_width=True,
-                         help="foi pago por outro meio / é legítimo — fica como está"):
-                resolver_auditoria_lote("Auditoria Lançamento", [int(r) for r in _sll["row_number"]],
-                                        f"Resolvido — mantido no painel {_hoje_txt}")
-                _apos_escrita()
+            _pagl = _paginar(_grl, f"l_{_kl}")
+            for _, r in _pagl.iterrows():
+                rn = int(r["row_number"])
+                try:
+                    _lin = int(str(r.get("Linha", "")).strip() or 0)
+                except Exception:
+                    _lin = 0
+                _sit = str(r.get("Situação", "") or "")
+                _cand = str(r.get("Candidato na Fatura", "") or "")
+                _cor = "#B45309" if "Provável" in _sit else "#5C6B62"
+                c1, c2, c3 = st.columns([6, 1.9, 1.6])
+                c1.markdown(
+                    f"<div style='padding-top:6px;line-height:1.25'><b>L{_lin} · {r.get('Descrição', '?')}</b> — {fmt(float(r.get('Valor_num', 0) or 0))}"
+                    f"<br><span style='color:#5C6B62;font-size:12px'>{r.get('Data Lançamento', '')} · {r.get('Pessoa', '')}</span>"
+                    f"<br><span style='color:{_cor};font-size:12px'>{_sit}{' → ' + _cand if _cand else ''}</span></div>",
+                    unsafe_allow_html=True,
+                )
+                if c2.button("🔁 mesma compra", key=f"l_dup_{rn}", disabled=not _lin, use_container_width=True,
+                             help="cancela o lançamento manual; a linha da fatura fica (fatura prevalece)"):
+                    cancelar_lancamento(_lin, f"[painel {_hoje_txt}: mesma compra da fatura {r.get('Fatura Cartão', '')} "
+                                              f"venc {r.get('Fatura Vencimento', '')} ({_cand or 'sem candidato'}); fatura prevalece]")
+                    resolver_auditoria("Auditoria Lançamento", rn, f"Resolvido — manual L{_lin} cancelado no painel {_hoje_txt}")
+                    _apos_escrita()
+                if c3.button("✅ manter", key=f"l_keep_{rn}", use_container_width=True,
+                             help="foi pago por outro meio / é legítimo — fica como está"):
+                    resolver_auditoria("Auditoria Lançamento", rn, f"Resolvido — mantido no painel {_hoje_txt}")
+                    _apos_escrita()
 
     # ============== Despesas novas (1ª aparição) + virou recorrente? ==============
     _dn = despesas_novas(df_lanc, df_rec)
@@ -925,9 +940,9 @@ with st.container(key="lin-group-b"):
             icon="🆕", expanded=False,
         ):
             if _dn["novas"]:
-                st.markdown("**Apareceu pela primeira vez nos últimos 60 dias** (total ≥ R$ 150) — quanto está pesando em cada mês:")
+                st.markdown("**Não existia e passou a se repetir** (surgiu nos últimos 90 dias e já tem 2 meses ou 3+ ocorrências) — quanto está pesando em cada mês. Compra pontual não entra aqui.")
                 _dfn = pd.DataFrame(_dn["novas"])
-                _colcfg = {c: st.column_config.NumberColumn(format="R$ %.0f") for c in _dfn.columns if c == "Total" or c[:2] == "20"}
+                _colcfg = {c: st.column_config.NumberColumn(format="R$ %.0f") for c in _dfn.columns if c in ("Total", "Média/mês") or c[:2] == "20"}
                 st.dataframe(_dfn, hide_index=True, use_container_width=True, column_config=_colcfg)
             if _dn["virou_recorrente"]:
                 st.markdown("**Virou recorrente e não está nas Recorrentes** (3+ meses distintos) — cadastrar na aba Recorrentes pra entrar no planejado × pago:")
