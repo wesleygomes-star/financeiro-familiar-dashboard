@@ -893,48 +893,26 @@ def _emparelhar_recorrentes(df_desp: pd.DataFrame, df_rec: pd.DataFrame, compete
              (_toks_rec(r.get(col_desc, "")) if col_desc else set())
              | _toks_rec(r.get("Subcategoria", "")))  # subcat vira token (Cemig+Energia, Claro+Internet)
             for j, r in rec_ativas.iterrows()]
+    # 18/09/2026: NOME antes de VALOR. Com o esperado virando média móvel, um item qualquer da mesma
+    # categoria com valor "coincidente" (±3%) roubava o par da conta certa cujo valor mudou (Pelada
+    # 270→370 casou com um Lazer de 304,70). Agora: par por TOKEN de descrição (até ±60% do valor)
+    # sempre vence par só por categoria (±3%, valor quase exato); dentro de cada grupo, o mais
+    # próximo em valor vence; melhor par global com consumo único.
     pares = []
     for ri, (_j, rval, rcat, rtoks) in enumerate(recs):
         if rval <= 0:
             continue
         for li, (_i, ltoks, lcat, lval) in enumerate(lanc):
             diff = abs(lval - rval)
-            if diff > rval * 0.20:
-                continue
             shared = len(rtoks & ltoks)
             cat_ok = bool(rcat) and rcat == lcat
-            # par SÓ por categoria (sem token) exige valor quase exato (±8%) —
-            # evita casar item aleatório da mesma categoria (14/07)
-            if shared == 0 and cat_ok and diff > rval * 0.03:
-                continue
-            if shared >= 1 or cat_ok:
-                pares.append((shared * 100 + (10 if cat_ok else 0) + (20 - 20 * diff / (rval * 0.20)), ri, li))
+            if shared >= 1 and diff <= rval * 0.60:
+                pares.append((1000 + shared * 100 + (10 if cat_ok else 0) + (20 - 20 * diff / (rval * 0.60)), ri, li))
+            elif shared == 0 and cat_ok and diff <= rval * 0.03:
+                pares.append((100 + (20 - 20 * diff / (rval * 0.03)), ri, li))
     pares.sort(key=lambda p: p[0], reverse=True)
     r_used, l_used, mp = set(), set(), {}
     for _score, ri, li in pares:
-        if ri in r_used or li in l_used:
-            continue
-        r_used.add(ri)
-        l_used.add(li)
-        mp[recs[ri][0]] = lanc[li][0]
-
-    # 2º passe (16/07): sobras com TOKEN em comum aceitam variação maior de valor
-    # (conta fixa de valor volátil — ex: Economia de Energia 301 esperado, 233 pago)
-    pares2 = []
-    for ri, (_j, rval, rcat, rtoks) in enumerate(recs):
-        if ri in r_used or rval <= 0:
-            continue
-        for li, (_i, ltoks, lcat, lval) in enumerate(lanc):
-            if li in l_used:
-                continue
-            diff = abs(lval - rval)
-            if diff > rval * 0.60:
-                continue
-            shared = len(rtoks & ltoks)
-            if shared >= 1:
-                pares2.append((shared * 100 + (10 if rcat == lcat else 0) - diff / max(rval, 1), ri, li))
-    pares2.sort(key=lambda p: p[0], reverse=True)
-    for _score, ri, li in pares2:
         if ri in r_used or li in l_used:
             continue
         r_used.add(ri)
