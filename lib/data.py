@@ -757,7 +757,7 @@ def _lancamentos_da_fatura(cartao_str: str, mes_ref: str, df_lanc: pd.DataFrame,
     _alvo = cartao_str.lower().strip()
     _eh_credito = df_lanc["Forma Pgto"].astype(str).str.lower().str.contains("crédito|credito", na=False, regex=True)
     # label exato + rótulos LEGADO curtos (<3 palavras, ex. 'XP Wesley'). O contains por
-    # 1ª palavra puro fazia os dois Santander da Sabrina ('… 2' e '… 0064') dividirem os
+    # 1ª palavra puro fazia os dois Santander da Sabrina (rótulos antigos '… 2' e '… 0064', unificados em 18/09/2026) dividirem os
     # MESMOS lançamentos — cada fatura pendente contava tudo de novo (bug 21/08: R$ 404
     # virava R$ 808 na projeção). Rótulo completo de OUTRO cartão nunca entra.
     _legado = _cart_norm.str.contains(primeira.lower(), na=False) & (
