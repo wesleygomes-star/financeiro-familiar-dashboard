@@ -597,14 +597,15 @@ with _f_ctx.expander(f"**Contas fixas** `{_resumo_fixas}`", icon="🕐", expande
     if not audit.empty:
         _ash = audit.sort_values("Dia Cobrança")
         st.dataframe(
-            _ash[["Status", "Descrição", "Valor Pago", "Valor Esperado", "Dia Cobrança"]],
+            _ash[["Status", "Descrição", "Valor Pago", "Valor Esperado", "Diferença", "Dia Cobrança"]],
             use_container_width=True, hide_index=True,
             column_config={
                 "Valor Pago": st.column_config.NumberColumn(format="R$ %.0f", help="o que realmente saiu este mês"),
-                "Valor Esperado": st.column_config.NumberColumn(format="R$ %.0f", help="referência do cadastro"),
+                "Valor Esperado": st.column_config.NumberColumn(format="R$ %.0f", help="média móvel dos últimos 3 meses pagos (cadastro só quando não há histórico)"),
+                "Diferença": st.column_config.NumberColumn(format="R$ %.0f", help="pago − média dos 3 meses anteriores"),
             },
         )
-        st.caption("cadastro alimenta os alertas do Zap e a projeção; coluna Fim encerra contas (vigência)")
+        st.caption("esperado = média móvel de 3 meses; o cadastro é referência e alimenta os alertas do Zap; coluna Fim encerra contas (vigência)")
 
 # ============== A conta do mês (conta + baldes + metas num card só) ==============
 no_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df_lanc.columns else df_lanc

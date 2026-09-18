@@ -979,6 +979,49 @@ def evolucao_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, ano: str) -> dic
             "tot_pago": tot_pago, "tot_esp": tot_esp, "n_pago": n_pago, "n_vig": n_vig}
 
 
+def _pool_fixas(df_lanc: pd.DataFrame, competencia: str) -> pd.DataFrame:
+    """Lançamentos que podem pagar uma conta fixa na competência: despesas de consumo + linhas
+    Tipo=Despesa do balde investimento (parcela de acordo/financiamento de imóvel, 11/09/2026).
+    Por COMPETÊNCIA (14/07): fixa paga no cartão (caixa mês seguinte) conta como paga."""
+    if df_lanc is None or df_lanc.empty:
+        return pd.DataFrame()
+    lanc_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df_lanc.columns else df_lanc
+    _sp = split_movimentos(lanc_mes)
+    _inv_desp = _sp["aportes"]
+    if not _inv_desp.empty and "Tipo" in _inv_desp.columns:
+        _inv_desp = _inv_desp[_inv_desp["Tipo"].astype(str).str.strip().str.lower() == "despesa"]
+    return pd.concat([_sp["despesas"], _inv_desp]) if not _inv_desp.empty else _sp["despesas"]
+
+
+def _comp_anterior(competencia: str, k: int) -> str:
+    m, y = competencia.split("/")
+    m, y = int(m), int(y)
+    m -= k
+    while m <= 0:
+        m += 12
+        y -= 1
+    return f"{m:02d}/{y}"
+
+
+def media_movel_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competencia: str, n_meses: int = 3) -> dict:
+    """Média móvel do que foi PAGO em cada recorrente nas `n_meses` competências anteriores
+    (só meses em que casou). Retorna {índice em df_rec: (média, nº de meses usados)}."""
+    vals = {}
+    if df_rec is None or df_rec.empty or df_lanc is None or df_lanc.empty:
+        return vals
+    for k in range(1, n_meses + 1):
+        comp = _comp_anterior(competencia, k)
+        pool = _pool_fixas(df_lanc, comp)
+        if pool.empty:
+            continue
+        emp = _emparelhar_recorrentes(pool, df_rec, comp)
+        for ridx, li in emp.items():
+            v = float(pool.loc[li, "Valor"] or 0)
+            if v > 0:
+                vals.setdefault(ridx, []).append(v)
+    return {r: (round(sum(v) / len(v), 2), len(v)) for r, v in vals.items()}
+
+
 def auditar_contas_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competencia: str) -> pd.DataFrame:
     """Retorna DataFrame com 1 linha por recorrente ATIVA, status do mês.
 
@@ -993,20 +1036,16 @@ def auditar_contas_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competenci
     if rec_ativas.empty:
         return pd.DataFrame()
 
-    # Filtra por COMPETÊNCIA (14/07): "a conta do mês foi paga?" é pergunta de competência —
-    # fixa paga no cartão (caixa mês seguinte) conta como paga; e o pool NÃO herda as compras
-    # de junho da fatura (que geravam pares-lixo tipo Cemig←ELECTROLUX no modo Caixa).
-    lanc_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df_lanc.columns else df_lanc
-    _sp = split_movimentos(lanc_mes)
-    # (11/09/2026) Parcela de acordo/financiamento de imóvel chega com Tipo=Despesa e categoria
-    # "Investimentos em Imóvel" (é patrimônio, não consumo — fica fora dos gastos), mas TEM
-    # recorrente própria (ex.: "AP Cláudio 501 — acordo saldo final"). Sem isto a conta fixa
-    # aparecia "Atrasada" mesmo paga. Entram no pool só as linhas Tipo=Despesa desse balde;
-    # aportes financeiros (Tipo=Investimento), pagamento de fatura, RD e ESTORNADO seguem fora.
-    _inv_desp = _sp["aportes"]
-    if not _inv_desp.empty and "Tipo" in _inv_desp.columns:
-        _inv_desp = _inv_desp[_inv_desp["Tipo"].astype(str).str.strip().str.lower() == "despesa"]
-    lanc_mes = pd.concat([_sp["despesas"], _inv_desp]) if not _inv_desp.empty else _sp["despesas"]
+    lanc_mes = _pool_fixas(df_lanc, competencia)
+
+    # 18/09/2026 (Wesley): o ESPERADO de cada conta fixa é a MÉDIA MÓVEL dos últimos 3 meses pagos,
+    # não o valor cadastrado — assim a diferença que aparece no lançamento é contra o que se vem
+    # pagando de fato. O cadastro fica como fallback (conta nova, sem histórico) e como referência.
+    _mm = media_movel_fixas(df_lanc, df_rec, competencia, n_meses=3)
+    df_rec_adj = df_rec.copy()
+    for _ridx, (_media, _n) in _mm.items():
+        if _n >= 1 and _media > 0 and _ridx in df_rec_adj.index:
+            df_rec_adj.loc[_ridx, "Valor"] = f"{_media:.2f}"
 
     try:
         m, y = competencia.split("/")
@@ -1018,13 +1057,15 @@ def auditar_contas_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competenci
     eh_mes_corrente = (hoje.month == m and hoje.year == y)
     dia_hoje = hoje.day if eh_mes_corrente else 31  # se mês passado, considera "fim do mês"
 
-    emparelhamento = _emparelhar_recorrentes(lanc_mes, df_rec, competencia)
+    emparelhamento = _emparelhar_recorrentes(lanc_mes, df_rec_adj, competencia)
     out_rows = []
     for ridx, rec in rec_ativas.iterrows():
         desc_rec = str(rec.get("Descrição") or rec.get("Descricao") or rec.get("Item") or rec.get("Nome") or "").strip()
         cat_rec = str(rec.get("Categoria", "")).strip()
         pessoa_rec = str(rec.get("Pessoa", "")).strip()
-        valor_esp = float(rec.get("Valor", 0) or 0)
+        valor_cad = float(rec.get("Valor", 0) or 0)
+        _media, _n = _mm.get(ridx, (0.0, 0))
+        valor_esp = float(_media) if (_n >= 1 and _media > 0) else valor_cad
         try:
             dia_cobranca = int(rec.get("Dia Cobrança") or rec.get("Dia") or 0)
         except Exception:
@@ -1051,12 +1092,15 @@ def auditar_contas_fixas(df_lanc: pd.DataFrame, df_rec: pd.DataFrame, competenci
             "Descrição": desc_rec,
             "Categoria": cat_rec,
             "Pessoa Esperada": pessoa_rec,
-            "Valor Esperado": valor_esp,
+            "Valor Esperado": round(valor_esp, 2),
+            "Cadastrado": valor_cad,
+            "Meses Média": int(_n),
             "Dia Cobrança": dia_cobranca,
             "Status": status,
             "Data Pagamento": data_pagamento or "",
             "Pessoa Pagou": pessoa_pagou,
             "Valor Pago": valor_pago,
+            "Diferença": round(valor_pago - valor_esp, 2) if match is not None else None,
         })
 
     return pd.DataFrame(out_rows)
