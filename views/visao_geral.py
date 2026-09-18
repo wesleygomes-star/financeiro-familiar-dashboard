@@ -842,7 +842,8 @@ with st.container(key="lin-group-b"):
         with _audit_ctx.expander(f"**Auditoria de cartão** `{len(_pend_f)} pendente(s)`", icon="🔍", expanded=False):
             st.caption(
                 "veio na fatura e NÃO tinha sido lançado no Zap. A compra já está no consumo — "
-                "aqui você só diz se reconhece a despesa. \"Não reconheço\" marca em disputa com a bandeira."
+                "aqui você só diz se reconhece a despesa. \"Não reconheço\" marca em disputa com a bandeira. "
+                "Duplicidade com lançamento manual o sistema cancela sozinho (fatura prevalece)."
             )
             _grp, _kf = _filtros(_pend_f, "aud_f")
             _grp["_d"] = _grp["Data Transação"].apply(_venc_key)
@@ -862,10 +863,7 @@ with st.container(key="lin-group-b"):
             for _, r in _pagina.iterrows():
                 rn = int(r["row_number"])
                 _tipo = str(r.get("Tipo", "") or "").strip()
-                _cands = candidatos_zap(df_lanc, r.get("Fatura Cartão", ""), r.get("Pessoa", ""),
-                                        r.get("Data Transação", ""), float(r.get("Valor_num", 0) or 0))
-                _tem_dup = not _cands.empty
-                cols = st.columns([6, 1.6, 1.9, 2.2] if _tem_dup else [6, 1.6, 1.9])
+                cols = st.columns([6, 1.6, 1.9])
                 cols[0].markdown(
                     f"<div style='padding-top:6px;line-height:1.25'><b>{r.get('Descrição', '?')}</b> — {fmt(float(r.get('Valor_num', 0) or 0))}"
                     f"<br><span style='color:#5C6B62;font-size:12px'>{r.get('Data Transação', '')} · {r.get('Pessoa', '')}"
@@ -878,23 +876,13 @@ with st.container(key="lin-group-b"):
                 if cols[2].button("❌ não reconheço", key=f"f_no_{rn}", use_container_width=True):
                     resolver_auditoria("Auditoria Fatura", rn, f"Em disputa — não reconhecida no painel {_hoje_txt}")
                     _apos_escrita()
-                if _tem_dup:
-                    cz = _cands.iloc[0]
-                    _rz = int(cz["row_number"])
-                    if cols[3].button(f"🔁 duplicado de L{_rz}", key=f"f_dup_{rn}_{_rz}", use_container_width=True,
-                                      help=f"cancela o manual L{_rz}: {cz['Descrição']} · {fmt(float(cz['Valor']))} · {cz['Data']} (fatura prevalece)"):
-                        cancelar_lancamento(_rz, f"[painel {_hoje_txt}: duplicado da fatura {r.get('Fatura Cartão', '')} "
-                                                 f"({r.get('Descrição', '')} {r.get('Valor', '')}); fatura prevalece]")
-                        resolver_auditoria("Auditoria Fatura", rn,
-                                           f"Resolvido — duplicado do manual L{_rz} (cancelado no painel {_hoje_txt})")
-                        _apos_escrita()
 
     if not _pend_l.empty:
         _audl_ctx = st.container(key="lin-audit-lanc")
         with _audl_ctx.expander(f"**Auditoria de lançamento** `{len(_pend_l)} pendente(s)`", icon="📝", expanded=False):
             st.caption(
-                "lançado no Zap com o caixa dessa fatura, mas a fatura não trouxe. Ou é a mesma compra com valor "
-                "diferente (a fatura prevalece: cancelar o manual), ou vem na próxima fatura, ou não foi no cartão."
+                "lançado no Zap com o caixa dessa fatura, mas a fatura não trouxe. Duplicidade o sistema já cancelou "
+                "sozinho; aqui só sobra o que não veio: ou vem na próxima fatura (manter), ou não foi no cartão (cancelar)."
             )
             _grl, _kl = _filtros(_pend_l, "aud_l")
             _grl["_d"] = _grl["Data Lançamento"].apply(_venc_key)
@@ -920,14 +908,14 @@ with st.container(key="lin-group-b"):
                     f"<br><span style='color:{_cor};font-size:12px'>{_sit}{' → ' + _cand if _cand else ''}</span></div>",
                     unsafe_allow_html=True,
                 )
-                if c2.button("🔁 mesma compra", key=f"l_dup_{rn}", disabled=not _lin, use_container_width=True,
-                             help="cancela o lançamento manual; a linha da fatura fica (fatura prevalece)"):
-                    cancelar_lancamento(_lin, f"[painel {_hoje_txt}: mesma compra da fatura {r.get('Fatura Cartão', '')} "
-                                              f"venc {r.get('Fatura Vencimento', '')} ({_cand or 'sem candidato'}); fatura prevalece]")
+                if c2.button("🗑 cancelar", key=f"l_del_{rn}", disabled=not _lin, use_container_width=True,
+                             help="não foi no cartão / não houve a compra — cancela o lançamento manual (fatura prevalece)"):
+                    cancelar_lancamento(_lin, f"[painel {_hoje_txt}: não veio na fatura {r.get('Fatura Cartão', '')} "
+                                              f"venc {r.get('Fatura Vencimento', '')}; fatura prevalece]")
                     resolver_auditoria("Auditoria Lançamento", rn, f"Resolvido — manual L{_lin} cancelado no painel {_hoje_txt}")
                     _apos_escrita()
                 if c3.button("✅ manter", key=f"l_keep_{rn}", use_container_width=True,
-                             help="foi pago por outro meio / é legítimo — fica como está"):
+                             help="foi pago por outro meio / vem na próxima fatura — fica como está"):
                     resolver_auditoria("Auditoria Lançamento", rn, f"Resolvido — mantido no painel {_hoje_txt}")
                     _apos_escrita()
 
