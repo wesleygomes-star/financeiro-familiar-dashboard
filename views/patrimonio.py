@@ -139,7 +139,7 @@ if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
     ic1, ic2, ic3 = st.columns(3)
     rend = rendimento_investido(df_saldo)
     ic1.metric("rendimento", f"+{rend['pct']:.2f}%" if rend else "—")
-    ic2.metric("snapshots", str(df_saldo["Data Snapshot"].nunique()))
+    ic2.metric("datas com print", str(df_saldo["Data Snapshot"].nunique()))
     if _est:
         _n_contas = df_saldo.groupby(["Pessoa", "Modalidade"]).ngroups if {"Pessoa", "Modalidade"} <= set(df_saldo.columns) else 0
         ic3.metric("contas", str(_n_contas) if _n_contas else "—")
@@ -545,6 +545,6 @@ if not _ap.empty:
         f'<div style="background:#fff;border-radius:14px;padding:16px 16px 8px;box-shadow:0 2px 8px rgba(12,60,45,0.06)">{_linhas_pend}</div>',
         unsafe_allow_html=True,
     )
-    st.caption("snapshot manual — fonte de verdade é o DOSSIE - AP 501 Ed Claudio de Paula.md na pasta do investimento")
+    st.caption("registro manual — fonte de verdade é o DOSSIE - AP 501 Ed Claudio de Paula.md na pasta do investimento")
 else:
     st.info("AP Cláudio não encontrado na aba Bens.")
