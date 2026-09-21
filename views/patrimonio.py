@@ -29,6 +29,7 @@ from lib.data import (
     meses_disponiveis,
     patrimonio_imobilizado,
     rendimento_investido,
+    historico_mensal_contas,
     saldo_estocado_atual,
     serie_estocado,
     valor_a_receber_hoje,
@@ -140,8 +141,20 @@ if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
     ic1.metric("rendimento", f"+{rend['pct']:.2f}%" if rend else "—")
     ic2.metric("snapshots", str(df_saldo["Data Snapshot"].nunique()))
     if _est:
-        ic3.metric("modalidades", str(df_saldo["Modalidade"].nunique()) if "Modalidade" in df_saldo.columns else "—")
-    st.caption("cada print de investimento no Zap vira um ponto novo na curva")
+        _n_contas = df_saldo.groupby(["Pessoa", "Modalidade"]).ngroups if {"Pessoa", "Modalidade"} <= set(df_saldo.columns) else 0
+        ic3.metric("contas", str(_n_contas) if _n_contas else "—")
+    st.caption("cada print de investimento no Zap vira um ponto novo na curva — cada ponto soma o último print de cada conta (pessoa + banco)")
+
+    # ---- Histórico mensal por conta (espelho da aba 'Histórico Mensal' da planilha) ----
+    _hm = historico_mensal_contas(df_saldo)
+    if not _hm.empty:
+        with st.expander("Histórico mensal por banco", expanded=False):
+            _hm_show = _hm.copy()
+            _hm_show.index = [f"{m[5:]}/{m[:4]}" for m in _hm_show.index]  # 2026-07 → 07/2026
+            _hm_show.index.name = "Mês"
+            _hm_show = _hm_show.map(lambda x: "—" if pd.isna(x) else ("•••" if _PRIV else fmt(float(x))))
+            st.dataframe(_hm_show, use_container_width=True)
+            st.caption("último print de cada conta no mês; mês sem print fica vazio. A planilha guarda o mesmo histórico na aba Histórico Mensal.")
 else:
     st.info("Mande o print do app do banco no grupo do Zap — o patrimônio entra sozinho.")
 

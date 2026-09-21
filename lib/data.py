@@ -1363,7 +1363,11 @@ def rendimento_investido(df_saldo: pd.DataFrame) -> dict:
     if "Modalidade" not in df_saldo.columns:
         return {}
     base = ganho = 0.0
-    for _, g in df_saldo.dropna(subset=["Data Snapshot_dt"]).groupby("Modalidade"):
+    # conta = Pessoa + banco (21/09: Inter do Wesley e Inter da Sabrina caíam no mesmo grupo
+    # e o "rendimento" virava a diferença entre saldos de pessoas diferentes)
+    d = df_saldo.dropna(subset=["Data Snapshot_dt"]).copy()
+    d["_conta"] = _chave_conta(d)
+    for _, g in d.groupby("_conta"):
         g = g.sort_values("Data Snapshot_dt")
         if len(g) < 2:
             continue
@@ -1384,13 +1388,51 @@ def serie_estocado(df_saldo: pd.DataFrame) -> pd.DataFrame:
     d = df_saldo.dropna(subset=["Data Snapshot_dt"]).copy()
     if d.empty:
         return pd.DataFrame()
-    if "Modalidade" not in d.columns:
-        d["Modalidade"] = "—"
-    piv = d.pivot_table(index="Data Snapshot_dt", columns="Modalidade",
-                        values="Saldo Total", aggfunc="last").sort_index().ffill()
+    piv = pivot_contas(d)
+    if piv.empty:
+        return pd.DataFrame()
     out = piv.sum(axis=1).reset_index()
     out.columns = ["Data Snapshot_dt", "Saldo Total"]
     return out
+
+
+def _chave_conta(d: pd.DataFrame) -> pd.Series:
+    """Conta investível = Pessoa + banco. Mesma instituição pra Wesley e Sabrina são contas
+    DIFERENTES (bug 21/09: pivot só por Modalidade fazia o Inter da Sabrina sumir atrás do
+    Inter do Wesley e a curva não batia com a planilha)."""
+    pessoa = d["Pessoa"].astype(str).str.strip() if "Pessoa" in d.columns else pd.Series("", index=d.index)
+    mod = d["Modalidade"].astype(str).str.strip() if "Modalidade" in d.columns else pd.Series("—", index=d.index)
+    return (pessoa + " · " + mod).str.strip(" ·")
+
+
+def pivot_contas(df_saldo: pd.DataFrame) -> pd.DataFrame:
+    """Datas × contas (Pessoa · banco) com o último saldo conhecido de cada conta em cada
+    data (forward-fill) — bancos chegam em datas diferentes, print por print."""
+    if df_saldo.empty or "Data Snapshot_dt" not in df_saldo.columns or "Saldo Total" not in df_saldo.columns:
+        return pd.DataFrame()
+    d = df_saldo.dropna(subset=["Data Snapshot_dt"]).copy()
+    if d.empty:
+        return pd.DataFrame()
+    d["_conta"] = _chave_conta(d)
+    d = d.sort_values("Data Snapshot_dt")
+    return d.pivot_table(index="Data Snapshot_dt", columns="_conta",
+                         values="Saldo Total", aggfunc="last").sort_index().ffill()
+
+
+def historico_mensal_contas(df_saldo: pd.DataFrame) -> pd.DataFrame:
+    """Mês × conta (Pessoa · banco) = último print de cada conta no mês (sem forward-fill:
+    mês sem print da conta fica vazio). Espelha a aba 'Histórico Mensal' da planilha."""
+    if df_saldo.empty or "Data Snapshot_dt" not in df_saldo.columns or "Saldo Total" not in df_saldo.columns:
+        return pd.DataFrame()
+    d = df_saldo.dropna(subset=["Data Snapshot_dt"]).copy()
+    if d.empty:
+        return pd.DataFrame()
+    d["_conta"] = _chave_conta(d)
+    d["_mes"] = d["Data Snapshot_dt"].dt.to_period("M").astype(str)
+    d = d.sort_values("Data Snapshot_dt")
+    piv = d.pivot_table(index="_mes", columns="_conta", values="Saldo Total", aggfunc="last").sort_index()
+    piv["Total"] = piv.sum(axis=1)
+    return piv
 
 
 @st.cache_data(ttl=60)
