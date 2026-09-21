@@ -27,8 +27,70 @@ def _client():
     return gspread.authorize(creds)
 
 
+@st.cache_resource
+def _spreadsheet():
+    """Objeto Spreadsheet cacheado — `open_by_key` custa 1 leitura de metadados por chamada."""
+    return _client().open_by_key(SHEET_ID)
+
+
+@st.cache_resource
+def _ws_map() -> dict:
+    """Worksheets por nome (1 leitura de metadados por processo, não por acesso)."""
+    return {w.title: w for w in _spreadsheet().worksheets()}
+
+
 def _ws(name: str):
-    return _client().open_by_key(SHEET_ID).worksheet(name)
+    m = _ws_map()
+    if name not in m:  # aba nova criada depois do boot
+        _ws_map.clear()
+        m = _ws_map()
+    return m[name]
+
+
+def _com_retry(fn, tentativas: int = 4):
+    """Cota do Sheets = 60 leituras/min por usuário (service account). Em 429, espera e
+    tenta de novo em vez de estourar traceback na tela (21/09/2026)."""
+    import time
+    for i in range(tentativas):
+        try:
+            return fn()
+        except gspread.exceptions.APIError as e:
+            code = getattr(getattr(e, "response", None), "status_code", None)
+            if code == 429 and i < tentativas - 1:
+                time.sleep(4 * (2 ** i))
+                continue
+            raise
+
+
+# Abas lidas numa ÚNICA chamada (values.batchGet). Antes: cada aba = 3 leituras (2 de metadados
+# + 1 de valores) × 8 abas por rerun ≈ 27 leituras por clique de auditoria → cota estourava
+# com 2 cliques/min (21/09/2026). Agora: 1 leitura por rerun, independente do nº de abas.
+TABS_BATCH = [
+    "Lançamentos", "Recorrentes", "Tetos", "Faturas", "Auditoria Fatura", "Auditoria Lançamento",
+    "Bens", "AP Claudio Aportes", "Bens Snapshots", "Saldo Investido", "Metas", "Custos Ferramenta",
+]
+
+
+@st.cache_data(ttl=60, show_spinner="lendo a planilha…")
+def _batch_values() -> dict:
+    sh = _spreadsheet()
+    ranges = [f"'{t}'" for t in TABS_BATCH]
+    res = _com_retry(lambda: sh.values_batch_get(ranges, params={"valueRenderOption": "FORMATTED_VALUE"}))
+    out = {}
+    for t, vr in zip(TABS_BATCH, res.get("valueRanges", [])):
+        out[t] = vr.get("values", [])
+    return out
+
+
+def _records_from_values(values: list) -> list:
+    """Mesma saída do gspread get_all_records(numericise_ignore=['all']): lista de dicts com
+    o header como chave, tudo string, linhas curtas completadas com ''. Colunas com header
+    vazio são ignoradas (Lançamentos tem 14 colunas fantasma)."""
+    if not values:
+        return []
+    header = [str(h).strip() for h in values[0]]
+    keys = [(i, h) for i, h in enumerate(header) if h != ""]
+    return [{h: (row[i] if i < len(row) else "") for i, h in keys} for row in values[1:]]
 
 
 def _parse_data(s):
@@ -93,8 +155,10 @@ def _records_formatted(name: str):
     """Lê aba como records — FORMATTED_VALUE (default) + desliga numericise auto do gspread.
     Tudo vem como string formatada; meu parser converte com cuidado.
     """
+    if name in TABS_BATCH:
+        return _records_from_values(_batch_values().get(name, []))
     ws = _ws(name)
-    return ws.get_all_records(numericise_ignore=["all"])
+    return _com_retry(lambda: ws.get_all_records(numericise_ignore=["all"]))
 
 
 @st.cache_data(ttl=60)
@@ -964,6 +1028,18 @@ def _pool_fixas(df_lanc: pd.DataFrame, competencia: str) -> pd.DataFrame:
     if df_lanc is None or df_lanc.empty:
         return pd.DataFrame()
     lanc_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df_lanc.columns else df_lanc
+    # 21/09/2026 (Wesley: "Netflix já veio na fatura e a conta fixa mostra em aberto"): assinatura
+    # no CARTÃO conta como paga no mês em que a fatura que a traz VENCE (Data Caixa). Só por
+    # competência, toda assinatura do cartão ficava "Atrasada" o mês inteiro, até a fatura
+    # seguinte ser carregada (a cobrança de 01/09 só chega na fatura de 08/10).
+    if "Mês Caixa" in df_lanc.columns and "Forma Pgto" in df_lanc.columns:
+        _cartao_caixa = df_lanc[
+            (df_lanc["Mês Caixa"] == competencia)
+            & df_lanc["Forma Pgto"].astype(str).str.lower().str.contains("cr[eé]dito", regex=True, na=False)
+            & (df_lanc["Competência"] != competencia)
+        ]
+        if not _cartao_caixa.empty:
+            lanc_mes = pd.concat([lanc_mes, _cartao_caixa])
     _sp = split_movimentos(lanc_mes)
     _inv_desp = _sp["aportes"]
     if not _inv_desp.empty and "Tipo" in _inv_desp.columns:

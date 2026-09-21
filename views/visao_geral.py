@@ -595,17 +595,46 @@ _resumo_fixas = f"{n_pagas}/{n_fixas} pagas · {fmt(_fixas_pago)} de {fmt(_fixas
 _f_ctx = col_f.container(key="lin-fix")
 with _f_ctx.expander(f"**Contas fixas** `{_resumo_fixas}`", icon="🕐", expanded=False):
     if not audit.empty:
-        _ash = audit.sort_values("Dia Cobrança")
-        st.dataframe(
-            _ash[["Status", "Descrição", "Valor Pago", "Valor Esperado", "Diferença", "Dia Cobrança"]],
-            use_container_width=True, hide_index=True,
-            column_config={
-                "Valor Pago": st.column_config.NumberColumn(format="R$ %.0f", help="o que realmente saiu este mês"),
-                "Valor Esperado": st.column_config.NumberColumn(format="R$ %.0f", help="média móvel dos últimos 3 meses pagos (cadastro só quando não há histórico)"),
-                "Diferença": st.column_config.NumberColumn(format="R$ %.0f", help="pago − média dos 3 meses anteriores"),
-            },
-        )
-        st.caption("esperado = média móvel de 3 meses; o cadastro é referência e alimenta os alertas do Zap; coluna Fim encerra contas (vigência)")
+        # 21/09/2026 (Wesley): a lista cresceu (41 contas) → filtros pra achar o que não está pago.
+        _ash = audit.copy()
+        _rec_forma = (df_rec.drop_duplicates("Descrição").set_index("Descrição")["Forma Pgto"]
+                      if not df_rec.empty and "Descrição" in df_rec.columns else pd.Series(dtype=str))
+        _ash["Onde"] = _ash["Descrição"].map(_rec_forma).fillna("").astype(str).str.lower().apply(
+            lambda f: "cartão" if ("cr" in f and "dito" in f) else "conta")
+        _n_abertas = int((_ash["Status"] != "Paga").sum())
+        _fc1, _fc2 = st.columns([3, 2])
+        _f_status = _fc1.pills("mostrar", [f"não pagas ({_n_abertas})", "pagas", "todas"], default="todas",
+                               key="fix_status", label_visibility="collapsed")
+        _f_onde = _fc2.pills("onde", ["cartão", "conta"], selection_mode="multi", default=["cartão", "conta"],
+                             key="fix_onde", label_visibility="collapsed")
+        _f_busca = st.text_input("buscar conta", placeholder="buscar: netflix, condomínio, sabrina…",
+                                 key="fix_busca", label_visibility="collapsed")
+        if _f_status and _f_status.startswith("não pagas"):
+            _ash = _ash[_ash["Status"] != "Paga"]
+        elif _f_status == "pagas":
+            _ash = _ash[_ash["Status"] == "Paga"]
+        if _f_onde:
+            _ash = _ash[_ash["Onde"].isin(_f_onde)]
+        if _f_busca.strip():
+            _q = _f_busca.strip().lower()
+            _ash = _ash[_ash.apply(lambda r: _q in f"{r['Descrição']} {r['Categoria']} {r['Pessoa Esperada']} {r['Onde']}".lower(), axis=1)]
+        if _ash.empty:
+            st.caption("nada com esse filtro")
+        else:
+            _ash["_ord"] = _ash["Status"].map({"Atrasada": 0, "Pendente": 1, "Paga": 2}).fillna(3)
+            _ash = _ash.sort_values(["_ord", "Dia Cobrança"])
+            st.dataframe(
+                _ash[["Status", "Descrição", "Onde", "Valor Pago", "Valor Esperado", "Diferença", "Dia Cobrança", "Data Pagamento"]],
+                use_container_width=True, hide_index=True,
+                column_config={
+                    "Onde": st.column_config.TextColumn(help="cartão = vem na fatura (pareia pelo vencimento da fatura do mês); conta = débito/PIX"),
+                    "Valor Pago": st.column_config.NumberColumn(format="R$ %.0f", help="o que realmente saiu este mês"),
+                    "Valor Esperado": st.column_config.NumberColumn(format="R$ %.0f", help="média móvel dos últimos 3 meses pagos (cadastro só quando não há histórico)"),
+                    "Diferença": st.column_config.NumberColumn(format="R$ %.0f", help="pago − média dos 3 meses anteriores"),
+                    "Data Pagamento": st.column_config.TextColumn("Pago em", help="cartão: vencimento da fatura em que a cobrança veio"),
+                },
+            )
+        st.caption("não pagas primeiro · assinatura no cartão conta como paga quando a fatura que a traz vence neste mês · esperado = média móvel de 3 meses")
 
 # ============== A conta do mês (conta + baldes + metas num card só) ==============
 no_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df_lanc.columns else df_lanc

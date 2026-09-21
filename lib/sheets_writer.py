@@ -24,9 +24,39 @@ def _write_client():
     return gspread.authorize(creds)
 
 
+@st.cache_resource
+def _write_sheet():
+    return _write_client().open_by_key(SHEET_ID)
+
+
+@st.cache_resource
+def _write_ws_map() -> dict:
+    """Worksheets por nome — `open_by_key` + `worksheet()` custavam 2 leituras de metadados por
+    escrita; com a cota de 60 leituras/min isso pesava em cada clique da auditoria (21/09/2026)."""
+    return {w.title: w for w in _write_sheet().worksheets()}
+
+
 def write_ws(name: str):
     """Worksheet com permissão de escrita."""
-    return _write_client().open_by_key(SHEET_ID).worksheet(name)
+    m = _write_ws_map()
+    if name not in m:
+        _write_ws_map.clear()
+        m = _write_ws_map()
+    return m[name]
+
+
+def _com_retry(fn, tentativas: int = 4):
+    """429 (cota) → espera e repete, em vez de traceback na tela."""
+    import time
+    for i in range(tentativas):
+        try:
+            return fn()
+        except gspread.exceptions.APIError as e:
+            code = getattr(getattr(e, "response", None), "status_code", None)
+            if code == 429 and i < tentativas - 1:
+                time.sleep(4 * (2 ** i))
+                continue
+            raise
 
 
 def append_lancamentos(rows: list[list]) -> int:
@@ -49,15 +79,22 @@ def append_lancamentos(rows: list[list]) -> int:
 
 
 # ===== Auditoria com botões (17/09/2026) — escrita mínima e reversível =====
-def _col_status(ws) -> int:
-    hdr = ws.row_values(1)
+@st.cache_resource
+def _col_status_aba(aba: str) -> int:
+    """Índice da coluna Status por aba — 1 leitura por processo, não por clique."""
+    hdr = _com_retry(lambda: write_ws(aba).row_values(1))
     return hdr.index("Status") + 1
+
+
+def _col_status(ws) -> int:
+    return _col_status_aba(ws.title)
 
 
 def resolver_auditoria(aba: str, row_number: int, status: str) -> None:
     """Escreve o Status de UM apontamento (aba 'Auditoria Fatura' ou 'Auditoria Lançamento')."""
     ws = write_ws(aba)
-    ws.update_cell(int(row_number), _col_status(ws), status)
+    col = _col_status(ws)
+    _com_retry(lambda: ws.update_cell(int(row_number), col, status))
 
 
 def resolver_auditoria_lote(aba: str, rows: list, status: str) -> int:
@@ -67,7 +104,7 @@ def resolver_auditoria_lote(aba: str, rows: list, status: str) -> int:
     ws = write_ws(aba)
     col = _col_status(ws)
     letra = gspread.utils.rowcol_to_a1(1, col).rstrip("1")
-    ws.batch_update([{"range": f"{letra}{int(r)}", "values": [[status]]} for r in rows], value_input_option="RAW")
+    _com_retry(lambda: ws.batch_update([{"range": f"{letra}{int(r)}", "values": [[status]]} for r in rows], value_input_option="RAW"))
     return len(rows)
 
 
@@ -76,8 +113,8 @@ def cancelar_lancamento(row_number: int, motivo: str) -> None:
     pra ficar rastreável, no mesmo padrão das conciliações feitas pelo Claude."""
     ws = write_ws("Lançamentos")
     r = int(row_number)
-    msg = ws.acell(f"J{r}").value or ""
-    ws.batch_update([
+    msg = _com_retry(lambda: ws.acell(f"J{r}").value) or ""
+    _com_retry(lambda: ws.batch_update([
         {"range": f"O{r}", "values": [["Cancelado"]]},
         {"range": f"J{r}", "values": [[(msg + " " + motivo).strip()]]},
-    ], value_input_option="RAW")
+    ], value_input_option="RAW"))
