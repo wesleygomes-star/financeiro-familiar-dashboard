@@ -13,6 +13,7 @@ import streamlit as st
 from lib.components import COR, PLOTLY_CONFIG, barra_navegacao, fig_mobile, tema_verde_premium
 from lib.sheets_writer import cancelar_lancamento, resolver_auditoria, resolver_auditoria_lote
 from lib.data import (
+    _batch_values,
     auditar_contas_fixas,
     load_tetos,
     is_rd,
@@ -791,9 +792,23 @@ with st.container(key="lin-group-b"):
     # ou cancelam o manual duplicado. Nada é apagado: cancelar = Status 'Cancelado' + motivo na col J.
     _hoje_txt = datetime.now().strftime("%d/%m/%Y")
 
-    def _apos_escrita():
-        st.cache_data.clear()
-        st.rerun()
+    # 21/09/2026 (Wesley: "quando clico no reconheço ele volta para a tela inicial"): o clique limpava
+    # TODO o cache e refazia a página inteira → o navegador perdia a posição e o expander fechava.
+    # Agora cada auditoria é um st.fragment: o clique grava na planilha, esconde a linha na hora
+    # (lista de resolvidas na sessão) e refaz SÓ o card. A página inteira relê a planilha na próxima
+    # carga natural (troca de mês, navegação, 60 s de cache).
+    def _apos_escrita(rows):
+        st.session_state.setdefault("aud_resolvidas", set()).update(int(r) for r in rows)
+        _batch_values.clear()
+        load_auditoria_fatura.clear()
+        load_auditoria_lancamento.clear()
+        st.rerun(scope="fragment")
+
+    def _sem_resolvidas(df):
+        done = st.session_state.get("aud_resolvidas", set())
+        if df.empty or not done or "row_number" not in df.columns:
+            return df
+        return df[~df["row_number"].astype(int).isin(done)]
 
     def _pendentes(df):
         if df.empty or "Status" not in df.columns:
@@ -859,23 +874,27 @@ with st.container(key="lin-group-b"):
             n1, n2, n3 = st.columns([1, 2, 1])
             if n1.button("‹ anterior", key=f"{k}_prev", disabled=pag == 0, use_container_width=True):
                 st.session_state[k] = pag - 1
-                st.rerun()
+                st.rerun(scope="fragment")
             n2.markdown(f"<div style='text-align:center;color:#5C6B62;font-size:12.5px;padding-top:8px'>"
                         f"página {pag + 1} de {npag} · {total} itens</div>", unsafe_allow_html=True)
             if n3.button("próxima ›", key=f"{k}_next", disabled=pag >= npag - 1, use_container_width=True):
                 st.session_state[k] = pag + 1
-                st.rerun()
+                st.rerun(scope="fragment")
         return grp.iloc[pag * POR_PAGINA:(pag + 1) * POR_PAGINA]
 
-    if not _pend_f.empty:
+    @st.fragment
+    def _frag_auditoria_cartao():
+        _pf = _sem_resolvidas(_pend_f)
+        if _pf.empty:
+            return
         _audit_ctx = st.container(key="lin-audit-fatura")
-        with _audit_ctx.expander(f"**Auditoria de cartão** `{len(_pend_f)} pendente(s)`", icon="🔍", expanded=False):
+        with _audit_ctx.expander(f"**Auditoria de cartão** `{len(_pf)} pendente(s)`", icon="🔍", expanded=False):
             st.caption(
                 "veio na fatura e NÃO tinha sido lançado no Zap. A compra já está no consumo — "
                 "aqui você só diz se reconhece a despesa. \"Não reconheço\" marca em disputa com a bandeira. "
                 "Duplicidade com lançamento manual o sistema cancela sozinho (fatura prevalece)."
             )
-            _grp, _kf = _filtros(_pend_f, "aud_f")
+            _grp, _kf = _filtros(_pf, "aud_f")
             _grp["_d"] = _grp["Data Transação"].apply(_venc_key)
             _grp = _grp.sort_values("_d").reset_index(drop=True)
             _miudos = _grp[_grp["Valor_num"].abs() < 20]
@@ -884,11 +903,11 @@ with st.container(key="lin-group-b"):
                          use_container_width=True):
                 resolver_auditoria_lote("Auditoria Fatura", [int(r) for r in _miudos["row_number"]],
                                         f"Resolvido — miúdo (<R$ 20) reconhecido no painel {_hoje_txt}")
-                _apos_escrita()
+                _apos_escrita(_miudos["row_number"])
             if b2.button(f"✅ reconheço todas do filtro ({len(_grp)})", key="aud_f_all", disabled=_grp.empty, use_container_width=True):
                 resolver_auditoria_lote("Auditoria Fatura", [int(r) for r in _grp["row_number"]],
                                         f"Resolvido — reconhecida em lote no painel {_hoje_txt}")
-                _apos_escrita()
+                _apos_escrita(_grp["row_number"])
             _pagina = _paginar(_grp, f"f_{_kf}")
             for _, r in _pagina.iterrows():
                 rn = int(r["row_number"])
@@ -902,25 +921,31 @@ with st.container(key="lin-group-b"):
                 )
                 if cols[1].button("✅ reconheço", key=f"f_ok_{rn}", use_container_width=True):
                     resolver_auditoria("Auditoria Fatura", rn, f"Resolvido — reconhecida no painel {_hoje_txt}")
-                    _apos_escrita()
+                    _apos_escrita([rn])
                 if cols[2].button("❌ não reconheço", key=f"f_no_{rn}", use_container_width=True):
                     resolver_auditoria("Auditoria Fatura", rn, f"Em disputa — não reconhecida no painel {_hoje_txt}")
-                    _apos_escrita()
+                    _apos_escrita([rn])
 
-    if not _pend_l.empty:
+    _frag_auditoria_cartao()
+
+    @st.fragment
+    def _frag_auditoria_lancamento():
+        _pl = _sem_resolvidas(_pend_l)
+        if _pl.empty:
+            return
         _audl_ctx = st.container(key="lin-audit-lanc")
-        with _audl_ctx.expander(f"**Auditoria de lançamento** `{len(_pend_l)} pendente(s)`", icon="📝", expanded=False):
+        with _audl_ctx.expander(f"**Auditoria de lançamento** `{len(_pl)} pendente(s)`", icon="📝", expanded=False):
             st.caption(
                 "lançado no Zap com o caixa dessa fatura, mas a fatura não trouxe. Duplicidade o sistema já cancelou "
                 "sozinho; aqui só sobra o que não veio: ou vem na próxima fatura (manter), ou não foi no cartão (cancelar)."
             )
-            _grl, _kl = _filtros(_pend_l, "aud_l")
+            _grl, _kl = _filtros(_pl, "aud_l")
             _grl["_d"] = _grl["Data Lançamento"].apply(_venc_key)
             _grl = _grl.sort_values("_d").reset_index(drop=True)
             if st.button(f"⏳ aguardar a próxima fatura pra todas do filtro ({len(_grl)})", key="aud_l_wait_all", disabled=_grl.empty, use_container_width=True):
                 resolver_auditoria_lote("Auditoria Lançamento", [int(r) for r in _grl["row_number"]],
                                         f"Aguardando próxima fatura — marcado no painel {_hoje_txt}")
-                _apos_escrita()
+                _apos_escrita(_grl["row_number"])
             _pagl = _paginar(_grl, f"l_{_kl}")
             for _, r in _pagl.iterrows():
                 rn = int(r["row_number"])
@@ -943,11 +968,13 @@ with st.container(key="lin-group-b"):
                     cancelar_lancamento(_lin, f"[painel {_hoje_txt}: não veio na fatura {r.get('Fatura Cartão', '')} "
                                               f"venc {r.get('Fatura Vencimento', '')}; fatura prevalece]")
                     resolver_auditoria("Auditoria Lançamento", rn, f"Resolvido — manual L{_lin} cancelado no painel {_hoje_txt}")
-                    _apos_escrita()
+                    _apos_escrita([rn])
                 if c3.button("✅ manter", key=f"l_keep_{rn}", use_container_width=True,
                              help="foi pago por outro meio / vem na próxima fatura — fica como está"):
                     resolver_auditoria("Auditoria Lançamento", rn, f"Resolvido — mantido no painel {_hoje_txt}")
-                    _apos_escrita()
+                    _apos_escrita([rn])
+
+    _frag_auditoria_lancamento()
 
     # ============== Despesas novas (1ª aparição) + virou recorrente? ==============
     _dn = despesas_novas(df_lanc, df_rec)
