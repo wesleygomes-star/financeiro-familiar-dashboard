@@ -581,8 +581,21 @@ TAXA_CDI_MUTUO = 0.11  # proxy do CDI usado entre prints — ajustar conforme ta
 
 
 # Sítio — ITCD regularizado pelo Wesley (cartório + parcelas + CDA de protesto por rompimento do
-# parcelamento), reembolsável quando o sítio for vendido. Valor fixo (sem correção — ao contrário
+# parcelamento), reembolsável na venda do sítio. Valor fixo (sem correção — ao contrário
 # do mútuo, não tem taxa combinada). Racional completo: Pagamentos Sítio/ANALISE_PROTESTO_ITCD_11-08.md
+#
+# SÍTIO VENDIDO — compromisso de compra e venda assinado via Clicksign em 08-09/10/2026 (última
+# assinatura 09/10 11h02). Preço R$950.000: R$350.000 no ato (sinal) + R$600.000 na escritura,
+# prazo máximo de 30 dias pra lavratura (até ~07/11/2026). Todo o dinheiro vai pra conta da mãe
+# (Maria da Conceição, Mercantil) — decisão da família (16/09): não rateia entre os irmãos, vira
+# apartamento pra ela. Por isso o sítio NÃO entra como bem nem a cota de 1/8 entra como receita;
+# o único efeito patrimonial pro Wesley é o reembolso abaixo, a acertar com a mãe.
+# Contrato assinado em Pagamentos Sítio/CONTRATO VENDA SITIO - ASSINADO Clicksign 08-10-2026.pdf
+SITIO_VENDA_DATA = datetime(2026, 10, 8)        # data do instrumento (Divinópolis, 08/10/2026)
+SITIO_VENDA_VALOR = 950_000.0
+SITIO_VENDA_SINAL = 350_000.0                   # pago no ato da assinatura, conta da mãe
+SITIO_VENDA_ESCRITURA = 600_000.0               # pago na escritura pública definitiva
+SITIO_ESCRITURA_PRAZO = datetime(2026, 11, 7)   # 30 dias da assinatura (cláusula 10)
 SITIO_JA_PAGO = 20_444.84  # cartório (2 inventários) + parcelas ITCD Nov/25-Fev/26, aba "Custo Sítio" linha 26
 SITIO_PAGAMENTO_PENDENTE = 7_802.44  # CDA Wesley (BH) — pago em 12/08/26 (confirmado)
 SITIO_PREJUIZO_4 = 11_588.20  # custas de protesto + estimativa de rompimento, dos 4 herdeiros — assumido pelo Wesley
@@ -614,7 +627,7 @@ def mutuo_empresta_hoje(df_lanc: pd.DataFrame = None) -> float:
 
 def valor_a_receber_hoje(df_lanc: pd.DataFrame = None) -> float:
     """Soma dos recebíveis de prazo incerto: mútuo Empresta (corrigido pelo CDI, líquido dos
-    recebimentos parciais lançados) + sítio (fixo)."""
+    recebimentos parciais lançados) + sítio (fixo — venda assinada 08/10/26, acertar com a mãe)."""
     return mutuo_empresta_hoje(df_lanc) + SITIO_A_RECEBER
 
 

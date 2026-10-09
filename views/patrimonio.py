@@ -18,6 +18,11 @@ from lib.data import (
     SITIO_PAGAMENTO_PENDENTE,
     SITIO_PREJUIZO_4,
     SITIO_A_RECEBER,
+    SITIO_VENDA_DATA,
+    SITIO_VENDA_VALOR,
+    SITIO_VENDA_SINAL,
+    SITIO_VENDA_ESCRITURA,
+    SITIO_ESCRITURA_PRAZO,
     TAXA_CDI_MUTUO,
     caixa_pelada_atual,
     custo_capital_corrigido,
@@ -203,12 +208,16 @@ st.markdown(
       </div>
     </div>
     <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(12,60,45,0.06)">
-      <div style="font-size:12.5px;color:#5C6B62;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Sítio — regularização ITCD</div>
+      <div style="font-size:12.5px;color:#5C6B62;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Sítio — regularização ITCD <span style="background:{COR['investimento']};color:#fff;border-radius:8px;padding:1px 8px;margin-left:6px;font-size:11px">VENDIDO {SITIO_VENDA_DATA.strftime('%d/%m/%y')}</span></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px">
-        <div style="color:#5C6B62">Já pago (cartório + parcelas Nov/25-Fev/26)</div><div style="text-align:right;font-weight:700">{fmt(SITIO_JA_PAGO)}</div>
+        <div style="color:#5C6B62">Venda (compromisso assinado, Clicksign)</div><div style="text-align:right;font-weight:700">{fmt(SITIO_VENDA_VALOR)}</div>
+        <div style="color:#5C6B62">· Sinal no ato ({SITIO_VENDA_DATA.strftime('%d/%m/%Y')})</div><div style="text-align:right;font-weight:700">{fmt(SITIO_VENDA_SINAL)}</div>
+        <div style="color:#5C6B62">· Saldo na escritura (até {SITIO_ESCRITURA_PRAZO.strftime('%d/%m/%Y')})</div><div style="text-align:right;font-weight:700">{fmt(SITIO_VENDA_ESCRITURA)}</div>
+        <div style="color:#5C6B62">Destino do dinheiro</div><div style="text-align:right;font-weight:700">100% conta da mãe (não rateia)</div>
+        <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;color:#5C6B62">Já pago (cartório + parcelas Nov/25-Fev/26)</div><div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;text-align:right;font-weight:700">{fmt(SITIO_JA_PAGO)}</div>
         <div style="color:#5C6B62">+ Pagamento confirmado (CDA Wesley, 12/08/26)</div><div style="text-align:right;font-weight:700">{fmt(SITIO_PAGAMENTO_PENDENTE)}</div>
         <div style="color:#5C6B62">− Prejuízo dos 4 herdeiros (assumido pelo Wesley)</div><div style="text-align:right;font-weight:700;color:{COR['alerta']}">-{fmt(SITIO_PREJUIZO_4)}</div>
-        <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;color:#1C2420;font-weight:800">Total reembolsável na venda</div>
+        <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;color:#1C2420;font-weight:800">A acertar com a mãe (reembolso)</div>
         <div style="border-top:1px solid #E1EAE4;margin-top:4px;padding-top:6px;text-align:right;font-weight:800;color:{COR['alerta']}">{fmt(SITIO_A_RECEBER)}</div>
       </div>
     </div>
@@ -218,7 +227,8 @@ st.markdown(
 st.caption(
     "recebíveis de prazo incerto — sem a liquidez de um saldo em banco (não dá pra sacar quando "
     "quiser), mas também não são bem físico (não é Imobilizado). Mútuo Empresta: a empresa paga "
-    "conforme disponibilidade de caixa. Sítio: reembolsável quando o imóvel for vendido — detalhe "
+    "conforme disponibilidade de caixa. Sítio: vendido em 08/10/2026 (R$950 mil, dinheiro fica com a "
+    "mãe pro apartamento dela) — o reembolso da regularização do ITCD se acerta com ela; detalhe "
     "do cálculo em Pagamentos Sítio/ANALISE_PROTESTO_ITCD_11-08.md."
 )
 
