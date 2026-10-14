@@ -722,7 +722,7 @@ def load_saldo_investido() -> pd.DataFrame:
 
 
 def saldo_estocado_atual(df_saldo: pd.DataFrame) -> dict:
-    """Retorna {pessoa: saldo_total} somando o ÚLTIMO snapshot de cada modalidade.
+    """Retorna {pessoa: saldo_total} somando o ÚLTIMO snapshot de cada conta (Pessoa · banco [· papel]).
     Snapshots de bancos diferentes chegam em datas diferentes (print por print) —
     pegar só 'a data mais recente' descartava os bancos que não vieram naquele dia."""
     if df_saldo.empty or "Pessoa" not in df_saldo.columns:
@@ -735,7 +735,8 @@ def saldo_estocado_atual(df_saldo: pd.DataFrame) -> dict:
             continue
         g = grupo.sort_values("Data Snapshot_dt", ascending=False) if tem_data else grupo
         if tem_mod:
-            ultimo_por_mod = g.drop_duplicates(subset=["Modalidade"], keep="first")
+            g = g.assign(_conta=_chave_conta(g))  # Pessoa · banco [· papel] (13/10: ações = 1 linha por papel)
+            ultimo_por_mod = g.drop_duplicates(subset=["_conta"], keep="first")
         else:
             ultimo_por_mod = g.head(1)
         out[pessoa] = float(ultimo_por_mod["Saldo Total"].sum())
@@ -1485,13 +1486,28 @@ def serie_estocado(df_saldo: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+_RE_TICKER = r"\b([A-Z]{4}\d{1,2})\b"
+
+
+def _ticker(d: pd.DataFrame) -> pd.Series:
+    """Ticker (ITSA4, COGN3, BHIA3…) extraído do Produto; vazio pra renda fixa / total agregado."""
+    if "Produto" not in d.columns:
+        return pd.Series("", index=d.index)
+    return d["Produto"].astype(str).str.extract(_RE_TICKER)[0].fillna("")
+
+
 def _chave_conta(d: pd.DataFrame) -> pd.Series:
-    """Conta investível = Pessoa + banco. Mesma instituição pra Wesley e Sabrina são contas
+    """Conta investível = Pessoa + banco [+ papel]. Mesma instituição pra Wesley e Sabrina são contas
     DIFERENTES (bug 21/09: pivot só por Modalidade fazia o Inter da Sabrina sumir atrás do
-    Inter do Wesley e a curva não batia com a planilha)."""
+    Inter do Wesley e a curva não batia com a planilha). 13/10: no mesmo banco, renda variável
+    é 1 linha por papel (ITSA4, COGN3…) — o ticker no Produto vira parte da chave; sem ticker
+    (CDB, Cofrinhos, total agregado) a chave continua Pessoa · banco, então o histórico antigo
+    com Produto vazio e o novo com 'Cofrinhos' seguem a mesma conta."""
     pessoa = d["Pessoa"].astype(str).str.strip() if "Pessoa" in d.columns else pd.Series("", index=d.index)
     mod = d["Modalidade"].astype(str).str.strip() if "Modalidade" in d.columns else pd.Series("—", index=d.index)
-    return (pessoa + " · " + mod).str.strip(" ·")
+    tk = _ticker(d)
+    base = (pessoa + " · " + mod).str.strip(" ·")
+    return base.where(tk == "", base + " · " + tk)
 
 
 def pivot_contas(df_saldo: pd.DataFrame) -> pd.DataFrame:

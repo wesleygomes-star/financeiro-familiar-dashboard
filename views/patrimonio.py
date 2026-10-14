@@ -34,6 +34,7 @@ from lib.data import (
     meses_disponiveis,
     patrimonio_imobilizado,
     rendimento_investido,
+    _chave_conta,
     historico_mensal_contas,
     saldo_estocado_atual,
     serie_estocado,
@@ -146,7 +147,7 @@ if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
     ic1.metric("rendimento", f"+{rend['pct']:.2f}%" if rend else "—")
     ic2.metric("datas com print", str(df_saldo["Data Snapshot"].nunique()))
     if _est:
-        _n_contas = df_saldo.groupby(["Pessoa", "Modalidade"]).ngroups if {"Pessoa", "Modalidade"} <= set(df_saldo.columns) else 0
+        _n_contas = _chave_conta(df_saldo).nunique() if {"Pessoa", "Modalidade"} <= set(df_saldo.columns) else 0
         ic3.metric("contas", str(_n_contas) if _n_contas else "—")
     st.caption("cada print de investimento no Zap vira um ponto novo na curva — cada ponto soma o último print de cada conta (pessoa + banco)")
 
@@ -168,9 +169,11 @@ st.markdown('<h4 style="margin-top:14px">Onde está</h4>', unsafe_allow_html=Tru
 _linhas_banco = []
 if not df_saldo.empty and "Modalidade" in df_saldo.columns and "Pessoa" in df_saldo.columns:
     _tem_data = "Data Snapshot_dt" in df_saldo.columns
-    # agrupa por PESSOA + banco — mesma instituição pra Wesley e Sabrina são contas diferentes,
-    # nunca devem se misturar numa linha só (bug 10/08: o Inter da Sabrina sumia atrás do do Wesley)
-    for (pessoa_g, mod), g in df_saldo.groupby(["Pessoa", "Modalidade"]):
+    # agrupa por PESSOA + banco [+ papel] — mesma instituição pra Wesley e Sabrina são contas diferentes,
+    # nunca devem se misturar numa linha só (bug 10/08: o Inter da Sabrina sumia atrás do do Wesley);
+    # 13/10: renda variável no mesmo banco é 1 linha por papel (ITSA4, COGN3…), o ticker entra na chave
+    _ds = df_saldo.assign(_conta=_chave_conta(df_saldo))
+    for (pessoa_g, mod, _ct), g in _ds.groupby(["Pessoa", "Modalidade", "_conta"]):
         g2 = g.sort_values("Data Snapshot_dt", ascending=False) if _tem_data else g
         ultimo = g2.iloc[0]
         _rend = float(ultimo.get("Rendimento Calc", 0) or 0)
@@ -186,7 +189,7 @@ if not df_saldo.empty and "Modalidade" in df_saldo.columns and "Pessoa" in df_sa
 if _linhas_banco:
     _df_banco = pd.DataFrame(_linhas_banco).sort_values("_saldo_sort", ascending=False).drop(columns=["_saldo_sort"])
     st.dataframe(_df_banco, use_container_width=True, hide_index=True)
-    st.caption("cada banco mostra o último print recebido no Zap, separado por pessoa.")
+    st.caption("cada conta mostra o último print recebido no Zap, separado por pessoa; ações aparecem por papel.")
 
 # ============== A Receber — recebíveis de prazo incerto ==============
 st.markdown('<h3 style="margin-top:20px">A Receber</h3>', unsafe_allow_html=True)
