@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from lib.components import COR, PLOTLY_CONFIG, barra_navegacao, faixa_titulo, fig_mobile, tema_verde_premium
+from lib.components import COR, PLOTLY_CONFIG, barra_navegacao, posicoes_rotulos, faixa_titulo, fig_mobile, tema_verde_premium
 from lib.data import (
     MUTUO_EMPRESTA_APORTADO,
     MUTUO_EMPRESTA_DATA_BASE,
@@ -126,12 +126,13 @@ if _imob["total"] > 0:
 st.markdown('<h3 style="margin-top:8px">Investível — evolução</h3>', unsafe_allow_html=True)
 if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
     _ev = serie_estocado(df_saldo)
+    _pos, _vis = posicoes_rotulos(_ev["Data Snapshot_dt"], _ev["Saldo Total"])
     if len(_ev) >= 1:
         figp = go.Figure(
             go.Scatter(
                 x=_ev["Data Snapshot_dt"], y=_ev["Saldo Total"], mode="lines+markers+text",
                 line=dict(color=COR["investimento"], width=3), marker=dict(size=9),
-                text=["" if _PRIV else fmt0(vv) for vv in _ev["Saldo Total"]], textposition="top center",
+                text=["" if (_PRIV or not _v) else fmt0(vv) for vv, _v in zip(_ev["Saldo Total"], _vis)], textposition=_pos,
             )
         )
         figp.update_traces(cliponaxis=False)

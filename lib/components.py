@@ -51,6 +51,42 @@ def fig_mobile(fig):
     return fig
 
 
+def posicoes_rotulos(xs, ys=None, min_gap: float = 0.12):
+    """Rótulo de valor em série temporal sem um ficar em cima do outro (18/10/2026, Wesley:
+    três prints em 14 dias — 04/10, 15/10 e 18/10 — empilhavam os três rótulos).
+
+    `min_gap` ≈ largura de um rótulo "R$ 419.263" como fração da largura do gráfico.
+    Cada ponto tenta, na ordem: em cima / embaixo / deslocado pra direita ou esquerda;
+    pico local nunca vai pra baixo, vale local prefere embaixo. Se nada couber, o
+    rótulo some (o valor continua no hover do ponto).
+    Devolve (lista de textposition, lista de bool 'mostra o texto').
+    """
+    x = pd.to_datetime(pd.Series(list(xs))).astype("int64").astype(float).tolist()
+    y = list(ys) if ys is not None else [0.0] * len(x)
+    span = (max(x) - min(x)) or 1.0
+    x = [(xi - min(x)) / span for xi in x]
+    hw = min_gap / 2  # deslocamento de 'left'/'right' (meio rótulo)
+    ocupado = {"top": [], "bottom": [], "middle": []}
+    pos, vis = [], []
+    for i, xi in enumerate(x):
+        maximo = 0 < i < len(x) - 1 and y[i] > y[i - 1] and y[i] > y[i + 1]
+        minimo = 0 < i < len(x) - 1 and y[i] < y[i - 1] and y[i] < y[i + 1]
+        if maximo:
+            cands = ["top center", "top right", "top left"]
+        elif minimo:
+            cands = ["bottom center", "bottom right", "bottom left", "top center"]
+        else:
+            cands = ["top center", "bottom center", "top right", "middle right", "top left"]
+        for c in cands:
+            banda, lado = c.split()
+            cx = xi + (hw if lado == "right" else -hw if lado == "left" else 0)
+            if all(abs(cx - o) >= min_gap for o in ocupado[banda]):
+                ocupado[banda].append(cx); pos.append(c); vis.append(True); break
+        else:
+            pos.append("top center"); vis.append(False)
+    return pos, vis
+
+
 def tema_verde_premium():
     """Tema v5 'Verde Premium' (mockup A aprovado 02/07) — chamar no topo de CADA view.
 

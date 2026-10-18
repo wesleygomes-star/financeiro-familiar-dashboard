@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from lib.components import COR, PLOTLY_CONFIG, barra_navegacao, fig_mobile, tema_verde_premium
+from lib.components import COR, PLOTLY_CONFIG, barra_navegacao, posicoes_rotulos, fig_mobile, tema_verde_premium
 from lib.sheets_writer import cancelar_lancamento, resolver_auditoria, resolver_auditoria_lote
 from lib.data import (
     _batch_values,
@@ -571,11 +571,12 @@ with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=Fal
                 unsafe_allow_html=True)
     if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
         _ev = serie_estocado(df_saldo)
+        _pos, _vis = posicoes_rotulos(_ev["Data Snapshot_dt"], _ev["Saldo Total"])
         if len(_ev) >= 1:
             figp = go.Figure(go.Scatter(
                 x=_ev["Data Snapshot_dt"], y=_ev["Saldo Total"], mode="lines+markers+text",
                 line=dict(color=COR["investimento"], width=3), marker=dict(size=9),
-                text=["" if _PRIV else fmt(vv) for vv in _ev["Saldo Total"]], textposition="top center"))
+                text=["" if (_PRIV or not _v) else fmt(vv) for vv, _v in zip(_ev["Saldo Total"], _vis)], textposition=_pos))
             figp.update_traces(cliponaxis=False)
             figp.update_layout(height=240, margin=dict(l=10, r=16, t=48, b=10), template="plotly_white",
                                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
