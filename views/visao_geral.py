@@ -578,7 +578,7 @@ with _p_ctx.expander(f"**Patrimônio** `{_patr_val}`", icon="🏦", expanded=Fal
                 line=dict(color=COR["investimento"], width=3), marker=dict(size=9),
                 text=["" if (_PRIV or not _v) else fmt(vv) for vv, _v in zip(_ev["Saldo Total"], _vis)], textposition=_pos))
             figp.update_traces(cliponaxis=False)
-            figp.update_layout(height=240, margin=dict(l=10, r=16, t=48, b=10), template="plotly_white",
+            figp.update_layout(height=240, margin=dict(l=10, r=56, t=48, b=10), template="plotly_white",
                                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                                font=dict(color="#2C2C2A", size=12), showlegend=False,
                                yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)"))

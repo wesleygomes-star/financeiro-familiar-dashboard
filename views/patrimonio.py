@@ -137,7 +137,7 @@ if not df_saldo.empty and "Data Snapshot_dt" in df_saldo.columns:
         )
         figp.update_traces(cliponaxis=False)
         figp.update_layout(
-            height=240, margin=dict(l=10, r=16, t=48, b=10), template="plotly_white",
+            height=240, margin=dict(l=10, r=56, t=48, b=10), template="plotly_white",
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             font=dict(color="#2C2C2A", size=12), showlegend=False,
             yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)"),
