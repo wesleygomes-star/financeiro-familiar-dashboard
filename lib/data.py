@@ -1042,18 +1042,12 @@ def _pool_fixas(df_lanc: pd.DataFrame, competencia: str) -> pd.DataFrame:
     if df_lanc is None or df_lanc.empty:
         return pd.DataFrame()
     lanc_mes = df_lanc[df_lanc["Competência"] == competencia] if "Competência" in df_lanc.columns else df_lanc
-    # 21/09/2026 (Wesley: "Netflix já veio na fatura e a conta fixa mostra em aberto"): assinatura
-    # no CARTÃO conta como paga no mês em que a fatura que a traz VENCE (Data Caixa). Só por
-    # competência, toda assinatura do cartão ficava "Atrasada" o mês inteiro, até a fatura
-    # seguinte ser carregada (a cobrança de 01/09 só chega na fatura de 08/10).
-    if "Mês Caixa" in df_lanc.columns and "Forma Pgto" in df_lanc.columns:
-        _cartao_caixa = df_lanc[
-            (df_lanc["Mês Caixa"] == competencia)
-            & df_lanc["Forma Pgto"].astype(str).str.lower().str.contains("cr[eé]dito", regex=True, na=False)
-            & (df_lanc["Competência"] != competencia)
-        ]
-        if not _cartao_caixa.empty:
-            lanc_mes = pd.concat([lanc_mes, _cartao_caixa])
+    # 18/10/2026 (Wesley): conta fixa pareia SÓ por competência. A fatura carregada/paga serve pra
+    # validar o que já foi lançado no mês anterior (e corrigir cartão) — nunca pra baixar a conta
+    # fixa do mês seguinte, que ainda vai ser paga. (Revoga o atalho de 21/09 que aceitava compra no
+    # cartão pelo mês de vencimento da fatura: a Anthropic de 17/09, na fatura de 08/10, baixava
+    # setembro E outubro. Efeito colateral aceito: assinatura de cartão fica Pendente/Atrasada até
+    # ser lançada no Zap ou a fatura do mês seguinte chegar.)
     _sp = split_movimentos(lanc_mes)
     _inv_desp = _sp["aportes"]
     if not _inv_desp.empty and "Tipo" in _inv_desp.columns:
