@@ -596,6 +596,11 @@ SITIO_VENDA_VALOR = 950_000.0
 SITIO_VENDA_SINAL = 350_000.0                   # pago no ato da assinatura, conta da mãe
 SITIO_VENDA_ESCRITURA = 600_000.0               # pago na escritura pública definitiva
 SITIO_ESCRITURA_PRAZO = datetime(2026, 11, 7)   # 30 dias da assinatura (cláusula 10)
+# Escritura pública lavrada em 04/11/2026 (Santo Antônio dos Campos, matrícula 11.517 do 2º RI de
+# Divinópolis) — minuta do cartório em Pagamentos Sítio/ESCRITURA SITIO - minuta cartorio 04-11-2026.
+# A escritura declara R$750.000 à vista (não os R$950.000 do contrato); o painel segue mostrando o
+# contrato, que é o que a mãe recebeu. Divergência a tratar com o contador (STATUS.md do sítio).
+SITIO_ESCRITURA_DATA = datetime(2026, 11, 4)    # data da lavratura (dentro do prazo)
 SITIO_JA_PAGO = 20_444.84  # cartório (2 inventários) + parcelas ITCD Nov/25-Fev/26, aba "Custo Sítio" linha 26
 SITIO_PAGAMENTO_PENDENTE = 7_802.44  # CDA Wesley (BH) — pago em 12/08/26 (confirmado)
 SITIO_PREJUIZO_4 = 11_588.20  # custas de protesto + estimativa de rompimento, dos 4 herdeiros — assumido pelo Wesley
